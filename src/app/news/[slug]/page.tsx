@@ -45,7 +45,7 @@ We’re currently seeking volunteers to help develop and deliver these programs.
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Post not found</h1>
-          <a href="/news" className="text-pink-600 hover:underline">
+          <a href="/news" className="text-purple-600 hover:underline">
             Back to News
           </a>
         </div>
@@ -57,7 +57,7 @@ We’re currently seeking volunteers to help develop and deliver these programs.
     <div className="min-h-screen bg-gray-50">
       <article className="max-w-4xl mx-auto px-4 py-16">
         <div className="bg-white p-8 rounded-lg shadow-md">
-          <div className="text-sm text-pink-600 font-medium mb-4">{post.date}</div>
+          <div className="text-sm text-purple-600 font-medium mb-4">{post.date}</div>
           <h1 className="text-4xl font-bold text-gray-900 mb-8">{post.title}</h1>
           <div className="prose prose-lg max-w-none">
             {post.body.split('\n\n').map((paragraph, i) => (
@@ -67,7 +67,7 @@ We’re currently seeking volunteers to help develop and deliver these programs.
             ))}
           </div>
           <div className="mt-12 pt-8 border-t border-gray-200">
-            <a href="/news" className="text-pink-600 font-medium hover:underline">
+            <a href="/news" className="text-purple-600 font-medium hover:underline">
               ← Back to News
             </a>
           </div>

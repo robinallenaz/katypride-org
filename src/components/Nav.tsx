@@ -1,7 +1,9 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useState } from 'react'
+import { cloudinaryLoader } from '@/lib/cloudinary'
 
 const navItems = [
   { href: '/', label: 'Home' },
@@ -21,11 +23,19 @@ export default function Nav() {
     <nav className="bg-white shadow-md">
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
-          <div className="flex items-center">
-            <Link href="/" className="text-xl font-bold text-pink-600">
-              Katy Pride
-            </Link>
-          </div>
+          <Link href="/" className="flex items-center space-x-2">
+            <Image
+              loader={cloudinaryLoader}
+              src="65ad7fd64707829ac5cdbe0d_epa64u"
+              alt="Katy Pride Logo"
+              width={64}
+              height={64}
+              className="rounded-full"
+              style={{ width: 'auto', height: 'auto' }}
+              priority
+            />
+            <span className="text-xl font-bold text-purple-600">Katy Pride</span>
+          </Link>
 
           {/* Desktop nav */}
           <div className="hidden md:flex space-x-6">
@@ -33,7 +43,7 @@ export default function Nav() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="text-gray-700 hover:text-pink-600 transition-colors"
+                className="text-gray-700 hover:text-purple-600 transition-colors"
               >
                 {item.label}
               </Link>
@@ -44,7 +54,7 @@ export default function Nav() {
           <div className="md:hidden">
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="text-gray-700 hover:text-pink-600 focus:outline-none"
+              className="text-gray-700 hover:text-purple-600 focus:outline-none"
             >
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {isOpen ? (
@@ -64,7 +74,7 @@ export default function Nav() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="block py-2 text-gray-700 hover:text-pink-600 transition-colors"
+                className="block py-2 text-gray-700 hover:text-purple-600 transition-colors"
                 onClick={() => setIsOpen(false)}
               >
                 {item.label}

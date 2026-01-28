@@ -27,16 +27,16 @@ export default function News() {
         <div className="space-y-8">
           {posts.map((post) => (
             <article key={post.slug} className="bg-white p-6 rounded-lg shadow-md">
-              <div className="text-sm text-pink-600 font-medium mb-2">{post.date}</div>
+              <div className="text-sm text-purple-600 font-medium mb-2">{post.date}</div>
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-                <a href={`/news/${post.slug}`} className="hover:text-pink-600 transition-colors">
+                <a href={`/news/${post.slug}`} className="hover:text-purple-600 transition-colors">
                   {post.title}
                 </a>
               </h2>
               <p className="text-gray-600 mb-4">{post.excerpt}</p>
               <a
                 href={`/news/${post.slug}`}
-                className="inline-block text-pink-600 font-medium hover:underline"
+                className="inline-block text-purple-600 font-medium hover:underline"
               >
                 Read more →
               </a>
