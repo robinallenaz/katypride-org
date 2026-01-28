@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { cloudinaryLoader } from '@/lib/cloudinary'
 
@@ -17,22 +18,23 @@ const navItems = [
 
 export default function Nav() {
   const [isOpen, setIsOpen] = useState(false)
+  const pathname = usePathname()
 
   return (
-    <nav className="bg-white shadow-md">
+    <nav className="bg-white border-b border-black/5 shadow-sm">
       <div className="max-w-6xl mx-auto px-4">
-        <div className="flex justify-between items-center h-24">
+        <div className="flex justify-between items-center py-4">
           <Link href="/" className="flex items-center space-x-2">
             <Image
               loader={cloudinaryLoader}
               src="65ad7fd64707829ac5cdbe0d_epa64u"
               alt="Katy Pride Logo"
-              width={80}
-              height={80}
+              width={72}
+              height={72}
               style={{ width: 'auto', height: 'auto' }}
               priority
             />
-            <span className="text-xl font-bold text-purple-600">Katy Pride</span>
+            <span className="font-heading text-xl font-bold text-purple-600">Katy Pride</span>
           </Link>
 
           {/* Desktop nav */}
@@ -41,7 +43,12 @@ export default function Nav() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="text-gray-700 hover:text-purple-600 transition-colors"
+                aria-current={pathname === item.href ? 'page' : undefined}
+                className={`font-heading rounded-md px-2 py-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#760088] focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+                  pathname === item.href
+                    ? 'text-purple-700 font-semibold'
+                    : 'text-gray-700 hover:text-purple-600'
+                }`}
               >
                 {item.label}
               </Link>
@@ -52,7 +59,11 @@ export default function Nav() {
           <div className="md:hidden">
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="text-gray-700 hover:text-purple-600 focus:outline-none"
+              type="button"
+              aria-label={isOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={isOpen}
+              aria-controls="mobile-nav"
+              className="text-gray-700 hover:text-purple-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#760088] focus-visible:ring-offset-2 focus-visible:ring-offset-white rounded-md p-2"
             >
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {isOpen ? (
@@ -67,12 +78,17 @@ export default function Nav() {
 
         {/* Mobile menu */}
         {isOpen && (
-          <div className="md:hidden pb-4">
+          <div id="mobile-nav" className="md:hidden pb-4 border-t border-black/5">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="block py-2 text-gray-700 hover:text-purple-600 transition-colors"
+                aria-current={pathname === item.href ? 'page' : undefined}
+                className={`font-heading block rounded-md px-2 py-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#760088] focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+                  pathname === item.href
+                    ? 'text-purple-700 font-semibold'
+                    : 'text-gray-700 hover:text-purple-600'
+                }`}
                 onClick={() => setIsOpen(false)}
               >
                 {item.label}

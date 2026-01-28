@@ -48,7 +48,7 @@ export default function Carousel() {
 
   return (
     <div className="relative z-10 max-w-6xl mx-auto px-4 py-16">
-      <div className="relative w-full h-96 md:h-[500px] bg-white/80 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden">
+      <div className="relative w-full h-96 md:h-[500px] bg-white/80 backdrop-blur-md rounded-2xl border border-black/5 shadow-xl overflow-hidden">
         <div className="relative w-full h-full">
           <Image
             loader={cloudinaryLoader}
@@ -62,7 +62,7 @@ export default function Carousel() {
           {/* Left arrow */}
           <button
             onClick={goToPrevious}
-            className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 p-2 rounded-full shadow-lg transition-all"
+            className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 p-2 rounded-full shadow-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#760088] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             aria-label="Previous slide"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,7 +73,7 @@ export default function Carousel() {
           {/* Right arrow */}
           <button
             onClick={goToNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 p-2 rounded-full shadow-lg transition-all"
+            className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 p-2 rounded-full shadow-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#760088] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             aria-label="Next slide"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -87,7 +87,7 @@ export default function Carousel() {
               <button
                 key={slideIndex}
                 onClick={() => goToSlide(slideIndex)}
-                className={`w-3 h-3 rounded-full transition-all ${
+                className={`w-3 h-3 rounded-full transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#760088] focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                   slideIndex === currentIndex
                     ? 'bg-white'
                     : 'bg-white/50 hover:bg-white/75'

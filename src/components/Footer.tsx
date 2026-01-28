@@ -19,7 +19,7 @@ export default function Footer() {
                 height={80}
                 style={{ width: 'auto', height: 'auto' }}
               />
-              <h2 className="text-2xl font-bold">Katy Pride</h2>
+              <h2 className="font-heading text-2xl font-bold">Katy Pride</h2>
             </div>
             <p className="text-purple-100 leading-relaxed max-w-sm">
               Building community, advocating for equality, and celebrating diversity in Katy and beyond.
@@ -28,7 +28,7 @@ export default function Footer() {
 
           {/* Quick Links */}
           <div>
-            <h3 className="text-lg font-semibold mb-6 text-white">Connect</h3>
+            <h3 className="font-heading text-lg font-semibold mb-6 text-white">Connect</h3>
             <nav aria-label="Social links">
               <ul className="space-y-3">
                 <li>
@@ -63,7 +63,7 @@ export default function Footer() {
 
           {/* Contact */}
           <div>
-            <h3 className="text-lg font-semibold mb-6 text-white">Get in Touch</h3>
+            <h3 className="font-heading text-lg font-semibold mb-6 text-white">Get in Touch</h3>
             <nav aria-label="Contact information">
               <ul className="space-y-3">
                 <li>
