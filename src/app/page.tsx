@@ -15,7 +15,7 @@ export default function Home() {
             Welcome to Katy Pride
           </h1>
           <p className="text-xl md:text-2xl text-gray-700 mb-8 max-w-3xl mx-auto leading-relaxed">
-            Building community, advocating for equality, and celebrating diversity in Katy and beyond.
+            Building community, advocating for equality,<br />and celebrating diversity in Katy and beyond.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <a

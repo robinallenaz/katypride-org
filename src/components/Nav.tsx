@@ -9,11 +9,10 @@ const navItems = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About Us' },
   { href: '/events', label: 'Events' },
+  { href: '/calendar', label: 'Calendar' },
   { href: '/advocacy', label: 'Advocacy' },
-  { href: '/education', label: 'Education' },
-  { href: '/pride-celebration', label: 'Pride Celebration' },
+  { href: '/celebration', label: 'Celebration' },
   { href: '/resources', label: 'Resources' },
-  { href: '/news', label: 'News' },
 ]
 
 export default function Nav() {
@@ -22,15 +21,14 @@ export default function Nav() {
   return (
     <nav className="bg-white shadow-md">
       <div className="max-w-6xl mx-auto px-4">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-24">
           <Link href="/" className="flex items-center space-x-2">
             <Image
               loader={cloudinaryLoader}
               src="65ad7fd64707829ac5cdbe0d_epa64u"
               alt="Katy Pride Logo"
-              width={64}
-              height={64}
-              className="rounded-full"
+              width={80}
+              height={80}
               style={{ width: 'auto', height: 'auto' }}
               priority
             />
