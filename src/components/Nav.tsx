@@ -1,10 +1,9 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { cloudinaryLoader } from '@/lib/cloudinary'
+import { cloudinaryUrl } from '@/lib/cloudinary'
 
 const navItems = [
   { href: '/', label: 'Home' },
@@ -25,14 +24,13 @@ export default function Nav() {
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex justify-between items-center py-4">
           <Link href="/" className="flex items-center space-x-2">
-            <Image
-              loader={cloudinaryLoader}
-              src="65ad7fd64707829ac5cdbe0d_epa64u"
+            <img
+              src={cloudinaryUrl('65ad7fd64707829ac5cdbe0d_epa64u', 144)}
               alt="Katy Pride Logo"
               width={72}
               height={72}
               style={{ width: 'auto', height: 'auto' }}
-              priority
+              loading="eager"
             />
             <span className="font-heading text-xl font-bold text-purple-600">Katy Pride</span>
           </Link>

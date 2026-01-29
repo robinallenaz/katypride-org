@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Image from 'next/image'
-import { cloudinaryLoader } from '@/lib/cloudinary'
+import { cloudinaryUrl } from '@/lib/cloudinary'
 
 const slides = [
   {
@@ -50,13 +49,11 @@ export default function Carousel() {
     <div className="relative z-10 max-w-6xl mx-auto px-4 py-16">
       <div className="relative w-full h-96 md:h-[500px] bg-white/80 backdrop-blur-md rounded-2xl border border-black/5 shadow-xl overflow-hidden">
         <div className="relative w-full h-full">
-          <Image
-            loader={cloudinaryLoader}
-            src={slides[currentIndex].src}
+          <img
+            src={cloudinaryUrl(slides[currentIndex].src, 2000)}
             alt={slides[currentIndex].alt}
-            fill
-            className="object-cover"
-            priority
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="eager"
           />
           
           {/* Left arrow */}

@@ -1,7 +1,6 @@
 'use client'
 
-import Image from 'next/image'
-import { cloudinaryLoader } from '@/lib/cloudinary'
+import { cloudinaryUrl } from '@/lib/cloudinary'
 
 export default function Footer() {
   return (
@@ -11,13 +10,13 @@ export default function Footer() {
           {/* Brand */}
           <div className="space-y-6">
             <div className="flex items-center space-x-3">
-              <Image
-                loader={cloudinaryLoader}
-                src="65ad7fd64707829ac5cdbe0d_epa64u"
+              <img
+                src={cloudinaryUrl('65ad7fd64707829ac5cdbe0d_epa64u', 160)}
                 alt="Katy Pride Logo"
                 width={80}
                 height={80}
                 style={{ width: 'auto', height: 'auto' }}
+                loading="lazy"
               />
               <h2 className="font-heading text-2xl font-bold">Katy Pride</h2>
             </div>
