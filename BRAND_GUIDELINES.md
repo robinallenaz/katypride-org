@@ -4,7 +4,7 @@
 This document defines the brand identity and visual guidelines for Katy Pride to ensure consistency across all materials.
 
 ## Logo
-- **Primary Logo**: Katy Pride logo with text (Cloudinary: 65ad7fd64707829ac5cdbe0d_epa64u)
+- **Primary Logo**: Katy Pride logo with text (Cloudinary: [65ad7fd64707829ac5cdbe0d_epa64u](https://res.cloudinary.com/dpus8jzix/image/upload/v1769621138/65ad7fd64707829ac5cdbe0d_epa64u.png))
 - **Logo Variations**: Square/cropped version for tight spaces
 - **Minimum Size**: 40px height for digital, 0.5" for print
 - **Clear Space**: Minimum 0.5x logo height on all sides
@@ -164,15 +164,6 @@ Katy Pride Celebration and general branded collateral may use the rainbow gradie
 - **Special Treatment**: Permitted to use rainbow gradient image as image, background, or overlay
 - **Usage**: Katy Pride Celebration and generic branded collateral
 
-## Representation Guidelines
-
-### Public Representation
-- **Professional Appearance**: Board members should maintain professional appearance when representing Katy Pride in public forums
-- **Communication Standards**: Comments made on behalf of Katy Pride must be respectful, honest, and non-hateful
-- **Public Conduct**: Representatives should remain respectful in public situations while representing the organization
-- **Personal Reflection**: Although Board members may not act on behalf of Katy Pride, their words and actions still reflect the organization and should be treated accordingly
-- **Media Representation**: Only the President may represent the organization to any media outlet unless another Board member is appointed by the President
-
 ## Social Media Guidelines
 
 ### Content Guidelines
@@ -224,24 +215,18 @@ Katy Pride Celebration and general branded collateral may use the rainbow gradie
 
 ## Digital Guidelines
 ### Website
-- **Header Style**: White background, purple logo, purple text on hover, responsive mobile menu
-- **Footer Style**: Dark purple gradient, organized in 3 columns, social links, contact info
-- **Button Styles**: Primary (purple gradient), Secondary (purple outline), Tertiary (text link)
-- **Form Elements**: Rounded inputs, purple borders on focus, subtle shadows
+- **Header Style**: Responsive mobile menu
+- **Footer Style**: Organized in 3 columns, social links, contact info
+- **Button Styles**
+- **Form Elements**
 
 ### Social Media
-- **Profile Images**: Katy Pride logo on purple gradient background
+- **Profile Images**: Katy Pride logo
 - **Post Templates**: Brand colors, pillar-specific borders, consistent typography
 - **Hashtags**: #KatyPride #KatyTexas #LGBTQ #Pride #CommunityEmbracingYou
 
-## Print Guidelines
-- **Business Cards**: 2" x 3.5", vertical logo, purple accent, contact info
-- **Flyers**: 8.5" x 11", pillar colors for borders, clear hierarchy
-- **Banners**: Variable sizes, large logo, bold text, high contrast
-
 ## Applications
 ### Correct Usage
-- Website header with white background and purple logo
 - Event flyers with green borders for Events pillar content
 - Social media posts using pillar-specific colors as borders
 - Business cards with logo on clean white background
@@ -260,10 +245,6 @@ Katy Pride Celebration and general branded collateral may use the rainbow gradie
 - **Logo Files**: SVG (vector), PNG (transparent), JPG (white background)
 - **Color Profiles**: RGB for digital, CMYK for print
 - **Naming Conventions**: katypride-element-version.ext (e.g., katypride-logo-primary.svg)
-
-## Contact
-- **Brand Questions**: Communications Chair
-- **Asset Requests**: Complete Brand Asset Request Form, allow 3-5 business days
 
 ---
 
