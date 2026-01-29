@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Katy Pride Website
 
-## Getting Started
+This repository contains the website for **Katy Pride**, an LGBTQ+ community organization serving Katy and West Houston.
+## What’s in this site
 
-First, run the development server:
+Current pages include:
+
+- **Home**
+- **About** (Mission, Vision, Pronouns Matter)
+- **Events**
+- **Calendar**
+- **Advocacy** (Helpful links + Title IX and KISD Gender Policy support sections)
+-  **Celebration**
+- **Resources** (categorized local & national resources with jump navigation)
+
+- **Donate**
+- **Newsletter**
+- **Volunteer**
+
+Images are served from **Cloudinary**.
+
+## Running locally
+
+Install dependencies:
+
+```bash
+npm ci
+```
+
+Start the dev server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```text
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Build
 
-## Learn More
+This project is configured for static export (for GitHub Pages previews):
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Preview deployments (GitHub Pages)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This repo includes a GitHub Actions workflow that builds the static site and deploys it to GitHub Pages.
 
-## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+In GitHub:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Repo **Settings**
+2. **Pages**
+3. **Build and deployment**
+4. **Source**: `GitHub Actions`
+
+The preview URL will be:
+
+```text
+https://<github-username>.github.io/<repo-name>/
+```
+
+## Tech stack (current)
+
+- **Next.js** (App Router)
+- **React**
+- **TypeScript**
+- **Tailwind CSS**
+- **Cloudinary** (hosted images)
+- **GitHub Actions** (GitHub Pages deployment)
+
+## Tech stack (planned / rough outline)
+
+- **Content management**: lightweight CMS or structured content (e.g. MD/MDX or a headless CMS)
+- **Forms**: Google Forms (newsletter signup + volunteer intake)
+- **Email / newsletter**: Mailchimp
+- **Data / lightweight backend**: Airtable
+- **Analytics**: privacy-friendly analytics (provider TBD)
+- **Accessibility & QA**: automated checks (linting, link checking, a11y audits)
+- **Hosting / deployment**: Vercel (production) + GitHub Pages (preview)
+
