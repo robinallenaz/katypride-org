@@ -1,7 +1,8 @@
-import type {StructureResolver} from 'sanity/structure'
+import { orderableDocumentListDeskItem } from '@sanity/orderable-document-list'
+import type { StructureResolver } from 'sanity/structure'
 
 // https://www.sanity.io/docs/structure-builder-cheat-sheet
-export const structure: StructureResolver = (S) =>
+export const structure: StructureResolver = (S, context) =>
   S.list()
     .title('Content')
     .items([
@@ -11,7 +12,18 @@ export const structure: StructureResolver = (S) =>
         .schemaType('coffeeMeetupOverride')
         .child(S.documentTypeList('coffeeMeetupOverride').title('Coffee Meetup Overrides')),
       S.divider(),
+      orderableDocumentListDeskItem({
+        type: 'formLink',
+        title: 'Form Links',
+        S,
+        context,
+      }),
+      S.listItem()
+        .title('Page Content')
+        .schemaType('pageContent')
+        .child(S.documentTypeList('pageContent').title('Page Content')),
+      S.divider(),
       ...S
         .documentTypeListItems()
-        .filter((listItem) => !['event', 'coffeeMeetupOverride'].includes(listItem.getId() || '')),
+        .filter((listItem) => !['event', 'coffeeMeetupOverride', 'formLink', 'pageContent'].includes(listItem.getId() || '')),
     ])

@@ -9,9 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@sanity/image-url": "^1.2.0",
-    "@sanity/vision": "^4.22.0",
     "@portabletext/react": "^3.2.1",
+    "@sanity/image-url": "^1.2.0",
+    "@sanity/orderable-document-list": "^1.5.0",
+    "@sanity/vision": "^4.22.0",
     "next": "16.1.6",
     "next-sanity": "^11.6.12",
     "react": "19.2.3",
