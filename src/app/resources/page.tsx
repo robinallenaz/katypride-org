@@ -16,6 +16,14 @@ export default function ResourcesPage() {
     chipText: string
   }
 
+  const getHostname = (href: string) => {
+    try {
+      return new URL(href).hostname.replace(/^www\./, "")
+    } catch {
+      return href
+    }
+  }
+
   const accents: Record<string, Accent> = {
     health: {
       cardBg: "bg-white/85",
@@ -24,13 +32,13 @@ export default function ResourcesPage() {
       cardHoverBorder: "hover:border-[#06bd01]/55",
       stripe: "border-l-[#06bd01]",
       ring: "focus-visible:ring-[#06bd01]",
-      pillBorder: "border-[#06bd01]/50",
-      pillBg: "bg-[#06bd01]/15",
-      pillHoverBg: "group-hover:bg-[#06bd01]/25",
-      pillText: "text-green-900",
+      pillBorder: "border-[#036600]",
+      pillBg: "bg-gradient-to-r from-[#036600] to-[#047a00]",
+      pillHoverBg: "group-hover:from-[#047a00] group-hover:to-[#059300]",
+      pillText: "text-white",
       chipBorder: "border-[#06bd01]/45",
-      chipBg: "bg-[#06bd01]/12",
-      chipHoverBg: "hover:bg-[#06bd01]/20",
+      chipBg: "bg-gradient-to-r from-[#036600] to-[#047a00]",
+      chipHoverBg: "hover:from-[#047a00] hover:to-[#059300]",
       chipText: "text-gray-900",
     },
     advocacy: {
@@ -40,13 +48,13 @@ export default function ResourcesPage() {
       cardHoverBorder: "hover:border-[#ff1c25]/55",
       stripe: "border-l-[#ff1c25]",
       ring: "focus-visible:ring-[#ff1c25]",
-      pillBorder: "border-[#ff1c25]/50",
-      pillBg: "bg-[#ff1c25]/15",
-      pillHoverBg: "group-hover:bg-[#ff1c25]/25",
-      pillText: "text-red-900",
+      pillBorder: "border-[#a80f14]",
+      pillBg: "bg-gradient-to-r from-[#a80f14] to-[#c8141a]",
+      pillHoverBg: "group-hover:from-[#c8141a] group-hover:to-[#e01b22]",
+      pillText: "text-white",
       chipBorder: "border-[#ff1c25]/45",
-      chipBg: "bg-[#ff1c25]/12",
-      chipHoverBg: "hover:bg-[#ff1c25]/20",
+      chipBg: "bg-gradient-to-r from-[#a80f14] to-[#c8141a]",
+      chipHoverBg: "hover:from-[#c8141a] hover:to-[#e01b22]",
       chipText: "text-gray-900",
     },
     ally: {
@@ -56,13 +64,13 @@ export default function ResourcesPage() {
       cardHoverBorder: "hover:border-[#760088]/55",
       stripe: "border-l-[#760088]",
       ring: "focus-visible:ring-[#760088]",
-      pillBorder: "border-[#760088]/50",
-      pillBg: "bg-[#760088]/15",
-      pillHoverBg: "group-hover:bg-[#760088]/25",
-      pillText: "text-purple-900",
+      pillBorder: "border-[#5f006d]",
+      pillBg: "bg-gradient-to-r from-[#5f006d] to-[#760088]",
+      pillHoverBg: "group-hover:from-[#760088] group-hover:to-[#8b00a2]",
+      pillText: "text-white",
       chipBorder: "border-[#760088]/45",
-      chipBg: "bg-[#760088]/12",
-      chipHoverBg: "hover:bg-[#760088]/20",
+      chipBg: "bg-gradient-to-r from-[#5f006d] to-[#760088]",
+      chipHoverBg: "hover:from-[#760088] hover:to-[#8b00a2]",
       chipText: "text-gray-900",
     },
     regional: {
@@ -72,13 +80,13 @@ export default function ResourcesPage() {
       cardHoverBorder: "hover:border-[#fe931f]/65",
       stripe: "border-l-[#fe931f]",
       ring: "focus-visible:ring-[#fe931f]",
-      pillBorder: "border-[#fe931f]/60",
-      pillBg: "bg-[#fe931f]/18",
-      pillHoverBg: "group-hover:bg-[#fe931f]/28",
-      pillText: "text-amber-950",
+      pillBorder: "border-[#a94e00]",
+      pillBg: "bg-gradient-to-r from-[#a94e00] to-[#c45a00]",
+      pillHoverBg: "group-hover:from-[#c45a00] group-hover:to-[#e06a00]",
+      pillText: "text-white",
       chipBorder: "border-[#fe931f]/55",
-      chipBg: "bg-[#fe931f]/14",
-      chipHoverBg: "hover:bg-[#fe931f]/22",
+      chipBg: "bg-gradient-to-r from-[#a94e00] to-[#c45a00]",
+      chipHoverBg: "hover:from-[#c45a00] hover:to-[#e06a00]",
       chipText: "text-gray-900",
     },
     national: {
@@ -88,13 +96,13 @@ export default function ResourcesPage() {
       cardHoverBorder: "hover:border-[#021999]/55",
       stripe: "border-l-[#021999]",
       ring: "focus-visible:ring-[#021999]",
-      pillBorder: "border-[#021999]/50",
-      pillBg: "bg-[#021999]/15",
-      pillHoverBg: "group-hover:bg-[#021999]/25",
-      pillText: "text-indigo-950",
+      pillBorder: "border-[#02127a]",
+      pillBg: "bg-gradient-to-r from-[#02127a] to-[#021999]",
+      pillHoverBg: "group-hover:from-[#021999] group-hover:to-[#0430cc]",
+      pillText: "text-white",
       chipBorder: "border-[#021999]/45",
-      chipBg: "bg-[#021999]/12",
-      chipHoverBg: "hover:bg-[#021999]/20",
+      chipBg: "bg-gradient-to-r from-[#02127a] to-[#021999]",
+      chipHoverBg: "hover:from-[#021999] hover:to-[#0430cc]",
       chipText: "text-gray-900",
     },
   }
@@ -110,7 +118,7 @@ export default function ResourcesPage() {
   }) => (
     <a
       href={href}
-      className={`inline-flex items-center justify-center rounded-full border px-4 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 ${accent.chipBorder} ${accent.chipBg} ${accent.chipText} ${accent.chipHoverBg} ${accent.ring}`}
+      className={`font-heading antialiased inline-flex items-center justify-center rounded-full border border-[#1a1a1a]/55 px-4 py-2 text-[13px] font-semibold leading-none tracking-wide text-white shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a1a]/75 ${accent.chipBg} ${accent.chipHoverBg}`}
     >
       {label}
     </a>
@@ -130,23 +138,23 @@ export default function ResourcesPage() {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label={`${name} (opens in a new tab)`}
+        aria-label={`${name} — Visit website (opens in a new tab)`}
         className={`group flex h-full items-start justify-between gap-4 rounded-2xl border border-l-4 px-4 py-4 shadow transition focus-visible:outline-none focus-visible:ring-2 ${accent.cardBg} ${accent.cardHoverBg} ${accent.cardBorder} ${accent.cardHoverBorder} ${accent.stripe} ${accent.ring}`}
       >
         <span className="min-w-0">
           <span className="font-heading text-lg text-gray-900 group-hover:text-purple-950 group-hover:underline decoration-purple-300 underline-offset-4">
             {name}
           </span>
-          <span className="mt-1 block text-sm text-gray-600 break-words">
-            {href}
+          <span className="mt-1 block text-sm text-gray-600 break-words" title={href}>
+            {getHostname(href)}
           </span>
         </span>
 
         <span
           aria-hidden="true"
-          className={`mt-0.5 shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition ${accent.pillBorder} ${accent.pillBg} ${accent.pillText} ${accent.pillHoverBg}`}
+          className={`font-heading antialiased mt-0.5 shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-none tracking-wide transition ${accent.pillBorder} ${accent.pillBg} ${accent.pillText} ${accent.pillHoverBg}`}
         >
-          External
+          Visit
         </span>
       </a>
     </li>
@@ -193,6 +201,9 @@ export default function ResourcesPage() {
           </p>
 
           <nav aria-label="Resource categories" className="mt-6">
+            <p className="text-sm text-gray-600 mb-3">
+              Select a category to jump to that section.
+            </p>
             <div className="grid gap-2 sm:flex sm:flex-wrap">
               <JumpLink
                 href="#health-and-wellness"
