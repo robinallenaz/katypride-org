@@ -1,9 +1,12 @@
  'use client'
 
  import { useEffect, useState } from 'react'
+ import { PortableText } from '@portabletext/react'
 
  import { client } from '@/sanity/lib/client'
  import { urlFor } from '@/sanity/lib/image'
+
+ type PortableTextValue = any[]
 
  type EventDoc = {
   _id: string
@@ -12,7 +15,9 @@
   end?: string
   location?: string
   externalUrl?: string
+  externalCtaLabel?: string
   image?: unknown
+  summary?: PortableTextValue
  }
 
  type EventItem = {
@@ -21,9 +26,13 @@
   start: Date
   end?: Date
   location?: string
+  address?: string
+  directionsUrl?: string
   externalUrl?: string
+  externalCtaLabel?: string
   imageSrc?: string
   imageAlt: string
+  summary?: PortableTextValue
  }
 
  export default function EventsPage() {
@@ -116,7 +125,9 @@
           end,
           location,
           externalUrl,
-          image
+          externalCtaLabel,
+          image,
+          summary
         }`
 
         const result = await client.fetch<EventDoc[]>(query, { now: nowIso })
@@ -145,6 +156,8 @@
       start,
       end,
       location: 'Coffee Fellows',
+      address: '3329 Grand Parkway, Katy, TX 77449',
+      directionsUrl: 'https://www.google.com/maps/dir//3329%20Grand%20Parkway,%20Katy,%20TX%2077449',
       imageSrc:
         'https://res.cloudinary.com/dpus8jzix/image/upload/v1769659484/Coffee-Meet-Up-2_pumkia.png',
       imageAlt: 'Espresso Yourself community coffee meet-up flyer',
@@ -163,8 +176,10 @@
       end,
       location: event.location,
       externalUrl: event.externalUrl,
+      externalCtaLabel: event.externalCtaLabel,
       imageSrc,
       imageAlt: event.title,
+      summary: event.summary,
     }
   })
 
@@ -253,6 +268,40 @@
                       </div>
                     </dl>
 
+                    {Array.isArray(event.summary) && event.summary.length > 0 && (
+                      <details className="mt-4 rounded-xl border border-black/10 bg-white px-4 py-3">
+                        <summary className="cursor-pointer font-heading text-sm font-semibold text-gray-900">
+                          More info
+                        </summary>
+                        <div className="mt-3 text-sm leading-relaxed text-gray-700">
+                          <PortableText value={event.summary} />
+                        </div>
+                      </details>
+                    )}
+
+                    {!Array.isArray(event.summary) && (event.address || event.directionsUrl) && (
+                      <details className="mt-4 rounded-xl border border-black/10 bg-white px-4 py-3">
+                        <summary className="cursor-pointer font-heading text-sm font-semibold text-gray-900">
+                          More info
+                        </summary>
+                        <div className="mt-3 text-sm leading-relaxed text-gray-700">
+                          {event.address && <p>{event.address}</p>}
+                          {event.directionsUrl && (
+                            <p className="mt-2">
+                              <a
+                                href={event.directionsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-heading text-xs font-semibold tracking-wide text-gray-900 underline underline-offset-2"
+                              >
+                                Get directions
+                              </a>
+                            </p>
+                          )}
+                        </div>
+                      </details>
+                    )}
+
                     {event.externalUrl && (
                       <div className="mt-4">
                         <a
@@ -261,7 +310,7 @@
                           rel="noopener noreferrer"
                           className="inline-flex items-center justify-center rounded-full border border-[#1a1a1a]/55 px-4 py-2 font-heading text-xs font-semibold tracking-wide text-gray-900 shadow-sm transition bg-white hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a1a]/75"
                         >
-                          Learn more
+                          {event.externalCtaLabel || 'Learn more'}
                         </a>
                       </div>
                     )}

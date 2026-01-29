@@ -30,8 +30,8 @@ export const eventType = defineType({
     defineField({
       name: 'summary',
       title: 'Summary',
-      type: 'text',
-      rows: 3,
+      type: 'array',
+      of: [{ type: 'block' }],
     }),
     defineField({
       name: 'image',
@@ -43,6 +43,11 @@ export const eventType = defineType({
       name: 'externalUrl',
       title: 'External URL',
       type: 'url',
+    }),
+    defineField({
+      name: 'externalCtaLabel',
+      title: 'External Link Button Text',
+      type: 'string',
     }),
     defineField({
       name: 'published',
