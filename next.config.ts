@@ -1,13 +1,15 @@
 import type { NextConfig } from "next";
 
+const isStaticExport = process.env.NEXT_PUBLIC_STATIC_EXPORT === "true";
+
 const nextConfig: NextConfig = {
-  output: "export",
+  output: isStaticExport ? "export" : undefined,
   trailingSlash: true,
   images: {
-    unoptimized: true,
+    unoptimized: isStaticExport,
   },
-  basePath: process.env.NEXT_PUBLIC_BASE_PATH || "",
-  assetPrefix: process.env.NEXT_PUBLIC_BASE_PATH || "",
+  basePath: isStaticExport ? process.env.NEXT_PUBLIC_BASE_PATH || "" : "",
+  assetPrefix: isStaticExport ? process.env.NEXT_PUBLIC_BASE_PATH || "" : "",
 };
 
 export default nextConfig;
