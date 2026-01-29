@@ -42,7 +42,7 @@ export default function CalendarPage() {
               <iframe
                 src={embedUrl}
                 title="Katy Pride Google Calendar"
-                className="absolute inset-0 h-full w-full"
+                className="absolute inset-0 h-full w-full contrast-125"
                 style={{ border: 0 }}
                 scrolling="no"
               />

@@ -6,6 +6,12 @@ export const structure: StructureResolver = (S) =>
     .title('Content')
     .items([
       S.listItem().title('Events').schemaType('event').child(S.documentTypeList('event').title('Events')),
+      S.listItem()
+        .title('Coffee Meetup Overrides')
+        .schemaType('coffeeMeetupOverride')
+        .child(S.documentTypeList('coffeeMeetupOverride').title('Coffee Meetup Overrides')),
       S.divider(),
-      ...S.documentTypeListItems().filter((listItem) => listItem.getId() !== 'event'),
+      ...S
+        .documentTypeListItems()
+        .filter((listItem) => !['event', 'coffeeMeetupOverride'].includes(listItem.getId() || '')),
     ])

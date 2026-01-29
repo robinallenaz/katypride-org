@@ -20,6 +20,22 @@
   summary?: PortableTextValue
  }
 
+ type CoffeeMeetupOverrideDoc = {
+  _id: string
+  meetupDate: string
+  cancelled?: boolean
+  title?: string
+  start?: string
+  end?: string
+  location?: string
+  address?: string
+  directionsUrl?: string
+  externalUrl?: string
+  externalCtaLabel?: string
+  image?: unknown
+  summary?: PortableTextValue
+ }
+
  type EventItem = {
   id: string
   title: string
@@ -111,6 +127,7 @@
     }).format(date)
 
   const [sanityEvents, setSanityEvents] = useState<EventDoc[]>([])
+  const [coffeeMeetupOverrides, setCoffeeMeetupOverrides] = useState<CoffeeMeetupOverrideDoc[]>([])
   const [loadingSanity, setLoadingSanity] = useState(true)
   const [visibleCount, setVisibleCount] = useState(3)
 
@@ -118,6 +135,7 @@
     const run = async () => {
       try {
         const nowIso = new Date().toISOString()
+        const todayDate = nowIso.slice(0, 10)
         const query = `*[_type == "event" && coalesce(published, true) == true && start >= $now] | order(start asc)[0...50]{
           _id,
           title,
@@ -130,11 +148,33 @@
           summary
         }`
 
-        const result = await client.fetch<EventDoc[]>(query, { now: nowIso })
-        setSanityEvents(result)
+        const coffeeOverrideQuery = `*[_type == "coffeeMeetupOverride" && meetupDate >= $today] | order(meetupDate asc)[0...50]{
+          _id,
+          meetupDate,
+          cancelled,
+          title,
+          start,
+          end,
+          location,
+          address,
+          directionsUrl,
+          externalUrl,
+          externalCtaLabel,
+          image,
+          summary
+        }`
+
+        const [eventsResult, coffeeOverrideResult] = await Promise.all([
+          client.fetch<EventDoc[]>(query, { now: nowIso }),
+          client.fetch<CoffeeMeetupOverrideDoc[]>(coffeeOverrideQuery, { today: todayDate }),
+        ])
+
+        setSanityEvents(eventsResult)
+        setCoffeeMeetupOverrides(coffeeOverrideResult)
       } catch (e) {
         console.error('Failed to load events from Sanity', e)
         setSanityEvents([])
+        setCoffeeMeetupOverrides([])
       } finally {
         setLoadingSanity(false)
       }
@@ -143,26 +183,45 @@
     run()
   }, [])
 
-  const recurringCoffeeMeetups: EventItem[] = buildUpcomingSecondFridays(12).map((date) => {
-    const start = new Date(date)
-    start.setHours(8, 0, 0, 0)
+  const coffeeOverrideByDateKey = new Map(
+    coffeeMeetupOverrides
+      .filter((o) => Boolean(o.meetupDate))
+      .map((o) => [o.meetupDate, o] as const),
+  )
 
-    const end = new Date(date)
-    end.setHours(10, 0, 0, 0)
+  const recurringCoffeeMeetups: EventItem[] = buildUpcomingSecondFridays(12)
+    .map<EventItem | null>((date) => {
+      const dateKey = date.toISOString().slice(0, 10)
+      const override = coffeeOverrideByDateKey.get(dateKey)
+      if (override?.cancelled) return null
 
-    return {
-      id: `recurring-coffee-${date.toISOString().slice(0, 10)}`,
-      title: 'Espresso Yourself: Community Coffee Meet-Up',
-      start,
-      end,
-      location: 'Coffee Fellows',
-      address: '3329 Grand Parkway, Katy, TX 77449',
-      directionsUrl: 'https://www.google.com/maps/dir//3329%20Grand%20Parkway,%20Katy,%20TX%2077449',
-      imageSrc:
-        'https://res.cloudinary.com/dpus8jzix/image/upload/v1769659484/Coffee-Meet-Up-2_pumkia.png',
-      imageAlt: 'Espresso Yourself community coffee meet-up flyer',
-    }
-  })
+      const start = override?.start ? new Date(override.start) : new Date(date)
+      if (!override?.start) start.setHours(8, 0, 0, 0)
+
+      const end: Date | undefined = override?.end ? new Date(override.end) : new Date(date)
+      if (!override?.end) end.setHours(10, 0, 0, 0)
+
+      const imageSrc = override?.image ? urlFor(override.image).width(1400).quality(85).url() : undefined
+
+      return {
+        id: `recurring-coffee-${dateKey}`,
+        title: override?.title || 'Espresso Yourself: Community Coffee Meet-Up',
+        start,
+        end,
+        location: override?.location || 'Coffee Fellows',
+        address: override?.address || '3329 Grand Parkway, Katy, TX 77449',
+        directionsUrl:
+          override?.directionsUrl || 'https://www.google.com/maps/dir//3329%20Grand%20Parkway,%20Katy,%20TX%2077449',
+        externalUrl: override?.externalUrl,
+        externalCtaLabel: override?.externalCtaLabel,
+        imageSrc:
+          imageSrc ||
+          'https://res.cloudinary.com/dpus8jzix/image/upload/v1769659484/Coffee-Meet-Up-2_pumkia.png',
+        imageAlt: override?.title || 'Espresso Yourself community coffee meet-up flyer',
+        summary: override?.summary,
+      }
+    })
+    .filter((e): e is EventItem => e !== null)
 
   const sanityEventItems: EventItem[] = sanityEvents.map((event) => {
     const start = new Date(event.start)
@@ -264,7 +323,22 @@
 
                       <div>
                         <dt className="sr-only">Location</dt>
-                        <dd>{event.location || 'TBD'}</dd>
+                        <dd>
+                          <div>{event.location || 'TBD'}</div>
+                          {event.address && (
+                            <div className="mt-1 text-sm text-gray-700">{event.address}</div>
+                          )}
+                          {event.directionsUrl && (
+                            <a
+                              href={event.directionsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-1 inline-block font-heading text-xs font-semibold tracking-wide text-gray-900 underline underline-offset-2"
+                            >
+                              Get directions
+                            </a>
+                          )}
+                        </dd>
                       </div>
                     </dl>
 
@@ -275,29 +349,6 @@
                         </summary>
                         <div className="mt-3 text-sm leading-relaxed text-gray-700">
                           <PortableText value={event.summary} />
-                        </div>
-                      </details>
-                    )}
-
-                    {!Array.isArray(event.summary) && (event.address || event.directionsUrl) && (
-                      <details className="mt-4 rounded-xl border border-black/10 bg-white px-4 py-3">
-                        <summary className="cursor-pointer font-heading text-sm font-semibold text-gray-900">
-                          More info
-                        </summary>
-                        <div className="mt-3 text-sm leading-relaxed text-gray-700">
-                          {event.address && <p>{event.address}</p>}
-                          {event.directionsUrl && (
-                            <p className="mt-2">
-                              <a
-                                href={event.directionsUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="font-heading text-xs font-semibold tracking-wide text-gray-900 underline underline-offset-2"
-                              >
-                                Get directions
-                              </a>
-                            </p>
-                          )}
                         </div>
                       </details>
                     )}
