@@ -215,19 +215,18 @@ Katy Pride Celebration and general branded collateral may use the rainbow gradie
 
 ## Digital Guidelines
 ### Website
-- **Header Style**: White background, purple logo, purple text on hover, responsive mobile menu
-- **Footer Style**: Dark purple gradient, organized in 3 columns, social links, contact info
-- **Button Styles**: Primary (purple gradient), Secondary (purple outline), Tertiary (text link)
-- **Form Elements**: Rounded inputs, purple borders on focus, subtle shadows
+- **Header Style**: Responsive mobile menu
+- **Footer Style**: Organized in 3 columns, social links, contact info
+- **Button Styles**
+- **Form Elements**
 
 ### Social Media
-- **Profile Images**: Katy Pride logo on purple gradient background
+- **Profile Images**: Katy Pride logo
 - **Post Templates**: Brand colors, pillar-specific borders, consistent typography
 - **Hashtags**: #KatyPride #KatyTexas #LGBTQ #Pride #CommunityEmbracingYou
 
 ## Applications
 ### Correct Usage
-- Website header with white background and purple logo
 - Event flyers with green borders for Events pillar content
 - Social media posts using pillar-specific colors as borders
 - Business cards with logo on clean white background
