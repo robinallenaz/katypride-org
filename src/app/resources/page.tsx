@@ -26,84 +26,84 @@ export default function ResourcesPage() {
 
   const accents: Record<string, Accent> = {
     health: {
-      cardBg: "bg-white/85",
+      cardBg: "bg-white/90",
       cardHoverBg: "hover:bg-white",
-      cardBorder: "border-[#06bd01]/35",
-      cardHoverBorder: "hover:border-[#06bd01]/55",
+      cardBorder: "border-gray-200",
+      cardHoverBorder: "hover:border-[#06bd01]/50",
       stripe: "border-l-[#06bd01]",
       ring: "focus-visible:ring-[#06bd01]",
-      pillBorder: "border-[#036600]",
-      pillBg: "bg-gradient-to-r from-[#036600] to-[#047a00]",
-      pillHoverBg: "group-hover:from-[#047a00] group-hover:to-[#059300]",
-      pillText: "text-white",
-      chipBorder: "border-[#06bd01]/45",
-      chipBg: "bg-gradient-to-r from-[#036600] to-[#047a00]",
-      chipHoverBg: "hover:from-[#047a00] hover:to-[#059300]",
-      chipText: "text-gray-900",
+      pillBorder: "border-[#06bd01]/30",
+      pillBg: "bg-[#06bd01]/10",
+      pillHoverBg: "group-hover:bg-[#06bd01]/20",
+      pillText: "text-[#036600]",
+      chipBorder: "border-[#06bd01]/40",
+      chipBg: "bg-white",
+      chipHoverBg: "hover:bg-[#06bd01]/10",
+      chipText: "text-[#036600]",
     },
     advocacy: {
-      cardBg: "bg-white/85",
+      cardBg: "bg-white/90",
       cardHoverBg: "hover:bg-white",
-      cardBorder: "border-[#ff1c25]/35",
-      cardHoverBorder: "hover:border-[#ff1c25]/55",
+      cardBorder: "border-gray-200",
+      cardHoverBorder: "hover:border-[#ff1c25]/50",
       stripe: "border-l-[#ff1c25]",
       ring: "focus-visible:ring-[#ff1c25]",
-      pillBorder: "border-[#a80f14]",
-      pillBg: "bg-gradient-to-r from-[#a80f14] to-[#c8141a]",
-      pillHoverBg: "group-hover:from-[#c8141a] group-hover:to-[#e01b22]",
-      pillText: "text-white",
-      chipBorder: "border-[#ff1c25]/45",
-      chipBg: "bg-gradient-to-r from-[#a80f14] to-[#c8141a]",
-      chipHoverBg: "hover:from-[#c8141a] hover:to-[#e01b22]",
-      chipText: "text-gray-900",
+      pillBorder: "border-[#ff1c25]/30",
+      pillBg: "bg-[#ff1c25]/10",
+      pillHoverBg: "group-hover:bg-[#ff1c25]/20",
+      pillText: "text-[#a80f14]",
+      chipBorder: "border-[#ff1c25]/40",
+      chipBg: "bg-white",
+      chipHoverBg: "hover:bg-[#ff1c25]/10",
+      chipText: "text-[#a80f14]",
     },
     ally: {
-      cardBg: "bg-white/85",
+      cardBg: "bg-white/90",
       cardHoverBg: "hover:bg-white",
-      cardBorder: "border-[#760088]/35",
-      cardHoverBorder: "hover:border-[#760088]/55",
+      cardBorder: "border-gray-200",
+      cardHoverBorder: "hover:border-[#760088]/50",
       stripe: "border-l-[#760088]",
       ring: "focus-visible:ring-[#760088]",
-      pillBorder: "border-[#5f006d]",
-      pillBg: "bg-gradient-to-r from-[#5f006d] to-[#760088]",
-      pillHoverBg: "group-hover:from-[#760088] group-hover:to-[#8b00a2]",
-      pillText: "text-white",
-      chipBorder: "border-[#760088]/45",
-      chipBg: "bg-gradient-to-r from-[#5f006d] to-[#760088]",
-      chipHoverBg: "hover:from-[#760088] hover:to-[#8b00a2]",
-      chipText: "text-gray-900",
+      pillBorder: "border-[#760088]/30",
+      pillBg: "bg-[#760088]/10",
+      pillHoverBg: "group-hover:bg-[#760088]/20",
+      pillText: "text-[#760088]",
+      chipBorder: "border-[#760088]/40",
+      chipBg: "bg-white",
+      chipHoverBg: "hover:bg-[#760088]/10",
+      chipText: "text-[#760088]",
     },
     regional: {
-      cardBg: "bg-white/85",
+      cardBg: "bg-white/90",
       cardHoverBg: "hover:bg-white",
-      cardBorder: "border-[#fe931f]/45",
-      cardHoverBorder: "hover:border-[#fe931f]/65",
+      cardBorder: "border-gray-200",
+      cardHoverBorder: "hover:border-[#fe931f]/50",
       stripe: "border-l-[#fe931f]",
       ring: "focus-visible:ring-[#fe931f]",
-      pillBorder: "border-[#a94e00]",
-      pillBg: "bg-gradient-to-r from-[#a94e00] to-[#c45a00]",
-      pillHoverBg: "group-hover:from-[#c45a00] group-hover:to-[#e06a00]",
-      pillText: "text-white",
-      chipBorder: "border-[#fe931f]/55",
-      chipBg: "bg-gradient-to-r from-[#a94e00] to-[#c45a00]",
-      chipHoverBg: "hover:from-[#c45a00] hover:to-[#e06a00]",
-      chipText: "text-gray-900",
+      pillBorder: "border-[#fe931f]/30",
+      pillBg: "bg-[#fe931f]/10",
+      pillHoverBg: "group-hover:bg-[#fe931f]/20",
+      pillText: "text-[#a94e00]",
+      chipBorder: "border-[#fe931f]/40",
+      chipBg: "bg-white",
+      chipHoverBg: "hover:bg-[#fe931f]/10",
+      chipText: "text-[#a94e00]",
     },
     national: {
-      cardBg: "bg-white/85",
+      cardBg: "bg-white/90",
       cardHoverBg: "hover:bg-white",
-      cardBorder: "border-[#021999]/35",
-      cardHoverBorder: "hover:border-[#021999]/55",
+      cardBorder: "border-gray-200",
+      cardHoverBorder: "hover:border-[#021999]/50",
       stripe: "border-l-[#021999]",
       ring: "focus-visible:ring-[#021999]",
-      pillBorder: "border-[#02127a]",
-      pillBg: "bg-gradient-to-r from-[#02127a] to-[#021999]",
-      pillHoverBg: "group-hover:from-[#021999] group-hover:to-[#0430cc]",
-      pillText: "text-white",
-      chipBorder: "border-[#021999]/45",
-      chipBg: "bg-gradient-to-r from-[#02127a] to-[#021999]",
-      chipHoverBg: "hover:from-[#021999] hover:to-[#0430cc]",
-      chipText: "text-gray-900",
+      pillBorder: "border-[#021999]/30",
+      pillBg: "bg-[#021999]/10",
+      pillHoverBg: "group-hover:bg-[#021999]/20",
+      pillText: "text-[#021999]",
+      chipBorder: "border-[#021999]/40",
+      chipBg: "bg-white",
+      chipHoverBg: "hover:bg-[#021999]/10",
+      chipText: "text-[#021999]",
     },
   }
 
@@ -118,7 +118,7 @@ export default function ResourcesPage() {
   }) => (
     <a
       href={href}
-      className={`font-heading antialiased inline-flex items-center justify-center rounded-full border border-[#1a1a1a]/55 px-4 py-2 text-[13px] font-semibold leading-none tracking-wide text-white shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a1a]/75 ${accent.chipBg} ${accent.chipHoverBg}`}
+      className={`font-heading antialiased inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-[13px] font-semibold leading-none tracking-wide shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${accent.chipBorder} ${accent.chipBg} ${accent.chipHoverBg} ${accent.chipText} ${accent.ring}`}
     >
       {label}
     </a>
@@ -152,12 +152,35 @@ export default function ResourcesPage() {
 
         <span
           aria-hidden="true"
-          className={`font-heading antialiased mt-0.5 shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-none tracking-wide transition ${accent.pillBorder} ${accent.pillBg} ${accent.pillText} ${accent.pillHoverBg}`}
+          className={`font-heading antialiased mt-0.5 shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold leading-none tracking-wide transition-all duration-200 ${accent.pillBorder} ${accent.pillBg} ${accent.pillText} ${accent.pillHoverBg}`}
         >
-          Visit
+          Visit →
         </span>
       </a>
     </li>
+  )
+
+  const BackToCategories = () => (
+    <a
+      href="#categories"
+      className="inline-flex items-center gap-1.5 text-sm text-[#760088] hover:text-[#5a0066] font-medium mt-4 transition-colors"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M5 10l7-7m0 0l7 7m-7-7v18"
+        />
+      </svg>
+      Back to categories
+    </a>
   )
 
   const Section = ({
@@ -185,6 +208,7 @@ export default function ResourcesPage() {
           />
         ))}
       </ul>
+      <BackToCategories />
     </section>
   )
 
@@ -200,7 +224,7 @@ export default function ResourcesPage() {
             Community resources and support links.
           </p>
 
-          <nav aria-label="Resource categories" className="mt-6">
+          <nav id="categories" aria-label="Resource categories" className="mt-6 scroll-mt-24">
             <p className="text-sm text-gray-600 mb-3">
               Select a category to jump to that section.
             </p>
