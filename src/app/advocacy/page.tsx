@@ -102,6 +102,50 @@ export default function AdvocacyPage() {
               </li>
             </ul>
           </section>
+
+          <section className="mt-10">
+            <h2 className="font-heading text-2xl md:text-3xl font-bold text-[#760088] mb-4">
+              Title IX Discrimination
+            </h2>
+
+            <p className="text-lg text-gray-700 leading-relaxed max-w-4xl">
+              Are you experiencing hardship, or discrimination, based on your perceived, or lived, sex, sexual orientation, and/or gender identity, in an educational space? If so, your civil rights guaranteed by Federal Title IX laws may be violated. You can report sex and gender-based discrimination to the Federal Department of Education's Office of Civil Rights.
+            </p>
+
+            <div className="mt-5">
+              <a
+                href="https://www2.ed.gov/about/offices/list/ocr/complaintintro.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="File a Title IX Complaint with the Office of Civil Rights (opens in a new tab)"
+                className="inline-flex items-center justify-center rounded-full border border-[#1a1a1a]/55 px-5 py-3 font-heading text-sm font-semibold tracking-wide text-white shadow-sm transition bg-gradient-to-r from-[#02127a] to-[#021999] hover:from-[#021999] hover:to-[#0430cc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a1a]/75"
+              >
+                File a Title IX Complaint with the Office of Civil Rights
+              </a>
+            </div>
+          </section>
+
+          <section className="mt-10">
+            <h2 className="font-heading text-2xl md:text-3xl font-bold text-[#760088] mb-4">
+              KISD Gender Policy
+            </h2>
+
+            <p className="text-lg text-gray-700 leading-relaxed max-w-4xl">
+              If you're a Katy ISD student, or parent, facing discrimination or hardship based on Katy ISD's "Gender Policy," and would like support and assistance figuring out what your options are, you can submit this Google Form and someone will follow up with you.
+            </p>
+
+            <div className="mt-5">
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSdIrFFrdR5LTTocvubHZTphYSc1-VwZHuozR4BWSe2RHuR6dw/viewform"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="KISD Gender Policy Support (opens in a new tab)"
+                className="inline-flex items-center justify-center rounded-full border border-[#1a1a1a]/55 px-5 py-3 font-heading text-sm font-semibold tracking-wide text-white shadow-sm transition bg-gradient-to-r from-[#5f006d] to-[#760088] hover:from-[#760088] hover:to-[#8b00a2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a1a]/75"
+              >
+                KISD Gender Policy Support
+              </a>
+            </div>
+          </section>
         </div>
       </section>
     </div>
