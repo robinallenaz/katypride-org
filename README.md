@@ -67,6 +67,41 @@ When an override exists for a date, the Events page will use the override values
 - GitHub Pages deployments are **static previews** and are not intended for admin management.
 - Admins should use the **Vercel/production** site to access the Studio at `/studio`.
 
+## Admin: managing the Google Calendar
+
+The `/calendar` page embeds a **Google Calendar**. Events added to this calendar appear automatically in the embedded view.
+
+### Give admins edit access to the calendar
+
+1. Open [Google Calendar](https://calendar.google.com) as the calendar owner
+2. Find the **Katy Pride** calendar in the left sidebar
+3. Click the **⋮** (three dots) → **Settings and sharing**
+4. Scroll to **Share with specific people or groups**
+5. Click **+ Add people and groups**
+6. Enter each admin's email address
+7. Set permission to **Make changes to events** (or **Make changes and manage sharing** for full control)
+8. Click **Send**
+
+### Add events to the calendar
+
+Once an admin has edit access:
+
+1. Go to [Google Calendar](https://calendar.google.com)
+2. Make sure you're viewing the **Katy Pride** calendar
+3. Click on a date/time → **Create event**
+4. Fill in details and save
+
+The event will appear in the embedded calendar on `/calendar` automatically.
+
+### Note: Events page vs Calendar page
+
+| Where admins add events | Where it shows up |
+|-------------------------|-------------------|
+| **Google Calendar** | Embedded calendar on `/calendar` |
+| **Sanity Studio** | Events feed on `/events` |
+
+If you want an event in **both places**, add it in both Google Calendar and Sanity Studio.
+
 ## Running locally
 
 Install dependencies:
@@ -125,11 +160,9 @@ https://<github-username>.github.io/<repo-name>/
 
 ## Tech stack (planned / rough outline)
 
-- **Content management**: lightweight CMS or structured content (e.g. MD/MDX or a headless CMS)
 - **Forms**: Google Forms (newsletter signup + volunteer intake)
 - **Email / newsletter**: Mailchimp
-- **Data / lightweight backend**: Airtable
-- **Analytics**: privacy-friendly analytics (provider TBD)
+- **Analytics**: privacy-friendly analytics (provider TBD, maybe Umami self-hosted on Vercel or Vercel Analytics)
 - **Accessibility & QA**: automated checks (linting, link checking, a11y audits)
 - **Hosting / deployment**: Vercel (production) + GitHub Pages (preview)
 

@@ -37,12 +37,12 @@ export default function CalendarPage() {
             </a>
           </div>
 
-          <div className="mt-8 rounded-2xl border border-black/5 bg-white overflow-hidden shadow-sm">
+          <div className="mt-8 rounded-2xl border border-black/10 bg-white overflow-hidden shadow-sm">
             <div className="relative w-full" style={{ paddingTop: '75%' }}>
               <iframe
                 src={embedUrl}
                 title="Katy Pride Google Calendar"
-                className="absolute inset-0 h-full w-full contrast-125"
+                className="absolute inset-0 h-full w-full"
                 style={{ border: 0 }}
                 scrolling="no"
               />

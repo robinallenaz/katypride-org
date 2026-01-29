@@ -295,8 +295,8 @@
                     </div>
 
                     {label && (
-                      <div className="absolute right-3 top-3 rounded-full border border-black/40 bg-white/95 px-3 py-1 shadow-sm">
-                        <span className="font-heading text-xs font-semibold tracking-wide text-gray-900">
+                      <div className="absolute right-3 top-3 rounded-full border border-black/70 bg-white px-3.5 py-1.5 shadow-md">
+                        <span className="font-heading text-sm font-extrabold tracking-wide text-gray-900">
                           {label}
                         </span>
                       </div>
