@@ -33,7 +33,7 @@ async function getPageContent(): Promise<PageContent | null> {
 export default async function CelebrationPage() {
   const [formLinks, pageContent] = await Promise.all([getFormLinks(), getPageContent()])
 
-  const heading = pageContent?.heading || 'Celebration'
+  const heading = pageContent?.heading || 'Katy Pride Celebration'
   const intro = pageContent?.intro || 'This page is a placeholder. Details for Katy Pride Celebration will live here.'
 
   return (
