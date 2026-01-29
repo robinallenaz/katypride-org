@@ -4,11 +4,11 @@
  import { PortableText } from '@portabletext/react'
 
  import { client } from '@/sanity/lib/client'
- import { urlFor } from '@/sanity/lib/image'
+import { urlFor } from '@/sanity/lib/image'
 
- type PortableTextValue = any[]
+type PortableTextValue = any[]
 
- type EventDoc = {
+type EventDoc = {
   _id: string
   title: string
   start: string
@@ -18,9 +18,10 @@
   externalCtaLabel?: string
   image?: unknown
   summary?: PortableTextValue
- }
+  published?: boolean
+}
 
- type CoffeeMeetupOverrideDoc = {
+type CoffeeMeetupOverrideDoc = {
   _id: string
   meetupDate: string
   cancelled?: boolean
@@ -34,9 +35,9 @@
   externalCtaLabel?: string
   image?: unknown
   summary?: PortableTextValue
- }
+}
 
- type EventItem = {
+type EventItem = {
   id: string
   title: string
   start: Date
@@ -145,7 +146,8 @@
           externalUrl,
           externalCtaLabel,
           image,
-          summary
+          summary,
+          published
         }`
 
         const coffeeOverrideQuery = `*[_type == "coffeeMeetupOverride" && meetupDate >= $today] | order(meetupDate asc)[0...50]{
@@ -194,13 +196,10 @@
       const dateKey = date.toISOString().slice(0, 10)
       const override = coffeeOverrideByDateKey.get(dateKey)
       if (override?.cancelled) return null
-
       const start = override?.start ? new Date(override.start) : new Date(date)
       if (!override?.start) start.setHours(8, 0, 0, 0)
-
       const end: Date | undefined = override?.end ? new Date(override.end) : new Date(date)
       if (!override?.end) end.setHours(10, 0, 0, 0)
-
       const imageSrc = override?.image ? urlFor(override.image).width(1400).quality(85).url() : undefined
 
       return {

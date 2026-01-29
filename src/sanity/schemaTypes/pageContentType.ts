@@ -34,10 +34,9 @@ export const pageContentType = defineType({
     defineField({
       name: 'intro',
       title: 'Intro Text',
-      type: 'text',
-      placeholder: 'Write a brief introduction for this page...',
-      description: 'Introductory paragraph displayed below the heading',
-      rows: 4,
+      type: 'array',
+      of: [{ type: 'block' }],
+      description: 'Introductory paragraph displayed below the heading. Supports bold, italic, links, and lists.',
     }),
   ],
   preview: {

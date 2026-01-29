@@ -1,4 +1,5 @@
 import { client } from '@/sanity/lib/client'
+import { PortableText } from '@portabletext/react'
 
 interface FormLink {
   _id: string
@@ -8,7 +9,7 @@ interface FormLink {
 
 interface PageContent {
   heading?: string
-  intro?: string
+  intro?: any[]
 }
 
 async function getFormLinks(): Promise<FormLink[]> {
@@ -34,7 +35,7 @@ export default async function CelebrationPage() {
   const [formLinks, pageContent] = await Promise.all([getFormLinks(), getPageContent()])
 
   const heading = pageContent?.heading || 'Katy Pride Celebration'
-  const intro = pageContent?.intro || 'This page is a placeholder. Details for Katy Pride Celebration will live here.'
+  const intro = pageContent?.intro
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
@@ -43,9 +44,13 @@ export default async function CelebrationPage() {
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
             {heading}
           </h1>
-          <p className="text-lg text-gray-700 leading-relaxed max-w-3xl">
-            {intro}
-          </p>
+          <div className="text-lg text-gray-700 leading-relaxed max-w-3xl">
+            {intro ? (
+              <PortableText value={intro} />
+            ) : (
+              <p>This page is a placeholder. Details for Katy Pride Celebration will live here.</p>
+            )}
+          </div>
 
           {/* Form Links */}
           {formLinks.length > 0 && (
