@@ -1,4 +1,10 @@
 export default function CalendarPage() {
+  const calendarId = 'c_4489e0e539da4cb7b0a54b0aae11ab9e581f93a23e897f71f1d56abbb5909ea9@group.calendar.google.com'
+  const timeZone = 'America/Chicago'
+  const embedUrl = `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(calendarId)}&ctz=${encodeURIComponent(timeZone)}`
+  const googleCalendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(calendarId)}`
+  const icsUrl = `https://calendar.google.com/calendar/ical/${encodeURIComponent(calendarId)}/public/basic.ics`
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
       <section className="max-w-6xl mx-auto px-4 py-16">
@@ -6,9 +12,42 @@ export default function CalendarPage() {
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
             Calendar
           </h1>
+
           <p className="text-lg text-gray-700 leading-relaxed max-w-3xl">
-            This page is a placeholder. A calendar view of Katy Pride events will be added here.
+            View upcoming Katy Pride events and add them to your own calendar.
           </p>
+
+          <div className="mt-6 flex flex-col sm:flex-row gap-3">
+            <a
+              href={googleCalendarUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center rounded-full border border-[#1a1a1a]/55 px-5 py-3 font-heading text-sm font-semibold tracking-wide text-white shadow-sm transition bg-gradient-to-r from-[#5f006d] to-[#760088] hover:from-[#760088] hover:to-[#8b00a2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a1a]/75"
+            >
+              Open in Google Calendar
+            </a>
+
+            <a
+              href={icsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center rounded-full border border-[#1a1a1a]/55 px-5 py-3 font-heading text-sm font-semibold tracking-wide text-gray-900 shadow-sm transition bg-white hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a1a]/75"
+            >
+              Subscribe (iCal)
+            </a>
+          </div>
+
+          <div className="mt-8 rounded-2xl border border-black/5 bg-white overflow-hidden shadow-sm">
+            <div className="relative w-full" style={{ paddingTop: '75%' }}>
+              <iframe
+                src={embedUrl}
+                title="Katy Pride Google Calendar"
+                className="absolute inset-0 h-full w-full"
+                style={{ border: 0 }}
+                scrolling="no"
+              />
+            </div>
+          </div>
         </div>
       </section>
     </div>
