@@ -1,3 +1,13 @@
+import Link from "next/link"
+
+export function generateStaticParams() {
+  return [
+    { slug: "pride-2025-announcement" },
+    { slug: "volunteer-spotlight" },
+    { slug: "new-partnership" },
+  ]
+}
+
 export default function NewsPost({ params }: { params: { slug: string } }) {
   const posts: Record<string, { title: string; date: string; body: string }> = {
     'pride-2025-announcement': {
@@ -45,9 +55,9 @@ We’re currently seeking volunteers to help develop and deliver these programs.
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Post not found</h1>
-          <a href="/news" className="text-purple-600 hover:underline">
+          <Link href="/news" className="text-purple-600 hover:underline">
             Back to News
-          </a>
+          </Link>
         </div>
       </div>
     )
@@ -67,9 +77,9 @@ We’re currently seeking volunteers to help develop and deliver these programs.
             ))}
           </div>
           <div className="mt-12 pt-8 border-t border-gray-200">
-            <a href="/news" className="text-purple-600 font-medium hover:underline">
+            <Link href="/news" className="text-purple-600 font-medium hover:underline">
               ← Back to News
-            </a>
+            </Link>
           </div>
         </div>
       </article>

@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 export default function News() {
   const posts = [
     {
@@ -29,17 +31,14 @@ export default function News() {
             <article key={post.slug} className="bg-white p-6 rounded-lg shadow-md">
               <div className="text-sm text-purple-600 font-medium mb-2">{post.date}</div>
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-                <a href={`/news/${post.slug}`} className="hover:text-purple-600 transition-colors">
+                <Link href={`/news/${post.slug}`} className="hover:text-purple-600 transition-colors">
                   {post.title}
-                </a>
+                </Link>
               </h2>
               <p className="text-gray-600 mb-4">{post.excerpt}</p>
-              <a
-                href={`/news/${post.slug}`}
-                className="inline-block text-purple-600 font-medium hover:underline"
-              >
+              <Link href={`/news/${post.slug}`} className="inline-block text-purple-600 font-medium hover:underline">
                 Read more →
-              </a>
+              </Link>
             </article>
           ))}
         </div>
