@@ -1,5 +1,7 @@
 import { client } from '@/sanity/lib/client'
 import { PortableText } from '@portabletext/react'
+import { PreviewBanner } from '@/components/PreviewBanner'
+import { isPreviewMode, getDraftContent } from '@/lib/preview'
 
 interface FormLink {
   _id: string
@@ -12,33 +14,43 @@ interface PageContent {
   intro?: any[]
 }
 
-async function getFormLinks(): Promise<FormLink[]> {
-  return client.fetch(
-    `*[_type == "formLink" && page == "celebration" && active == true] | order(orderRank asc) {
+async function getFormLinks(previewMode = false): Promise<FormLink[]> {
+  const query = `*[_type == "formLink" && page == "celebration" && active == true] | order(orderRank asc) {
       _id,
       title,
       url
     }`
-  )
+  
+  if (previewMode) {
+    return getDraftContent(query)
+  }
+  
+  return client.fetch(query)
 }
 
-async function getPageContent(): Promise<PageContent | null> {
-  return client.fetch(
-    `*[_type == "pageContent" && page == "celebration"][0] {
+async function getPageContent(previewMode = false): Promise<PageContent | null> {
+  const query = `*[_type == "pageContent" && page == "celebration"][0] {
       heading,
       intro
     }`
-  )
+  
+  if (previewMode) {
+    return getDraftContent(query)
+  }
+  
+  return client.fetch(query)
 }
 
-export default async function CelebrationPage() {
-  const [formLinks, pageContent] = await Promise.all([getFormLinks(), getPageContent()])
+export default async function CelebrationPage({ searchParams }: { searchParams: Record<string, string> }) {
+  const preview = isPreviewMode(searchParams)
+  const [formLinks, pageContent] = await Promise.all([getFormLinks(preview), getPageContent(preview)])
 
   const heading = pageContent?.heading || 'Katy Pride Celebration'
   const intro = pageContent?.intro
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
+      {preview && <PreviewBanner />}
       <section className="max-w-6xl mx-auto px-4 py-16">
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">

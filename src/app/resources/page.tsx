@@ -1,4 +1,6 @@
 import { client } from '@/sanity/lib/client'
+import { PreviewBanner } from '@/components/PreviewBanner'
+import { isPreviewMode, getDraftContent } from '@/lib/preview'
 
 interface ResourceLink {
   _id: string
@@ -78,24 +80,28 @@ const defaultResources: ResourceLink[] = [
   { _id: 'n12', name: 'Trevor Project', url: 'https://www.thetrevorproject.org/', category: 'national' },
 ]
 
-async function getResourceLinks(): Promise<ResourceLink[]> {
-  const sanityResources = await client.fetch<ResourceLink[]>(
-    `*[_type == "resourceLink" && active == true] | order(orderRank asc) {
+async function getResourceLinks(previewMode = false): Promise<ResourceLink[]> {
+  const query = `*[_type == "resourceLink" && active == true] | order(orderRank asc) {
       _id,
       name,
       url,
       category
     }`
-  )
+  
+  const sanityResources = previewMode 
+    ? await getDraftContent(query) as ResourceLink[]
+    : await client.fetch<ResourceLink[]>(query)
+    
   // Merge Sanity resources with defaults - Sanity resources appear first, then defaults
   // Use a Set to track URLs and avoid duplicates
-  const seenUrls = new Set(sanityResources.map((r) => r.url))
+  const seenUrls = new Set(sanityResources.map((r: ResourceLink) => r.url))
   const uniqueDefaults = defaultResources.filter((r) => !seenUrls.has(r.url))
   return [...sanityResources, ...uniqueDefaults]
 }
 
-export default async function ResourcesPage() {
-  const resources = await getResourceLinks()
+export default async function ResourcesPage({ searchParams }: { searchParams: Record<string, string> }) {
+  const preview = isPreviewMode(searchParams)
+  const resources = await getResourceLinks(preview)
 
   const healthResources = resources.filter((r) => r.category === 'health')
   const advocacyResources = resources.filter((r) => r.category === 'advocacy')
@@ -301,6 +307,7 @@ export default async function ResourcesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
+      {preview && <PreviewBanner />}
       <section className="max-w-6xl mx-auto px-4 py-16">
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">

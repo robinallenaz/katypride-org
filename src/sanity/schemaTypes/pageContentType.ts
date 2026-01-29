@@ -6,19 +6,21 @@ export const pageContentType = defineType({
   title: 'Page Content',
   type: 'document',
   icon: DocumentTextIcon,
+  description: 'Customize page headings and introductory text. This allows you to personalize the main content area of specific pages.',
   fields: [
     defineField({
       name: 'page',
-      title: 'Page',
+      title: 'Target Page',
       type: 'string',
-      description: 'Which page does this content belong to?',
+      description: 'Which page should this custom content appear on? Each page can have one content entry.',
       options: {
         list: [
-          { title: 'Celebration', value: 'celebration' },
-          { title: 'Volunteer', value: 'volunteer' },
-          { title: 'Donate', value: 'donate' },
-          { title: 'Events', value: 'events' },
-          { title: 'About', value: 'about' },
+          { title: 'Home Page (/)', value: 'home' },
+          { title: 'Celebration (/celebration)', value: 'celebration' },
+          { title: 'Volunteer (/volunteer)', value: 'volunteer' },
+          { title: 'Donate (/donate)', value: 'donate' },
+          { title: 'Events (/events)', value: 'events' },
+          { title: 'About (/about)', value: 'about' },
         ],
         layout: 'radio',
       },
@@ -28,15 +30,15 @@ export const pageContentType = defineType({
       name: 'heading',
       title: 'Page Heading',
       type: 'string',
-      placeholder: 'e.g., Katy Pride Celebration',
-      description: 'Main heading displayed at the top of the page',
+      placeholder: 'e.g., Katy Pride Celebration 2026',
+      description: 'The main heading that appears at the top of the page. Leave blank to use the default heading.',
     }),
     defineField({
       name: 'intro',
-      title: 'Intro Text',
+      title: 'Introduction Text',
       type: 'array',
       of: [{ type: 'block' }],
-      description: 'Introductory paragraph displayed below the heading. Supports bold, italic, links, and lists.',
+      description: 'Introductory paragraph that appears below the heading. Supports bold, italic, links, lists, and other formatting. Leave blank to use default text.',
     }),
   ],
   preview: {
@@ -46,6 +48,7 @@ export const pageContentType = defineType({
     },
     prepare({ page, heading }) {
       const pageNames: Record<string, string> = {
+        home: 'Home Page',
         celebration: 'Celebration',
         volunteer: 'Volunteer',
         donate: 'Donate',

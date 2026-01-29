@@ -5,6 +5,8 @@
 
  import { client } from '@/sanity/lib/client'
 import { urlFor } from '@/sanity/lib/image'
+import { PreviewBanner } from '@/components/PreviewBanner'
+import { isPreviewMode, getDraftContent } from '@/lib/preview'
 
 type PortableTextValue = any[]
 
@@ -166,9 +168,12 @@ type EventItem = {
           summary
         }`
 
+        const searchParams = new URLSearchParams(window.location.search)
+        const preview = isPreviewMode(searchParams)
+
         const [eventsResult, coffeeOverrideResult] = await Promise.all([
-          client.fetch<EventDoc[]>(query, { now: nowIso }),
-          client.fetch<CoffeeMeetupOverrideDoc[]>(coffeeOverrideQuery, { today: todayDate }),
+          preview ? (getDraftContent(query) as Promise<EventDoc[]>) : client.fetch<EventDoc[]>(query, { now: nowIso }),
+          preview ? (getDraftContent(coffeeOverrideQuery) as Promise<CoffeeMeetupOverrideDoc[]>) : client.fetch<CoffeeMeetupOverrideDoc[]>(coffeeOverrideQuery, { today: todayDate }),
         ])
 
         setSanityEvents(eventsResult)
@@ -249,6 +254,7 @@ type EventItem = {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
+      {isPreviewMode(new URLSearchParams(window.location.search)) && <PreviewBanner />}
       <section className="max-w-6xl mx-auto px-4 py-16">
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
