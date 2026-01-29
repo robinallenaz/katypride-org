@@ -23,7 +23,14 @@ export const structure: StructureResolver = (S, context) =>
         .schemaType('pageContent')
         .child(S.documentTypeList('pageContent').title('Page Content')),
       S.divider(),
+      orderableDocumentListDeskItem({
+        type: 'resourceLink',
+        title: 'Resource Links',
+        S,
+        context,
+      }),
+      S.divider(),
       ...S
         .documentTypeListItems()
-        .filter((listItem) => !['event', 'coffeeMeetupOverride', 'formLink', 'pageContent'].includes(listItem.getId() || '')),
+        .filter((listItem) => !['event', 'coffeeMeetupOverride', 'formLink', 'pageContent', 'resourceLink'].includes(listItem.getId() || '')),
     ])
