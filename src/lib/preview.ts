@@ -9,22 +9,11 @@ export async function getDraftContent(query: string, params?: Record<string, any
 }
 
 // Check if we're in preview mode
-export function isPreviewMode(searchParams: URLSearchParams | Record<string, string> | any): boolean {
-  if (!searchParams) {
+export function isPreviewMode(searchParams: URLSearchParams | any): boolean {
+  if (!searchParams || typeof searchParams.get !== 'function') {
     return false
   }
-  
-  // Handle Next.js searchParams (plain object)
-  if (typeof searchParams === 'object' && 'preview' in searchParams) {
-    return searchParams.preview === 'true'
-  }
-  
-  // Handle URLSearchParams object
-  if (typeof searchParams.get === 'function') {
-    return searchParams.get('preview') === 'true'
-  }
-  
-  return false
+  return searchParams.get('preview') === 'true'
 }
 
 // Create preview URL for a given path

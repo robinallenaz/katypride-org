@@ -50,9 +50,9 @@ export default function Carousel() {
       <div className="relative w-full h-96 md:h-[500px] bg-white/80 backdrop-blur-md rounded-2xl border border-black/5 shadow-xl overflow-hidden">
         <div className="relative w-full h-full">
           <img
-            src={cloudinaryUrl(slides[currentIndex].src, 2000)}
+            src={cloudinaryUrl(slides[currentIndex].src, 1200)}
             alt={slides[currentIndex].alt}
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-contain"
             loading="eager"
           />
           

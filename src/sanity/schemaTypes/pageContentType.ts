@@ -48,7 +48,6 @@ export const pageContentType = defineType({
     },
     prepare({ page, heading }) {
       const pageNames: Record<string, string> = {
-        home: 'Home Page',
         celebration: 'Celebration',
         volunteer: 'Volunteer',
         donate: 'Donate',
