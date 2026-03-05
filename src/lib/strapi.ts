@@ -1,4 +1,5 @@
 const STRAPI_URL = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337'
+const STRAPI_API_TOKEN = process.env.STRAPI_API_TOKEN || ''
 
 export interface StrapiImage {
   id: number
@@ -101,6 +102,7 @@ class StrapiClient {
     const url = `${this.baseUrl}/api${endpoint}`
     const headers = {
       'Content-Type': 'application/json',
+      ...(STRAPI_API_TOKEN && { 'Authorization': `Bearer ${STRAPI_API_TOKEN}` }),
       ...options.headers,
     }
 
@@ -122,6 +124,7 @@ class StrapiClient {
   }
 
   async getEvents(): Promise<StrapiEvent[]> {
+    // Use UTC time for consistent filtering regardless of server timezone
     const now = encodeURIComponent(new Date().toISOString())
     const response = await this.request<StrapiResponse<StrapiEvent>>(
       `/events?filters[published][$eq]=true&filters[start][$gte]=${now}&sort=start:asc&populate=image`

@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: katypride-strapi
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /admin
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 1337
+      - key: DATABASE_URL
+        fromDatabase: true
+      - key: ADMIN_JWT_SECRET
+        generateValue: true
+      - key: API_TOKEN_SALT
+        generateValue: true
+      - key: TRANSFER_TOKEN_SALT
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: APP_KEYS
+        generateValue: true
+
+databases:
+  - name: katypride-db
+    plan: free

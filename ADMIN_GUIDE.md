@@ -1,6 +1,6 @@
 
 
-Welcome to the Katy Pride website administration guide. This document explains how to manage website content using **Sanity Studio**.
+Welcome to the Katy Pride website administration guide. This document explains how to manage website content using **Strapi CMS**.
 
 ## Getting Started
 
@@ -13,6 +13,16 @@ Welcome to the Katy Pride website administration guide. This document explains h
 - **Page Content** – Page headings and introductory text
 - **Carousel Images** – Photos displayed in the home page carousel
 - **Website Images** – General image library for website use
+
+## Accessing the Admin Panel
+
+**Development:** `http://localhost:3000/admin`  
+**Production:** `https://your-backend-name.vercel.app/admin`
+
+The admin panel is powered by Strapi CMS and provides an intuitive interface for managing all website content.
+
+### Production Setup
+See [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md) for complete deployment instructions.
 
 ## Managing Events
 
@@ -38,7 +48,7 @@ Welcome to the Katy Pride website administration guide. This document explains h
 - **Event Category** (General Event or Coffee Meetup)
 - **Published** (enable to show on website)
 
-**💡Tip** Click **Preview Pages** in the sidebar to see how your event looks before publishing!
+**💡Tip** Use the Strapi admin panel to preview your content before publishing!
 
 ### Coffee Meetup Events
 
@@ -160,9 +170,9 @@ Buttons open in a new tab. Drag and drop to reorder them.
 
 ## Previewing Changes
 
-Preview unpublished changes before going live:<br><br>
+Preview unpublished changes before going live:
 
-**Option 1:** Click **Preview Pages** in the Sanity Studio sidebar, then open the page preview in a new tab<br><br>
+**Option 1:** Use the Strapi admin panel's preview functionality<br><br>
 
 **Option 2:** Add `?preview=true` to any page URL (e.g., `/events?preview=true`)<br><br>
 
@@ -171,7 +181,7 @@ A yellow "Preview Mode" banner indicates you're viewing unpublished content (vis
 ## Publishing Workflow
 
 1. Review content in preview mode
-2. Return to Sanity Studio
+2. Return to Strapi admin panel
 3. Click **Publish**
 4. Changes go live immediately
 
