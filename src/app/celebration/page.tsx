@@ -41,13 +41,20 @@ export default async function CelebrationPage() {
   const intro = pageContent?.intro
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
-      <section className="max-w-6xl mx-auto px-4 py-16">
+    <>
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-[#760088] text-white px-4 py-2 rounded-md font-semibold z-50"
+      >
+        Skip to main content
+      </a>
+      <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
+        <section id="main-content" className="max-w-6xl mx-auto px-4 py-16">
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
             {heading}
           </h1>
-          <div className="text-lg text-gray-700 leading-relaxed max-w-3xl">
+          <div className="text-lg text-gray-800 leading-relaxed max-w-3xl">
             {intro ? (
               <StrapiRichText content={intro} />
             ) : (
@@ -87,10 +94,10 @@ export default async function CelebrationPage() {
           )}
         </div>
 
-        {/* 2025 Sponsors */}
+        {/* 2026 Sponsors */}
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10 mt-8">
           <h2 className="font-heading text-3xl md:text-4xl font-bold text-[#760088] mb-8 text-center">
-            Katy Pride 2025 Sponsors
+            Katy Pride 2026 Sponsors
           </h2>
 
           {/* Platinum Sponsor */}
@@ -145,5 +152,6 @@ export default async function CelebrationPage() {
         </div>
       </section>
     </div>
+    </>
   )
 }

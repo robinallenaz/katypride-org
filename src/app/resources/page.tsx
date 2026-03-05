@@ -124,11 +124,11 @@ export default async function ResourcesPage() {
       pillBorder: "border-[#06bd01]/30",
       pillBg: "bg-[#06bd01]/10",
       pillHoverBg: "group-hover:bg-[#06bd01]/20",
-      pillText: "text-[#036600]",
+      pillText: "text-[#025200]",
       chipBorder: "border-[#06bd01]/40",
       chipBg: "bg-white",
       chipHoverBg: "hover:bg-[#06bd01]/10",
-      chipText: "text-[#036600]",
+      chipText: "text-[#025200]",
     },
     advocacy: {
       cardBg: "bg-white/90",
@@ -140,11 +140,11 @@ export default async function ResourcesPage() {
       pillBorder: "border-[#ff1c25]/30",
       pillBg: "bg-[#ff1c25]/10",
       pillHoverBg: "group-hover:bg-[#ff1c25]/20",
-      pillText: "text-[#a80f14]",
+      pillText: "text-[#800000]",
       chipBorder: "border-[#ff1c25]/40",
       chipBg: "bg-white",
       chipHoverBg: "hover:bg-[#ff1c25]/10",
-      chipText: "text-[#a80f14]",
+      chipText: "text-[#800000]",
     },
     ally: {
       cardBg: "bg-white/90",
@@ -156,11 +156,11 @@ export default async function ResourcesPage() {
       pillBorder: "border-[#760088]/30",
       pillBg: "bg-[#760088]/10",
       pillHoverBg: "group-hover:bg-[#760088]/20",
-      pillText: "text-[#760088]",
+      pillText: "text-[#5a0066]",
       chipBorder: "border-[#760088]/40",
       chipBg: "bg-white",
       chipHoverBg: "hover:bg-[#760088]/10",
-      chipText: "text-[#760088]",
+      chipText: "text-[#5a0066]",
     },
     regional: {
       cardBg: "bg-white/90",
@@ -172,11 +172,11 @@ export default async function ResourcesPage() {
       pillBorder: "border-[#fe931f]/30",
       pillBg: "bg-[#fe931f]/10",
       pillHoverBg: "group-hover:bg-[#fe931f]/20",
-      pillText: "text-[#a94e00]",
+      pillText: "text-[#804000]",
       chipBorder: "border-[#fe931f]/40",
       chipBg: "bg-white",
       chipHoverBg: "hover:bg-[#fe931f]/10",
-      chipText: "text-[#a94e00]",
+      chipText: "text-[#804000]",
     },
     national: {
       cardBg: "bg-white/90",
@@ -188,11 +188,11 @@ export default async function ResourcesPage() {
       pillBorder: "border-[#021999]/30",
       pillBg: "bg-[#021999]/10",
       pillHoverBg: "group-hover:bg-[#021999]/20",
-      pillText: "text-[#021999]",
+      pillText: "text-[#001566]",
       chipBorder: "border-[#021999]/40",
       chipBg: "bg-white",
       chipHoverBg: "hover:bg-[#021999]/10",
-      chipText: "text-[#021999]",
+      chipText: "text-[#001566]",
     },
   }
 
@@ -207,7 +207,8 @@ export default async function ResourcesPage() {
   }) => (
     <a
       href={href}
-      className={`font-heading antialiased inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-[13px] font-semibold leading-none tracking-wide shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${accent.chipBorder} ${accent.chipBg} ${accent.chipHoverBg} ${accent.chipText} ${accent.ring}`}
+      role="tab"
+      className={`font-heading antialiased inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-[13px] font-semibold leading-none tracking-wide shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${accent.chipBorder} ${accent.chipBg} ${accent.chipHoverBg} ${accent.chipText} ${accent.ring}`}
     >
       {label}
     </a>
@@ -243,7 +244,7 @@ export default async function ResourcesPage() {
           aria-hidden="true"
           className={`font-heading antialiased mt-0.5 shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold leading-none tracking-wide transition-all duration-200 ${accent.pillBorder} ${accent.pillBg} ${accent.pillText} ${accent.pillHoverBg}`}
         >
-          Visit →
+          Visit <span aria-hidden="true">→</span>
         </span>
       </a>
     </li>
@@ -302,22 +303,29 @@ export default async function ResourcesPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
-      <section className="max-w-6xl mx-auto px-4 py-16">
+    <>
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-[#760088] text-white px-4 py-2 rounded-md font-semibold z-50"
+      >
+        Skip to main content
+      </a>
+      <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
+        <section id="main-content" className="max-w-6xl mx-auto px-4 py-16">
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
             LGBTQ Local & National Resources
           </h1>
 
-          <p className="text-lg text-gray-700 leading-relaxed max-w-3xl">
+          <p className="text-lg text-gray-800 leading-relaxed max-w-3xl">
             Community resources and support links.
           </p>
 
           <nav id="categories" aria-label="Resource categories" className="mt-6 scroll-mt-24">
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-gray-700 mb-3" id="category-description">
               Select a category to jump to that section.
             </p>
-            <div className="grid gap-2 sm:flex sm:flex-wrap">
+            <div className="grid gap-2 sm:flex sm:flex-wrap" role="tablist" aria-describedby="category-description">
               <JumpLink
                 href="#health-and-wellness"
                 label="Health & Wellness"
@@ -383,5 +391,6 @@ export default async function ResourcesPage() {
         </div>
       </section>
     </div>
+    </>
   )
 }

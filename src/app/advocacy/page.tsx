@@ -1,30 +1,37 @@
 export default function AdvocacyPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
-      <section className="max-w-6xl mx-auto px-4 py-16">
+    <>
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-[#760088] text-white px-4 py-2 rounded-md font-semibold z-50"
+      >
+        Skip to main content
+      </a>
+      <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
+        <section id="main-content" className="max-w-6xl mx-auto px-4 py-16">
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
             Advocacy
           </h1>
 
           <section className="mt-8">
-            <p className="text-lg text-gray-700 leading-relaxed max-w-4xl">
+            <p className="text-lg text-gray-800 leading-relaxed max-w-4xl">
               Katy Pride believes all humans are inherently worthy of being celebrated and embraced as their authentic selves.
             </p>
 
-            <p className="mt-4 text-lg text-gray-700 leading-relaxed max-w-4xl">
+            <p className="mt-4 text-lg text-gray-800 leading-relaxed max-w-4xl">
               We are proud to lift up and celebrate the accomplishments and successes of LGBTQIA+ students, parents, educators and community members, and stand in solidarity with those who face intolerance, hatred or discrimination in educational and community spaces.
             </p>
 
-            <p className="mt-4 text-lg text-gray-700 leading-relaxed max-w-4xl">
+            <p className="mt-4 text-lg text-gray-800 leading-relaxed max-w-4xl">
               Katy Pride connects community members with resources and support to meet their needs.
             </p>
 
-            <p className="mt-4 text-lg text-gray-700 leading-relaxed max-w-4xl">
+            <p className="mt-4 text-lg text-gray-800 leading-relaxed max-w-4xl">
               Katy Pride encourages participation and attendance to local school board meetings, supports get out the vote efforts for elections, including all local elections, offers educational events for the public, and community partners, and strives to partner with LGBTQIA+ student organizations in meaningful ways.
             </p>
 
-            <p className="mt-4 text-lg text-gray-700 leading-relaxed max-w-4xl">
+            <p className="mt-4 text-lg text-gray-800 leading-relaxed max-w-4xl">
               Building relationships within our community, and advocating for inclusive, equitable and affirming education for all students is critical to Katy Pride's mission to empower the LGBTQ+ community in Katy and West Houston by hosting inclusive events, advocating for equality, and fostering a supportive culture of acceptance and diversity.
             </p>
           </section>
@@ -108,7 +115,7 @@ export default function AdvocacyPage() {
               Title IX Discrimination
             </h2>
 
-            <p className="text-lg text-gray-700 leading-relaxed max-w-4xl">
+            <p className="text-lg text-gray-800 leading-relaxed max-w-4xl">
               Are you experiencing hardship, or discrimination, based on your perceived, or lived, sex, sexual orientation, and/or gender identity, in an educational space? If so, your civil rights guaranteed by Federal Title IX laws may be violated. You can report sex and gender-based discrimination to the Federal Department of Education's Office of Civil Rights.
             </p>
 
@@ -130,7 +137,7 @@ export default function AdvocacyPage() {
               KISD Gender Policy
             </h2>
 
-            <p className="text-lg text-gray-700 leading-relaxed max-w-4xl">
+            <p className="text-lg text-gray-800 leading-relaxed max-w-4xl">
               If you're a Katy ISD student, or parent, facing discrimination or hardship based on Katy ISD's "Gender Policy," and would like support and assistance figuring out what your options are, you can submit this Google Form and someone will follow up with you.
             </p>
 
@@ -149,5 +156,6 @@ export default function AdvocacyPage() {
         </div>
       </section>
     </div>
+    </>
   )
 }

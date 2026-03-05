@@ -542,6 +542,78 @@ export interface ApiEventEvent extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiFormLinkFormLink extends Struct.CollectionTypeSchema {
+  collectionName: 'form_links';
+  info: {
+    description: 'Form links displayed on various pages like celebration and volunteer signup.';
+    displayName: 'Form Link';
+    pluralName: 'form-links';
+    singularName: 'form-link';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    active: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::form-link.form-link'
+    > &
+      Schema.Attribute.Private;
+    orderRank: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<1>;
+    page: Schema.Attribute.Enumeration<
+      ['celebration', 'volunteer', 'vendor', 'sponsor', 'contact']
+    > &
+      Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    url: Schema.Attribute.String & Schema.Attribute.Required;
+  };
+}
+
+export interface ApiPageContentPageContent extends Struct.CollectionTypeSchema {
+  collectionName: 'page_contents';
+  info: {
+    description: 'General page content like headings and intro text for various pages.';
+    displayName: 'Page Content';
+    pluralName: 'page-contents';
+    singularName: 'page-content';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    heading: Schema.Attribute.String;
+    intro: Schema.Attribute.Blocks;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::page-content.page-content'
+    > &
+      Schema.Attribute.Private;
+    metaDescription: Schema.Attribute.Text;
+    metaTitle: Schema.Attribute.String;
+    page: Schema.Attribute.Enumeration<
+      ['celebration', 'about', 'advocacy', 'contact', 'home']
+    > &
+      Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiResourceLinkResourceLink
   extends Struct.CollectionTypeSchema {
   collectionName: 'resource_links';
@@ -1093,6 +1165,8 @@ declare module '@strapi/strapi' {
       'api::calendar-setting.calendar-setting': ApiCalendarSettingCalendarSetting;
       'api::carousel-image.carousel-image': ApiCarouselImageCarouselImage;
       'api::event.event': ApiEventEvent;
+      'api::form-link.form-link': ApiFormLinkFormLink;
+      'api::page-content.page-content': ApiPageContentPageContent;
       'api::resource-link.resource-link': ApiResourceLinkResourceLink;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
