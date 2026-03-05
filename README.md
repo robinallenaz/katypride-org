@@ -1,168 +1,199 @@
 # Katy Pride Website
 
 This repository contains the website for **Katy Pride**, an LGBTQ+ community organization serving Katy and West Houston.
-## What’s in this site
 
-Current pages include:
+## Architecture
 
-- **Home**
-- **About** (Mission, Vision, Pronouns Matter)
-- **Events**
-- **Calendar**
-- **Advocacy** (Helpful links + Title IX and KISD Gender Policy support sections)
--  **Celebration**
-- **Resources** (categorized local & national resources with jump navigation)
+| Layer | Service | Cost |
+|-------|---------|------|
+| **Frontend** | Next.js on **Vercel** | Free |
+| **CMS** | Strapi v5 on **Render** (free tier) | Free |
+| **Database** | **Neon** PostgreSQL | Free (512MB) |
+| **CRM** | **GrowthSphere360** (GoHighLevel) | Existing plan |
+| **Images** | Cloudinary | Free tier |
 
-- **Donate**
-- **Newsletter**
-- **Volunteer**
+## Pages
 
-Images are served from **Cloudinary**.
+- **Home** — Carousel, featured events
+- **About** — Mission, Vision, Pronouns Matter
+- **Events** — Upcoming events from Strapi
+- **Calendar** — Embedded Google Calendar
+- **Advocacy** — Title IX, KISD policy support
+- **Celebration** — Chase the Rainbow 5K info
+- **Resources** — Categorized local & national LGBTQ+ resources
+- **Donate** — Donation form → GrowthSphere360 CRM
+- **Volunteer** — Volunteer signup → GrowthSphere360 CRM
+- **Vendor Signup** (`/vendor-signup`) — Chase the Rainbow 5K vendor application → CRM
+- **Newsletter** — Newsletter signup
+- **News** — Blog posts with HTML support (mailto links, etc.)
 
-## Admin: managing events
+## Admin: Managing Content (Strapi)
 
-Events are managed in **Sanity Studio**, embedded in this Next.js app.
+Admins manage site content through the **Strapi admin panel**.
 
-- **Studio URL (production/Vercel)**
-  - `https://<your-domain>/studio`
-  - Examples:
-    - `https://katypride.org/studio`
-    - `https://<your-vercel-domain>/studio`
+### Access the Admin Panel
 
-### Add/edit regular events
+- **Production**: `https://<your-render-app>.onrender.com/admin`
+- **Local**: `http://localhost:1337/admin`
 
-1. Open the Studio (`/studio`)
-2. Go to **Events**
-3. Create or edit an Event
-4. Fill in any of the following:
-   - **Title**
-   - **Start / End** date & time
-   - **Location**
-   - **Image**
-   - **Summary** (rich text)
-   - **External URL** (optional)
-   - **External Link Button Text** (optional)
-     - Examples: `Buy tickets`, `RSVP`, `Register`, `Donate`
-5. Publish
+### What Admins Can Manage
 
-The public Events page (`/events`) automatically displays upcoming published events.
+| Content Type | Description |
+|-------------|-------------|
+| **Events** | Title, date, location, image, summary, external links, category (general/coffee) |
+| **Resource Links** | Name, URL, category (health/advocacy/ally/regional/national), description |
+| **Carousel Images** | Title, image, alt text, active status |
+| **Calendar Settings** | Google Calendar ID, timezone, title, description |
 
-### Recurring “Espresso Yourself” coffee meetups
+### Add/Edit an Event
 
-The site automatically generates upcoming coffee meetups (2nd Friday). Admins can customize individual instances without losing the recurring behavior.
+1. Log in to the Strapi admin panel
+2. Click **Content Manager** → **Event**
+3. Click **+ Create new entry**
+4. Fill in: Title, Start/End date, Location, Image, Summary, External URL
+5. Set **Event Category**: `general` or `coffee`
+6. Click **Save** then **Publish**
 
-#### Customize or cancel a specific coffee meetup
+### Add/Edit a Resource
 
-1. Open the Studio (`/studio`)
-2. Go to **Coffee Meetup Overrides**
-3. Create a new override document
-4. Set **Meetup Date** to the specific meetup date you want to customize (YYYY-MM-DD)
-5. Optionally set any overrides (title, time, location/address, image, summary, external link)
-6. To remove an instance from the public feed, set **Cancelled** = true
+1. Click **Content Manager** → **Resource Link**
+2. Click **+ Create new entry**
+3. Fill in: Name, URL, Category, Description
+4. Click **Save** then **Publish**
 
-When an override exists for a date, the Events page will use the override values for that specific meetup.
+## Admin: Google Calendar
 
-### Important: GitHub Pages vs Vercel
+The `/calendar` page embeds a **Google Calendar**.
 
-- GitHub Pages deployments are **static previews** and are not intended for admin management.
-- Admins should use the **Vercel/production** site to access the Studio at `/studio`.
-
-## Admin: managing the Google Calendar
-
-The `/calendar` page embeds a **Google Calendar**. Events added to this calendar appear automatically in the embedded view.
-
-### Give admins edit access to the calendar
+### Give admins edit access
 
 1. Open [Google Calendar](https://calendar.google.com) as the calendar owner
-2. Find the **Katy Pride** calendar in the left sidebar
-3. Click the **⋮** (three dots) → **Settings and sharing**
-4. Scroll to **Share with specific people or groups**
-5. Click **+ Add people and groups**
-6. Enter each admin's email address
-7. Set permission to **Make changes to events** (or **Make changes and manage sharing** for full control)
-8. Click **Send**
+2. Find the **Katy Pride** calendar → **⋮** → **Settings and sharing**
+3. Scroll to **Share with specific people or groups**
+4. Add admin emails with **Make changes to events** permission
 
-### Add events to the calendar
-
-Once an admin has edit access:
-
-1. Go to [Google Calendar](https://calendar.google.com)
-2. Make sure you're viewing the **Katy Pride** calendar
-3. Click on a date/time → **Create event**
-4. Fill in details and save
-
-The event will appear in the embedded calendar on `/calendar` automatically.
-
-### Note: Events page vs Calendar page
+### Events page vs Calendar page
 
 | Where admins add events | Where it shows up |
 |-------------------------|-------------------|
 | **Google Calendar** | Embedded calendar on `/calendar` |
-| **Sanity Studio** | Events feed on `/events` |
+| **Strapi** | Events feed on `/events` |
 
-If you want an event in **both places**, add it in both Google Calendar and Sanity Studio.
+## CRM Integration (GrowthSphere360)
 
-## Running locally
+Forms on the website submit directly to GrowthSphere360 via the `/api/crm` API route.
 
-Install dependencies:
+### Forms → CRM
+
+| Form | URL | CRM Tags |
+|------|-----|----------|
+| Volunteer signup | `/volunteer` | `volunteer` + selected interests |
+| Donor form | `/donate` | `donor` |
+| Vendor application | `/vendor-signup` | `vendor`, `vendor-{type}`, `chase-the-rainbow-5k-2026` |
+
+### Vendor Data in CRM
+
+Vendor submissions include: company name, address, contact info, vendor type, fee, products/services, social media, and website. All stored as custom fields and tags.
+
+### View CRM Data
+
+1. Log in to GrowthSphere360
+2. Click **Contacts** to see all submissions
+3. Filter by tags (e.g., `vendor`, `volunteer`, `donor`)
+
+## Running Locally
+
+### Frontend (Next.js)
 
 ```bash
 npm ci
-```
-
-Start the dev server:
-
-```bash
 npm run dev
 ```
 
-Open:
+Open `http://localhost:3000`
 
-```text
-http://localhost:3000
-```
-
-## Build
-
-This project is configured for static export (for GitHub Pages previews):
+### Backend (Strapi)
 
 ```bash
-npm run build
+cd backend
+npm ci
+npm run develop
 ```
 
-## Preview deployments (GitHub Pages)
+Open `http://localhost:1337/admin`
 
-This repo includes a GitHub Actions workflow that builds the static site and deploys it to GitHub Pages.
+## Environment Variables
 
+### Frontend (`.env.local`)
 
-In GitHub:
-
-1. Repo **Settings**
-2. **Pages**
-3. **Build and deployment**
-4. **Source**: `GitHub Actions`
-
-The preview URL will be:
-
-```text
-https://<github-username>.github.io/<repo-name>/
+```env
+NEXT_PUBLIC_SANITY_PROJECT_ID=your_sanity_project_id
+NEXT_PUBLIC_SANITY_DATASET=production
+GHL_API_KEY=your_gohighlevel_api_key
+GHL_LOCATION_ID=your_ghl_location_id
+CRM_ADMIN_SECRET=your_crm_dashboard_admin_token
 ```
 
-## Tech stack (current)
+### Backend (`backend/.env`)
 
-- **Next.js** (App Router)
-- **React**
+```env
+# Server
+HOST=0.0.0.0
+PORT=1337
+
+# Secrets (auto-generated, keep these)
+APP_KEYS=...
+API_TOKEN_SALT=...
+ADMIN_JWT_SECRET=...
+TRANSFER_TOKEN_SALT=...
+ENCRYPTION_KEY=...
+JWT_SECRET=...
+
+# Database - Neon PostgreSQL
+DATABASE_CLIENT=postgres
+DATABASE_URL=postgresql://user:pass@host/dbname?sslmode=require
+DATABASE_SSL=true
+DATABASE_SSL_REJECT_UNAUTHORIZED=false
+```
+
+## Deployment
+
+### Frontend → Vercel
+
+1. Push code to GitHub
+2. Go to [vercel.com](https://vercel.com), sign in with GitHub
+3. Import the `katypride-org` repo
+4. Add environment variables (see above)
+5. Deploy — Vercel auto-detects Next.js
+
+### CMS → Render
+
+1. Create a [Neon](https://neon.tech) account and free PostgreSQL database
+2. Copy the connection string
+3. Go to [render.com](https://render.com), sign in with GitHub
+4. Create a **New Web Service** from the `katypride-org` repo
+5. Set **Root Directory**: `backend`
+6. Set **Build Command**: `npm ci && npm run build`
+7. Set **Start Command**: `npm run start`
+8. Add environment variables (see Backend section above, use your Neon connection string for `DATABASE_URL`)
+9. Deploy
+
+### After Deployment
+
+1. Visit your Render URL + `/admin` to create your admin account
+2. Re-create content types through the admin panel if needed
+3. Add content (events, resources, carousel images)
+4. Set API permissions: **Settings → Roles → Public → check "find" for each content type**
+
+## Tech Stack
+
+- **Next.js 16** (App Router)
+- **React 19**
 - **TypeScript**
-- **Tailwind CSS**
+- **Tailwind CSS 4**
+- **Strapi v5** (headless CMS)
+- **Neon PostgreSQL** (database)
+- **GrowthSphere360 / GoHighLevel** (CRM)
 - **Cloudinary** (hosted images)
-- **Sanity** (headless CMS for events, embedded Studio at `/studio`)
-- **GitHub Actions** (GitHub Pages deployment)
-
-## Tech stack (planned / rough outline)
-
-- **Forms**: Google Forms (newsletter signup + volunteer intake)
-- **Email / newsletter**: Mailchimp
-- **Analytics**: privacy-friendly analytics (provider TBD, maybe Umami self-hosted on Vercel or Vercel Analytics)
-- **Accessibility & QA**: automated checks (linting, link checking, a11y audits)
-- **Hosting / deployment**: Vercel (production) + GitHub Pages (preview)
-
+- **Vercel** (frontend hosting)
+- **Render** (CMS hosting)

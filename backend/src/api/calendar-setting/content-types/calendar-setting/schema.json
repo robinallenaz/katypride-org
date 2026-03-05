@@ -1,0 +1,37 @@
+{
+  "kind": "singleType",
+  "collectionName": "calendar_settings",
+  "info": {
+    "singularName": "calendar-setting",
+    "pluralName": "calendar-settings",
+    "displayName": "Calendar Settings",
+    "description": "Google Calendar embed settings for the /calendar page. Only one entry needed."
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "calendarId": {
+      "type": "string",
+      "required": true
+    },
+    "timeZone": {
+      "type": "string",
+      "default": "America/Chicago",
+      "required": true
+    },
+    "calendarTitle": {
+      "type": "string",
+      "default": "Calendar"
+    },
+    "calendarDescription": {
+      "type": "text",
+      "default": "View upcoming Katy Pride events..."
+    },
+    "showSubscribeButtons": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

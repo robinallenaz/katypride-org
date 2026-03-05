@@ -11,6 +11,8 @@ Welcome to the Katy Pride website administration guide. This document explains h
 - **Resources** – LGBTQ+ organizations and support links (katypride.org/resources)
 - **Form Links** – Buttons that link to external forms and registration pages
 - **Page Content** – Page headings and introductory text
+- **Carousel Images** – Photos displayed in the home page carousel
+- **Website Images** – General image library for website use
 
 ## Managing Events
 
@@ -33,24 +35,62 @@ Welcome to the Katy Pride website administration guide. This document explains h
 - **Event Image / Flyer**
 - **Registration / Tickets Link**
 - **Button Text** (custom registration button text)
+- **Event Category** (General Event or Coffee Meetup)
 - **Published** (enable to show on website)
 
-**💡** Click **Preview Pages** in the sidebar to see how your event looks before publishing!
+**💡Tip** Click **Preview Pages** in the sidebar to see how your event looks before publishing!
+
+### Coffee Meetup Events
+
+Coffee meetups are now managed as regular events with the **Coffee Meetup** category:
+
+- **Default Schedule**: Second Friday of each month at 8:00 AM
+- **Default Location**: Coffee Fellows (3329 Grand Parkway, Katy, TX 77449)
+- **Customization**: Create a coffee meetup event to override the default for a specific date
+- **Cancellation**: Don't create an event for a date you want to cancel
+
+**To customize a coffee meetup:**
+1. Create a new event with **Event Category** set to "Coffee Meetup"
+2. Set the date to the specific Friday you want to customize
+3. Customize title, time, location, description, or add RSVP link
+4. Leave a date without an event to cancel that month's meetup
 
 ### Event Display Rules
 
 - Events appear chronologically on `/events`
 - Only future, published events are visible to visitors
 - Past events and unpublished events are hidden automatically
+- Coffee meetups without custom events show default recurring schedule
 
-## Coffee Meetup Overrides
+## Managing Calendar Settings
 
-Coffee meetups occur on the **second Friday of each month**. To customize a specific date:
+### Configuring Google Calendar
 
-1. **Select Coffee Meetup Overrides**
-2. **Click New coffee meetup override**
-3. **Choose the date to customize**
-4. **Options:** cancel the meetup, change title/time/location/address, add custom description/image, or add RSVP link
+1. **Select Calendar Settings** from the sidebar
+2. **Edit the settings document** (there should only be one)
+3. **Complete the fields:**
+
+**Required:**
+
+- **Google Calendar ID** - The calendar ID to embed (find in Google Calendar settings under "Integrate calendar")
+- **Time Zone** - Time zone for calendar display (e.g., America/Chicago)
+
+**Optional:**
+
+- **Calendar Title** - Title displayed on the Calendar page
+- **Calendar Description** - Description displayed on the Calendar page  
+- **Show Subscribe Buttons** - Toggle to show/hide Google Calendar and iCal subscribe buttons
+
+**💡 Finding Your Calendar ID:**
+1. Open your Google Calendar
+2. Go to Settings → Click on the calendar name
+3. Scroll to "Integrate calendar" section
+4. Copy the Calendar ID (it looks like an email address)
+
+**💡 Making Calendar Public:**
+1. In Google Calendar settings, find "Access permissions"
+2. Select "Make available to public"
+3. Choose "See all event details" for full visibility
 
 ## Managing Resources
 
@@ -75,12 +115,41 @@ Resources are grouped by category. Drag and drop to reorder within categories.
 2. **Click New form link**
 3. **Configure:**
 
-- **Button Text**
-- **Form URL**
-- **Display Page** (Home, Celebration, Volunteer, Donate, or Events)
-- **Active** (enable to appear)
+   • Button Text<br>
+   • Form URL<br>
+   • Display Page (Home, Celebration, Volunteer, Donate, or Events)<br>
+   • Active (enable to appear)<br><br>
 
-Buttons open in a new tab. Drag and drop to reorder.
+Buttons open in a new tab. Drag and drop to reorder them.
+
+## Managing Carousel Images
+
+### Adding a Carousel Image
+1. **Select Carousel Images** from the sidebar
+2. **Click New carousel image**
+3. **Complete the fields:**
+
+• Image Title - Descriptive name for the image<br>
+• Image - Upload the photo (supports drag and drop)<br>
+• Alternative Text - Important for accessibility and SEO<br>
+• Active - Enable to show in carousel<br><br>
+
+**💡 Tips:**
+- Images automatically display in the order they were created (oldest first)
+- Use the drag-and-drop interface to reorder images visually
+- Use high-quality images (minimum 1200px width) for best results
+
+### Managing Website Images
+
+1. **Select Website Images** from the sidebar
+2. **Click New website image**
+3. **Complete the fields:**
+
+• Image Name - Descriptive name<br>
+• Image - Upload the photo<br>
+• Image Category - Choose appropriate category (Hero, Event, Celebration, Advocacy, Resource, General)<br>
+• Active - Enable to use on website<br>
+• Notes - Optional usage instructions
 
 ## Managing Page Content
 
@@ -91,11 +160,11 @@ Buttons open in a new tab. Drag and drop to reorder.
 
 ## Previewing Changes
 
-Preview unpublished changes before going live:
+Preview unpublished changes before going live:<br><br>
 
-**Option 1:** Click **Preview Pages** in the Sanity Studio sidebar, then open the page preview in a new tab
+**Option 1:** Click **Preview Pages** in the Sanity Studio sidebar, then open the page preview in a new tab<br><br>
 
-**Option 2:** Add `?preview=true` to any page URL (e.g., `/events?preview=true`)
+**Option 2:** Add `?preview=true` to any page URL (e.g., `/events?preview=true`)<br><br>
 
 A yellow "Preview Mode" banner indicates you're viewing unpublished content (visible only to admins).
 
@@ -119,7 +188,5 @@ A yellow "Preview Mode" banner indicates you're viewing unpublished content (vis
 - **Resource link issues:** Verify URL starts with `https://` and is marked active
 - **Form button missing:** Confirm correct display page is selected and it's marked active
 
----
 
-Last updated: January 2026 
 For updates or questions, contact robin@katypride.org

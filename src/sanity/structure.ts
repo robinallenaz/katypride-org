@@ -6,11 +6,42 @@ export const structure: StructureResolver = (S, context) =>
   S.list()
     .title('Content')
     .items([
-      S.listItem().title('Events').schemaType('event').child(S.documentTypeList('event').title('Events')),
       S.listItem()
-        .title('Coffee Meetup Overrides')
-        .schemaType('coffeeMeetupOverride')
-        .child(S.documentTypeList('coffeeMeetupOverride').title('Coffee Meetup Overrides')),
+        .title('Events')
+        .icon(() => '📅')
+        .child(
+          S.list()
+            .title('Events')
+            .items([
+              S.listItem()
+                .title('All Events')
+                .icon(() => '📋')
+                .child(
+                  S.documentTypeList('event')
+                    .title('All Events')
+                    .filter('_type == "event"')
+                    .defaultOrdering([{ field: 'start', direction: 'asc' }])
+                ),
+              S.listItem()
+                .title('General Events')
+                .icon(() => '🎉')
+                .child(
+                  S.documentTypeList('event')
+                    .title('General Events')
+                    .filter('_type == "event" && eventCategory == "general"')
+                    .defaultOrdering([{ field: 'start', direction: 'asc' }])
+                ),
+              S.listItem()
+                .title('Coffee Meetups')
+                .icon(() => '☕')
+                .child(
+                  S.documentTypeList('event')
+                    .title('Coffee Meetups')
+                    .filter('_type == "event" && eventCategory == "coffee"')
+                    .defaultOrdering([{ field: 'start', direction: 'asc' }])
+                ),
+            ])
+        ),
       S.divider(),
       orderableDocumentListDeskItem({
         type: 'formLink',
@@ -22,6 +53,11 @@ export const structure: StructureResolver = (S, context) =>
         .title('Page Content')
         .schemaType('pageContent')
         .child(S.documentTypeList('pageContent').title('Page Content')),
+      S.listItem()
+        .title('Calendar Settings')
+        .schemaType('calendarSettings')
+        .icon(() => '📅')
+        .child(S.documentTypeList('calendarSettings').title('Calendar Settings')),
       S.divider(),
       orderableDocumentListDeskItem({
         type: 'resourceLink',
@@ -97,7 +133,19 @@ export const structure: StructureResolver = (S, context) =>
           return S.document().title('Opening Admin Guide...')
         }),
       S.divider(),
+      orderableDocumentListDeskItem({
+        type: 'carouselImage',
+        title: 'Carousel Images',
+        S,
+        context,
+      }),
+      S.listItem()
+        .title('📸 Website Images')
+        .schemaType('websiteImage')
+        .icon(() => '🖼️')
+        .child(S.documentTypeList('websiteImage').title('Website Images')),
+      S.divider(),
       ...S
         .documentTypeListItems()
-        .filter((listItem) => !['event', 'coffeeMeetupOverride', 'formLink', 'pageContent', 'resourceLink'].includes(listItem.getId() || '')),
+        .filter((listItem) => !['event', 'formLink', 'pageContent', 'resourceLink', 'carouselImage', 'websiteImage', 'calendarSettings'].includes(listItem.getId() || '')),
     ])

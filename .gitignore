@@ -36,6 +36,23 @@ yarn-error.log*
 # vercel
 .vercel
 
+
+# strapi backend artifacts (backend itself is now tracked)
+backend/node_modules
+backend/.env*
+backend/.tmp
+backend/.cache
+backend/build
+backend/dist
+backend/public/uploads
+
+# test/migration scripts
+test-strapi-api.js
+test-with-token.js
+create-sample-content.js
+check-crm-contacts.js
+migrate-to-strapi.js
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

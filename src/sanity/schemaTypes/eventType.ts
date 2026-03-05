@@ -80,14 +80,28 @@ export const eventType = defineType({
       description: 'Uncheck to hide this event from the website without deleting it. Draft events are only visible to admins.',
       initialValue: true,
     }),
+    defineField({
+      name: 'eventCategory',
+      title: 'Event Category',
+      type: 'string',
+      options: {
+        list: [
+          { title: 'General Event', value: 'general' },
+          { title: 'Coffee Meetup', value: 'coffee' },
+        ],
+      },
+      description: 'Select the type of event. Coffee meetups have special recurring behavior.',
+      initialValue: 'general',
+    }),
   ],
   preview: {
     select: {
       title: 'title',
       start: 'start',
+      eventCategory: 'eventCategory',
       media: 'image',
     },
-    prepare({ title, start, media }) {
+    prepare({ title, start, eventCategory, media }) {
       const formattedStart = start
         ? new Date(start).toLocaleString('en-US', {
             month: 'short',
@@ -98,9 +112,12 @@ export const eventType = defineType({
           })
         : ''
 
+      const categoryIcon = eventCategory === 'coffee' ? '☕' : '🎉'
+      const categoryLabel = eventCategory === 'coffee' ? 'Coffee Meetup' : 'General Event'
+
       return {
         title: title || 'Untitled event',
-        subtitle: formattedStart,
+        subtitle: `${categoryIcon} ${categoryLabel} • ${formattedStart}`,
         media,
       }
     },

@@ -75,9 +75,6 @@ export default function AdminGuidePage() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">📚 Admin Guide</h1>
-            <p className="text-gray-600">
-              Comprehensive guide for managing the Katy Pride website
-            </p>
           </div>
           
           <div className="prose prose-lg max-w-none">

@@ -1,0 +1,58 @@
+{
+  "kind": "collectionType",
+  "collectionName": "events",
+  "info": {
+    "singularName": "event",
+    "pluralName": "events",
+    "displayName": "Event",
+    "description": "Community events displayed on the /events page. Includes Espresso Yourself meetups and special events like Chase the Rainbow 5K."
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "start": {
+      "type": "datetime",
+      "required": true
+    },
+    "end": {
+      "type": "datetime"
+    },
+    "location": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "blocks"
+    },
+    "externalUrl": {
+      "type": "string"
+    },
+    "externalCtaLabel": {
+      "type": "string"
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "published": {
+      "type": "boolean",
+      "default": true
+    },
+    "eventCategory": {
+      "type": "enumeration",
+      "default": "general",
+      "enum": [
+        "general",
+        "coffee"
+      ]
+    }
+  }
+}

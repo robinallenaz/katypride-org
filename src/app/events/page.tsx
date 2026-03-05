@@ -23,22 +23,6 @@ type EventDoc = {
   published?: boolean
 }
 
-type CoffeeMeetupOverrideDoc = {
-  _id: string
-  meetupDate: string
-  cancelled?: boolean
-  title?: string
-  start?: string
-  end?: string
-  location?: string
-  address?: string
-  directionsUrl?: string
-  externalUrl?: string
-  externalCtaLabel?: string
-  image?: unknown
-  summary?: PortableTextValue
-}
-
 type EventItem = {
   id: string
   title: string
@@ -78,50 +62,6 @@ type EventItem = {
       minute: '2-digit',
     }).format(date)
 
-  const formatTimeRange = (startIso: string, endIso?: string) => {
-    const start = new Date(startIso)
-    if (!endIso) return formatTime(start)
-
-    const end = new Date(endIso)
-    const sameDay =
-      start.getFullYear() === end.getFullYear() &&
-      start.getMonth() === end.getMonth() &&
-      start.getDate() === end.getDate()
-
-    if (!sameDay) return `${formatTime(start)} – ${formatLongDate(end)} ${formatTime(end)}`
-    return `${formatTime(start)} – ${formatTime(end)}`
-  }
-
-  const getSecondFriday = (year: number, monthIndex: number) => {
-    const firstOfMonth = new Date(year, monthIndex, 1)
-    const firstDay = firstOfMonth.getDay()
-    const friday = 5
-    const daysUntilFirstFriday = (friday - firstDay + 7) % 7
-    const firstFridayDate = 1 + daysUntilFirstFriday
-    const secondFridayDate = firstFridayDate + 7
-    return new Date(year, monthIndex, secondFridayDate)
-  }
-
-  const buildUpcomingSecondFridays = (count: number) => {
-    const now = new Date()
-    const results: Date[] = []
-
-    const startYear = now.getFullYear()
-    const startMonth = now.getMonth()
-
-    for (let i = 0; results.length < count && i < count + 24; i += 1) {
-      const monthIndex = (startMonth + i) % 12
-      const year = startYear + Math.floor((startMonth + i) / 12)
-      const secondFriday = getSecondFriday(year, monthIndex)
-
-      if (secondFriday >= new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
-        results.push(secondFriday)
-      }
-    }
-
-    return results
-  }
-
   const formatBadgeDate = (date: Date) =>
     new Intl.DateTimeFormat('en-US', {
       month: 'short',
@@ -130,15 +70,15 @@ type EventItem = {
     }).format(date)
 
   const [sanityEvents, setSanityEvents] = useState<EventDoc[]>([])
-  const [coffeeMeetupOverrides, setCoffeeMeetupOverrides] = useState<CoffeeMeetupOverrideDoc[]>([])
   const [loadingSanity, setLoadingSanity] = useState(true)
   const [visibleCount, setVisibleCount] = useState(3)
+  // Derived in useEffect to avoid window.location access during SSR
+  const [isPreview, setIsPreview] = useState(false)
 
   useEffect(() => {
     const run = async () => {
       try {
         const nowIso = new Date().toISOString()
-        const todayDate = nowIso.slice(0, 10)
         const query = `*[_type == "event" && coalesce(published, true) == true && start >= $now] | order(start asc)[0...50]{
           _id,
           title,
@@ -152,36 +92,19 @@ type EventItem = {
           published
         }`
 
-        const coffeeOverrideQuery = `*[_type == "coffeeMeetupOverride" && meetupDate >= $today] | order(meetupDate asc)[0...50]{
-          _id,
-          meetupDate,
-          cancelled,
-          title,
-          start,
-          end,
-          location,
-          address,
-          directionsUrl,
-          externalUrl,
-          externalCtaLabel,
-          image,
-          summary
-        }`
-
+        // Safe to access window here — useEffect only runs in the browser
         const searchParams = new URLSearchParams(window.location.search)
         const preview = isPreviewMode(searchParams)
+        setIsPreview(preview)
 
-        const [eventsResult, coffeeOverrideResult] = await Promise.all([
-          preview ? (getDraftContent(query) as Promise<EventDoc[]>) : client.fetch<EventDoc[]>(query, { now: nowIso }),
-          preview ? (getDraftContent(coffeeOverrideQuery) as Promise<CoffeeMeetupOverrideDoc[]>) : client.fetch<CoffeeMeetupOverrideDoc[]>(coffeeOverrideQuery, { today: todayDate }),
-        ])
+        const eventsResult = preview
+          ? (getDraftContent(query) as Promise<EventDoc[]>)
+          : client.fetch<EventDoc[]>(query, { now: nowIso })
 
-        setSanityEvents(eventsResult)
-        setCoffeeMeetupOverrides(coffeeOverrideResult)
+        setSanityEvents(await eventsResult)
       } catch (e) {
         console.error('Failed to load events from Sanity', e)
         setSanityEvents([])
-        setCoffeeMeetupOverrides([])
       } finally {
         setLoadingSanity(false)
       }
@@ -189,43 +112,6 @@ type EventItem = {
 
     run()
   }, [])
-
-  const coffeeOverrideByDateKey = new Map(
-    coffeeMeetupOverrides
-      .filter((o) => Boolean(o.meetupDate))
-      .map((o) => [o.meetupDate, o] as const),
-  )
-
-  const recurringCoffeeMeetups: EventItem[] = buildUpcomingSecondFridays(12)
-    .map<EventItem | null>((date) => {
-      const dateKey = date.toISOString().slice(0, 10)
-      const override = coffeeOverrideByDateKey.get(dateKey)
-      if (override?.cancelled) return null
-      const start = override?.start ? new Date(override.start) : new Date(date)
-      if (!override?.start) start.setHours(8, 0, 0, 0)
-      const end: Date | undefined = override?.end ? new Date(override.end) : new Date(date)
-      if (!override?.end) end.setHours(10, 0, 0, 0)
-      const imageSrc = override?.image ? urlFor(override.image).width(1400).quality(85).url() : undefined
-
-      return {
-        id: `recurring-coffee-${dateKey}`,
-        title: override?.title || 'Espresso Yourself: Community Coffee Meet-Up',
-        start,
-        end,
-        location: override?.location || 'Coffee Fellows',
-        address: override?.address || '3329 Grand Parkway, Katy, TX 77449',
-        directionsUrl:
-          override?.directionsUrl || 'https://www.google.com/maps/dir//3329%20Grand%20Parkway,%20Katy,%20TX%2077449',
-        externalUrl: override?.externalUrl,
-        externalCtaLabel: override?.externalCtaLabel,
-        imageSrc:
-          imageSrc ||
-          'https://res.cloudinary.com/dpus8jzix/image/upload/v1769659484/Coffee-Meet-Up-2_pumkia.png',
-        imageAlt: override?.title || 'Espresso Yourself community coffee meet-up flyer',
-        summary: override?.summary,
-      }
-    })
-    .filter((e): e is EventItem => e !== null)
 
   const sanityEventItems: EventItem[] = sanityEvents.map((event) => {
     const start = new Date(event.start)
@@ -246,7 +132,7 @@ type EventItem = {
     }
   })
 
-  const allEvents = [...recurringCoffeeMeetups, ...sanityEventItems]
+  const allEvents = [...sanityEventItems]
     .filter((e) => !Number.isNaN(e.start.getTime()))
     .sort((a, b) => a.start.getTime() - b.start.getTime())
 
@@ -254,7 +140,7 @@ type EventItem = {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
-      {isPreviewMode(new URLSearchParams(window.location.search)) && <PreviewBanner />}
+      {isPreview && <PreviewBanner />}
       <section className="max-w-6xl mx-auto px-4 py-16">
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">

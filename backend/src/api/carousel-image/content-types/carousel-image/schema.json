@@ -1,0 +1,39 @@
+{
+  "kind": "collectionType",
+  "collectionName": "carousel_images",
+  "info": {
+    "singularName": "carousel-image",
+    "pluralName": "carousel-images",
+    "displayName": "Carousel Image",
+    "description": "Homepage hero carousel images. Toggle isActive to show/hide images."
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "image": {
+      "type": "media",
+      "multiple": true,
+      "required": true,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "alt": {
+      "type": "string",
+      "required": true
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

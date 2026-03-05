@@ -25,11 +25,11 @@ export default function Nav() {
         <div className="flex justify-between items-center py-4">
           <Link href="/" className="flex items-center space-x-2">
             <img
-              src={cloudinaryUrl('65ad7fd64707829ac5cdbe0d_epa64u', 144)}
+              src={cloudinaryUrl('65ad7fd64707829ac5cdbe0d_epa64u', 300)}
               alt="Katy Pride Logo"
               width={72}
               height={72}
-              style={{ width: 'auto', height: 'auto' }}
+              className="h-12 w-auto"
               loading="eager"
             />
             <span className="font-heading text-xl font-bold text-purple-600">Katy Pride</span>
