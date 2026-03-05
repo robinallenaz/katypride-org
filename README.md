@@ -1,199 +1,164 @@
 # Katy Pride Website
 
-This repository contains the website for **Katy Pride**, an LGBTQ+ community organization serving Katy and West Houston.
+A modern, scalable website for **Katy Pride**, an LGBTQ+ community organization serving Katy and West Houston.
 
-## Architecture
+## 🚀 Quick Start for Admins
 
+**Access Strapi Admin Panel**: `https://katypride-7x4qno1sj-robinallenazs-projects.vercel.app/admin`
+
+**What you can manage**:
+- Events, Resources, Forms, Page Content
+- Form links for volunteer/donor/vendor signup  
+- Carousel images and calendar settings
+
+---
+
+## 📋 Admin Guide by Website Page
+
+### 🏠 Home Page
+**Content managed via**: Strapi Admin → Content Manager → **Carousel Image**
+
+**How to manage**:
+1. Go to **Content Manager** → **Carousel Image**
+2. Click **+ Create new entry**
+3. Add title, upload image, set alt text
+4. Toggle **Active** to show/hide on homepage
+5. Click **Save** then **Publish**
+
+### 📅 Events Page (`/events`)
+**Content managed via**: Strapi Admin → Content Manager → **Event**
+
+**How to add an event**:
+1. Click **+ Create new entry**
+2. Fill in required fields:
+   - **Title**: Event name
+   - **Start/End**: Date and time
+   - **Location**: Venue address
+   - **Image**: Upload event image
+   - **Summary**: Event details (rich text)
+   - **External URL**: Registration/ticket link (optional)
+   - **External CTA Label**: Button text (e.g., "Register Now")
+   - **Published**: Toggle to show/hide
+3. Click **Save** then **Publish**
+
+**Important**: Events automatically appear in date order. Past events are hidden.
+
+### 🗓️ Calendar Page (`/calendar`)
+**Content managed via**: Google Calendar (not Strapi)
+
+**How to manage**:
+1. Access Google Calendar with admin permissions
+2. Add/edit events directly in Google Calendar
+3. Changes appear instantly on website
+
+**To give someone admin access**:
+1. Go to Google Calendar → **Katy Pride** calendar settings
+2. **Share with specific people** → Add email
+3. Set permission: **Make changes to events**
+
+### 🎉 Celebration Page (`/celebration`)
+**Content managed via**: Strapi Admin → Content Manager
+
+**Page Content**:
+1. Go to **Content Manager** → **Page Content**
+2. Find entry with `page: "celebration"`
+3. Edit **Heading** and **Intro** content
+4. Click **Save** then **Publish**
+
+**Form Links** (Chase the Rainbow 5K signup forms):
+1. Go to **Content Manager** → **Form Link**
+2. Click **+ Create new entry**
+3. Fill in:
+   - **Title**: Form name (e.g., "Volunteer Signup")
+   - **URL**: Form link
+   - **Page**: Select "celebration"
+   - **Active**: Toggle to show/hide
+   - **Order Rank**: Number for ordering (1 = first)
+4. Click **Save** then **Publish**
+
+### 📚 Resources Page (`/resources`)
+**Content managed via**: Strapi Admin → Content Manager → **Resource Link**
+
+**How to add a resource**:
+1. Click **+ Create new entry**
+2. Fill in:
+   - **Name**: Organization name
+   - **URL**: Website link
+   - **Category**: health | advocacy | ally | regional | national
+   - **Active**: Toggle to show/hide
+   - **Description**: Brief description (optional)
+3. Click **Save** then **Publish**
+
+**Note**: Resources appear in category order. Default resources are built-in but can be overridden.
+
+### 🏢 About Page (`/about`)
+**Content managed via**: Strapi Admin → Content Manager → **Page Content**
+
+**How to edit**:
+1. Find entry with `page: "about"`
+2. Edit **Heading** and **Intro** content
+3. Click **Save** then **Publish**
+
+### 📢 Advocacy Page (`/advocacy`)
+**Content managed via**: Strapi Admin → Content Manager → **Page Content**
+
+**How to edit**:
+1. Find entry with `page: "advocacy"`
+2. Edit **Heading** and **Intro** content
+3. Click **Save** then **Publish**
+
+### 🤝 Volunteer & Donation Forms
+**Content managed via**: Strapi Admin → Content Manager → **Form Link**
+
+**Volunteer Page (`/volunteer`)**:
+1. Create Form Link entries with `page: "volunteer"`
+2. Links appear as signup buttons on the page
+
+**Donation Page (`/donate`)**:
+1. Create Form Link entries with `page: "donor"`
+2. Links appear as donation options
+
+### 🏪 Vendor Signup (`/vendor-signup`)
+**Content managed via**: Strapi Admin → Content Manager → **Form Link**
+
+**How to manage vendor forms**:
+1. Create Form Link entries with `page: "vendor"`
+2. Links appear as vendor application options
+3. Submissions go to GrowthSphere360 CRM with `vendor` tags
+
+---
+
+## 🔄 CRM Integration (GrowthSphere360)
+
+All form submissions automatically sync to GrowthSphere360 CRM:
+
+| Form | CRM Tags |
+|------|----------|
+| Volunteer | `volunteer` + selected interests |
+| Donor | `donor` |
+| Vendor | `vendor`, `vendor-{type}`, `chase-the-rainbow-5k-2026` |
+
+**View submissions**:
+1. Log in to GrowthSphere360
+2. Go to **Contacts**
+3. Filter by tags (`vendor`, `volunteer`, `donor`)
+
+---
+
+## 🛠️ Technical Setup
+
+### Architecture
 | Layer | Service | Cost |
 |-------|---------|------|
 | **Frontend** | Next.js on **Vercel** | Free |
-| **CMS** | Strapi v5 on **Render** (free tier) | Free |
+| **CMS** | Strapi v5 on **Render** | Free |
 | **Database** | **Neon** PostgreSQL | Free (512MB) |
-| **CRM** | **GrowthSphere360** (GoHighLevel) | Existing plan |
-| **Images** | Cloudinary | Free tier |
+| **CRM** | **GrowthSphere360** | Existing plan |
 
-## Pages
+### Local Development
 
-- **Home** — Carousel, featured events
-- **About** — Mission, Vision, Pronouns Matter
-- **Events** — Upcoming events from Strapi
-- **Calendar** — Embedded Google Calendar
-- **Advocacy** — Title IX, KISD policy support
-- **Celebration** — Chase the Rainbow 5K info
-- **Resources** — Categorized local & national LGBTQ+ resources
-- **Donate** — Donation form → GrowthSphere360 CRM
-- **Volunteer** — Volunteer signup → GrowthSphere360 CRM
-- **Vendor Signup** (`/vendor-signup`) — Chase the Rainbow 5K vendor application → CRM
-- **Newsletter** — Newsletter signup
-- **News** — Blog posts with HTML support (mailto links, etc.)
-
-## Admin: Managing Content (Strapi)
-
-Admins manage site content through the **Strapi admin panel**.
-
-### Access the Admin Panel
-
-- **Production**: `https://<your-render-app>.onrender.com/admin`
-- **Local**: `http://localhost:1337/admin`
-
-### What Admins Can Manage
-
-| Content Type | Description |
-|-------------|-------------|
-| **Events** | Title, date, location, image, summary, external links, category (general/coffee) |
-| **Resource Links** | Name, URL, category (health/advocacy/ally/regional/national), description |
-| **Carousel Images** | Title, image, alt text, active status |
-| **Calendar Settings** | Google Calendar ID, timezone, title, description |
-
-### Add/Edit an Event
-
-1. Log in to the Strapi admin panel
-2. Click **Content Manager** → **Event**
-3. Click **+ Create new entry**
-4. Fill in: Title, Start/End date, Location, Image, Summary, External URL
-5. Set **Event Category**: `general` or `coffee`
-6. Click **Save** then **Publish**
-
-### Add/Edit a Resource
-
-1. Click **Content Manager** → **Resource Link**
-2. Click **+ Create new entry**
-3. Fill in: Name, URL, Category, Description
-4. Click **Save** then **Publish**
-
-## Admin: Google Calendar
-
-The `/calendar` page embeds a **Google Calendar**.
-
-### Give admins edit access
-
-1. Open [Google Calendar](https://calendar.google.com) as the calendar owner
-2. Find the **Katy Pride** calendar → **⋮** → **Settings and sharing**
-3. Scroll to **Share with specific people or groups**
-4. Add admin emails with **Make changes to events** permission
-
-### Events page vs Calendar page
-
-| Where admins add events | Where it shows up |
-|-------------------------|-------------------|
-| **Google Calendar** | Embedded calendar on `/calendar` |
-| **Strapi** | Events feed on `/events` |
-
-## CRM Integration (GrowthSphere360)
-
-Forms on the website submit directly to GrowthSphere360 via the `/api/crm` API route.
-
-### Forms → CRM
-
-| Form | URL | CRM Tags |
-|------|-----|----------|
-| Volunteer signup | `/volunteer` | `volunteer` + selected interests |
-| Donor form | `/donate` | `donor` |
-| Vendor application | `/vendor-signup` | `vendor`, `vendor-{type}`, `chase-the-rainbow-5k-2026` |
-
-### Vendor Data in CRM
-
-Vendor submissions include: company name, address, contact info, vendor type, fee, products/services, social media, and website. All stored as custom fields and tags.
-
-### View CRM Data
-
-1. Log in to GrowthSphere360
-2. Click **Contacts** to see all submissions
-3. Filter by tags (e.g., `vendor`, `volunteer`, `donor`)
-
-## Running Locally
-
-### Frontend (Next.js)
-
+**Frontend**:
 ```bash
 npm ci
 npm run dev
-```
-
-Open `http://localhost:3000`
-
-### Backend (Strapi)
-
-```bash
-cd backend
-npm ci
-npm run develop
-```
-
-Open `http://localhost:1337/admin`
-
-## Environment Variables
-
-### Frontend (`.env.local`)
-
-```env
-NEXT_PUBLIC_SANITY_PROJECT_ID=your_sanity_project_id
-NEXT_PUBLIC_SANITY_DATASET=production
-GHL_API_KEY=your_gohighlevel_api_key
-GHL_LOCATION_ID=your_ghl_location_id
-CRM_ADMIN_SECRET=your_crm_dashboard_admin_token
-```
-
-### Backend (`backend/.env`)
-
-```env
-# Server
-HOST=0.0.0.0
-PORT=1337
-
-# Secrets (auto-generated, keep these)
-APP_KEYS=...
-API_TOKEN_SALT=...
-ADMIN_JWT_SECRET=...
-TRANSFER_TOKEN_SALT=...
-ENCRYPTION_KEY=...
-JWT_SECRET=...
-
-# Database - Neon PostgreSQL
-DATABASE_CLIENT=postgres
-DATABASE_URL=postgresql://user:pass@host/dbname?sslmode=require
-DATABASE_SSL=true
-DATABASE_SSL_REJECT_UNAUTHORIZED=false
-```
-
-## Deployment
-
-### Frontend → Vercel
-
-1. Push code to GitHub
-2. Go to [vercel.com](https://vercel.com), sign in with GitHub
-3. Import the `katypride-org` repo
-4. Add environment variables (see above)
-5. Deploy — Vercel auto-detects Next.js
-
-### CMS → Render
-
-1. Create a [Neon](https://neon.tech) account and free PostgreSQL database
-2. Copy the connection string
-3. Go to [render.com](https://render.com), sign in with GitHub
-4. Create a **New Web Service** from the `katypride-org` repo
-5. Set **Root Directory**: `backend`
-6. Set **Build Command**: `npm ci && npm run build`
-7. Set **Start Command**: `npm run start`
-8. Add environment variables (see Backend section above, use your Neon connection string for `DATABASE_URL`)
-9. Deploy
-
-### After Deployment
-
-1. Visit your Render URL + `/admin` to create your admin account
-2. Re-create content types through the admin panel if needed
-3. Add content (events, resources, carousel images)
-4. Set API permissions: **Settings → Roles → Public → check "find" for each content type**
-
-## Tech Stack
-
-- **Next.js 16** (App Router)
-- **React 19**
-- **TypeScript**
-- **Tailwind CSS 4**
-- **Strapi v5** (headless CMS)
-- **Neon PostgreSQL** (database)
-- **GrowthSphere360 / GoHighLevel** (CRM)
-- **Cloudinary** (hosted images)
-- **Vercel** (frontend hosting)
-- **Render** (CMS hosting)
+# http://localhost:3000

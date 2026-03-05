@@ -1,10 +1,8 @@
-import { client } from '@/sanity/lib/client'
-import { PortableText } from '@portabletext/react'
-import { PreviewBanner } from '@/components/PreviewBanner'
-import { isPreviewMode, getDraftContent } from '@/lib/preview'
+import { strapiClient, type StrapiFormLink, type StrapiPageContent } from '@/lib/strapi'
+import StrapiRichText from '@/components/StrapiRichText'
 
 interface FormLink {
-  _id: string
+  id: string
   title: string
   url: string
 }
@@ -14,43 +12,36 @@ interface PageContent {
   intro?: any[]
 }
 
-async function getFormLinks(previewMode = false): Promise<FormLink[]> {
-  const query = `*[_type == "formLink" && page == "celebration" && active == true] | order(orderRank asc) {
-      _id,
-      title,
-      url
-    }`
+async function getFormLinks(page: string): Promise<FormLink[]> {
+  const strapiFormLinks = await strapiClient.getFormLinks(page)
   
-  if (previewMode) {
-    return getDraftContent(query)
-  }
-  
-  return client.fetch(query)
+  // Convert Strapi form links to expected format
+  return strapiFormLinks.map((link) => ({
+    id: link.documentId,
+    title: link.title,
+    url: link.url
+  }))
 }
 
-async function getPageContent(previewMode = false): Promise<PageContent | null> {
-  const query = `*[_type == "pageContent" && page == "celebration"][0] {
-      heading,
-      intro
-    }`
+async function getPageContent(page: string): Promise<PageContent | null> {
+  const strapiContent = await strapiClient.getPageContent(page)
   
-  if (previewMode) {
-    return getDraftContent(query)
+  if (!strapiContent) return null
+  
+  return {
+    heading: strapiContent.heading,
+    intro: strapiContent.intro
   }
-  
-  return client.fetch(query)
 }
 
-export default async function CelebrationPage({ searchParams }: { searchParams: Record<string, string> }) {
-  const preview = isPreviewMode(searchParams)
-  const [formLinks, pageContent] = await Promise.all([getFormLinks(preview), getPageContent(preview)])
+export default async function CelebrationPage() {
+  const [formLinks, pageContent] = await Promise.all([getFormLinks('celebration'), getPageContent('celebration')])
 
   const heading = pageContent?.heading || 'Katy Pride Celebration'
   const intro = pageContent?.intro
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
-      {preview && <PreviewBanner />}
       <section className="max-w-6xl mx-auto px-4 py-16">
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
@@ -58,7 +49,7 @@ export default async function CelebrationPage({ searchParams }: { searchParams: 
           </h1>
           <div className="text-lg text-gray-700 leading-relaxed max-w-3xl">
             {intro ? (
-              <PortableText value={intro} />
+              <StrapiRichText content={intro} />
             ) : (
               <p>This page is a placeholder. Details for Katy Pride Celebration will live here.</p>
             )}
@@ -69,7 +60,7 @@ export default async function CelebrationPage({ searchParams }: { searchParams: 
             <div className="mt-6 flex flex-wrap gap-4">
               {formLinks.map((link) => (
                 <a
-                  key={link._id}
+                  key={link.id}
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"

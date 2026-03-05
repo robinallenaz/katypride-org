@@ -1,10 +1,8 @@
-import { client } from '@/sanity/lib/client'
-import { PreviewBanner } from '@/components/PreviewBanner'
-import { isPreviewMode, getDraftContent } from '@/lib/preview'
+import { strapiClient, type StrapiResourceLink } from '@/lib/strapi'
 
 interface ResourceLink {
-  _id: string
-  name: string
+  id: string
+  title: string
   url: string
   category: string
 }
@@ -27,81 +25,79 @@ type Accent = {
 }
 
 const defaultResources: ResourceLink[] = [
-  { _id: 'h1', name: 'AHF Pharmacy', url: 'https://ahfpharmacy.org/', category: 'health' },
-  { _id: 'h2', name: 'Houston Wellness Center (AHF)', url: 'https://locations.aidshealth.org/tx-houston-wellness18-25', category: 'health' },
-  { _id: 'h3', name: 'Avenue 360', url: 'https://avenue360.org/', category: 'health' },
-  { _id: 'h4', name: 'BWell Counseling Center', url: 'https://www.bwellcounselingcenter.com/', category: 'health' },
-  { _id: 'h5', name: 'Fort Bend County HHS', url: 'https://www.fortbendcountytx.gov/government/departments/health-and-human-services', category: 'health' },
-  { _id: 'h6', name: 'Legacy Community Health', url: 'https://www.legacycommunityhealth.org/', category: 'health' },
-  { _id: 'h7', name: 'SBCHC', url: 'https://sbchc.net/', category: 'health' },
-  { _id: 'h8', name: 'VADA Counseling', url: 'https://www.vadacounseling.com/', category: 'health' },
-  { _id: 'h9', name: 'West Houston Counseling', url: 'https://westhoustoncounseling.com/', category: 'health' },
-  { _id: 'a1', name: 'ACLU Texas', url: 'https://www.aclutx.org/', category: 'advocacy' },
-  { _id: 'a2', name: 'Equality Texas', url: 'https://www.equalitytexas.org/', category: 'advocacy' },
-  { _id: 'a3', name: 'League of Women Voters (Fort Bend)', url: 'https://www.lwv.org/local-leagues/lwv-fort-bend', category: 'advocacy' },
-  { _id: 'a4', name: 'Lone Star Legal Aid', url: 'https://www.lonestarlegal.org/', category: 'advocacy' },
-  { _id: 'a5', name: 'Somos Loud', url: 'https://somosloud.org/', category: 'advocacy' },
-  { _id: 'a6', name: 'Students Engaged in Advancing Texas', url: 'https://www.studentsengaged.org/', category: 'advocacy' },
-  { _id: 'a7', name: 'Trans Texas', url: 'https://www.transtexas.org/', category: 'advocacy' },
-  { _id: 'a8', name: 'Trans Legal Aid TX', url: 'https://translegalaidtx.com/', category: 'advocacy' },
-  { _id: 'a9', name: 'Veterans for Equality', url: 'https://veteransforequality.org/', category: 'advocacy' },
-  { _id: 'l1', name: 'First Christian Church Katy', url: 'https://www.fcckaty.com/', category: 'ally' },
-  { _id: 'l2', name: 'Hatch Youth', url: 'https://montrosecenter.org/micro-sites/hatch-youth/', category: 'ally' },
-  { _id: 'l3', name: 'Houston LGBTQ+ Chamber of Commerce', url: 'https://www.houstonlgbtchamber.com/', category: 'ally' },
-  { _id: 'l4', name: 'K-PLACE', url: 'https://fcckaty.org/kplace/', category: 'ally' },
-  { _id: 'l5', name: 'Mirus High School - LGBTQ+ Affirming School (8th-12th)', url: 'https://www.mirus-academy.org/', category: 'ally' },
-  { _id: 'l6', name: 'Montrose Center', url: 'https://montrosecenter.org/', category: 'ally' },
-  { _id: 'l7', name: 'Out for Education', url: 'https://outforeducation.org/', category: 'ally' },
-  { _id: 'l8', name: 'Parents of Trans Youth', url: 'https://www.parentsoftransyouth.com/', category: 'ally' },
-  { _id: 'l9', name: 'PFLAG Houston', url: 'https://www.pflaghouston.org/', category: 'ally' },
-  { _id: 'l10', name: 'The Normal Anomaly Initiative, Inc.', url: 'https://www.normalanomaly.org/', category: 'ally' },
-  { _id: 'l11', name: "Tony's Place", url: 'https://tonysplace.org/', category: 'ally' },
-  { _id: 'l12', name: 'Trans Masculine Alliance Houston', url: 'https://transmasculinehouston.com/', category: 'ally' },
-  { _id: 'l13', name: 'Transparent Closet', url: 'https://fcckaty.org/transparent-closet/', category: 'ally' },
-  { _id: 'r1', name: 'Brazoria County Pride', url: 'https://www.brazoriacountypride.com/', category: 'regional' },
-  { _id: 'r2', name: 'Columbus Pride', url: 'https://www.columbustxpride.com/', category: 'regional' },
-  { _id: 'r3', name: 'Fort Bend County Pride', url: 'https://www.fortbendcountypride.org/', category: 'regional' },
-  { _id: 'r4', name: 'Pride Galveston', url: 'https://pridegalveston.com/', category: 'regional' },
-  { _id: 'r5', name: 'New Faces of Pride', url: 'https://newfacesofpride.org/', category: 'regional' },
-  { _id: 'r6', name: 'Pride Houston', url: 'https://pridehouston365.org/', category: 'regional' },
-  { _id: 'r7', name: 'The Woodlands Pride', url: 'https://www.thewoodlandspride.org/', category: 'regional' },
-  { _id: 'r8', name: 'Third Coast Pride', url: 'https://gaygalveston.com/', category: 'regional' },
-  { _id: 'n1', name: 'ACLU (American Civil Liberties Union)', url: 'https://www.aclu.org/', category: 'national' },
-  { _id: 'n2', name: 'AHF (Aids Healthcare Foundation)', url: 'https://ahf.org/', category: 'national' },
-  { _id: 'n3', name: 'AHF Pharmacy', url: 'https://ahfpharmacy.org/', category: 'national' },
-  { _id: 'n4', name: 'Glaad', url: 'https://glaad.org/', category: 'national' },
-  { _id: 'n5', name: 'GLSEN', url: 'https://www.glsen.org/', category: 'national' },
-  { _id: 'n6', name: 'Human Rights Campaign', url: 'https://www.hrc.org/', category: 'national' },
-  { _id: 'n7', name: 'It Gets Better Project', url: 'https://itgetsbetter.org/', category: 'national' },
-  { _id: 'n8', name: 'Lambda Legal', url: 'https://lambdalegal.org/', category: 'national' },
-  { _id: 'n9', name: 'PFLAG', url: 'https://pflag.org/', category: 'national' },
-  { _id: 'n10', name: 'Planned Parenthood', url: 'https://www.plannedparenthood.org/', category: 'national' },
-  { _id: 'n11', name: 'Trans Lifeline', url: 'https://translifeline.org/', category: 'national' },
-  { _id: 'n12', name: 'Trevor Project', url: 'https://www.thetrevorproject.org/', category: 'national' },
+  { id: 'h1', title: 'AHF Pharmacy', url: 'https://ahfpharmacy.org/', category: 'health' },
+  { id: 'h2', title: 'Houston Wellness Center (AHF)', url: 'https://locations.aidshealth.org/tx-houston-wellness18-25', category: 'health' },
+  { id: 'h3', title: 'Avenue 360', url: 'https://avenue360.org/', category: 'health' },
+  { id: 'h4', title: 'BWell Counseling Center', url: 'https://www.bwellcounselingcenter.com/', category: 'health' },
+  { id: 'h5', title: 'Fort Bend County HHS', url: 'https://www.fortbendcountytx.gov/government/departments/health-and-human-services', category: 'health' },
+  { id: 'h6', title: 'Legacy Community Health', url: 'https://www.legacycommunityhealth.org/', category: 'health' },
+  { id: 'h7', title: 'SBCHC', url: 'https://sbchc.net/', category: 'health' },
+  { id: 'h8', title: 'VADA Counseling', url: 'https://www.vadacounseling.com/', category: 'health' },
+  { id: 'h9', title: 'West Houston Counseling', url: 'https://westhoustoncounseling.com/', category: 'health' },
+  { id: 'a1', title: 'ACLU Texas', url: 'https://www.aclutx.org/', category: 'advocacy' },
+  { id: 'a2', title: 'Equality Texas', url: 'https://www.equalitytexas.org/', category: 'advocacy' },
+  { id: 'a3', title: 'League of Women Voters (Fort Bend)', url: 'https://www.lwv.org/local-leagues/lwv-fort-bend', category: 'advocacy' },
+  { id: 'a4', title: 'Lone Star Legal Aid', url: 'https://www.lonestarlegal.org/', category: 'advocacy' },
+  { id: 'a5', title: 'Somos Loud', url: 'https://somosloud.org/', category: 'advocacy' },
+  { id: 'a6', title: 'Students Engaged in Advancing Texas', url: 'https://www.studentsengaged.org/', category: 'advocacy' },
+  { id: 'a7', title: 'Trans Texas', url: 'https://www.transtexas.org/', category: 'advocacy' },
+  { id: 'a8', title: 'Trans Legal Aid TX', url: 'https://translegalaidtx.com/', category: 'advocacy' },
+  { id: 'a9', title: 'Veterans for Equality', url: 'https://veteransforequality.org/', category: 'advocacy' },
+  { id: 'l1', title: 'First Christian Church Katy', url: 'https://www.fcckaty.com/', category: 'ally' },
+  { id: 'l2', title: 'Hatch Youth', url: 'https://montrosecenter.org/micro-sites/hatch-youth/', category: 'ally' },
+  { id: 'l3', title: 'Houston LGBTQ+ Chamber of Commerce', url: 'https://www.houstonlgbtchamber.com/', category: 'ally' },
+  { id: 'l4', title: 'K-PLACE', url: 'https://fcckaty.org/kplace/', category: 'ally' },
+  { id: 'l5', title: 'Mirus High School - LGBTQ+ Affirming School (8th-12th)', url: 'https://www.mirus-academy.org/', category: 'ally' },
+  { id: 'l6', title: 'Montrose Center', url: 'https://montrosecenter.org/', category: 'ally' },
+  { id: 'l7', title: 'Out for Education', url: 'https://outforeducation.org/', category: 'ally' },
+  { id: 'l8', title: 'Parents of Trans Youth', url: 'https://www.parentsoftransyouth.com/', category: 'ally' },
+  { id: 'l9', title: 'PFLAG Houston', url: 'https://www.pflaghouston.org/', category: 'ally' },
+  { id: 'l10', title: 'The Normal Anomaly Initiative, Inc.', url: 'https://www.normalanomaly.org/', category: 'ally' },
+  { id: 'l11', title: "Tony's Place", url: 'https://tonysplace.org/', category: 'ally' },
+  { id: 'l12', title: 'Trans Masculine Alliance Houston', url: 'https://transmasculinehouston.com/', category: 'ally' },
+  { id: 'l13', title: 'Transparent Closet', url: 'https://fcckaty.org/transparent-closet/', category: 'ally' },
+  { id: 'r1', title: 'Brazoria County Pride', url: 'https://www.brazoriacountypride.com/', category: 'regional' },
+  { id: 'r2', title: 'Columbus Pride', url: 'https://www.columbustxpride.com/', category: 'regional' },
+  { id: 'r3', title: 'Fort Bend County Pride', url: 'https://www.fortbendcountypride.org/', category: 'regional' },
+  { id: 'r4', title: 'Pride Galveston', url: 'https://pridegalveston.com/', category: 'regional' },
+  { id: 'r5', title: 'New Faces of Pride', url: 'https://newfacesofpride.org/', category: 'regional' },
+  { id: 'r6', title: 'Pride Houston', url: 'https://pridehouston365.org/', category: 'regional' },
+  { id: 'r7', title: 'The Woodlands Pride', url: 'https://www.thewoodlandspride.org/', category: 'regional' },
+  { id: 'r8', title: 'Third Coast Pride', url: 'https://gaygalveston.com/', category: 'regional' },
+  { id: 'n1', title: 'ACLU (American Civil Liberties Union)', url: 'https://www.aclu.org/', category: 'national' },
+  { id: 'n2', title: 'AHF (Aids Healthcare Foundation)', url: 'https://ahf.org/', category: 'national' },
+  { id: 'n3', title: 'AHF Pharmacy', url: 'https://ahfpharmacy.org/', category: 'national' },
+  { id: 'n4', title: 'Glaad', url: 'https://glaad.org/', category: 'national' },
+  { id: 'n5', title: 'GLSEN', url: 'https://www.glsen.org/', category: 'national' },
+  { id: 'n6', title: 'Human Rights Campaign', url: 'https://www.hrc.org/', category: 'national' },
+  { id: 'n7', title: 'It Gets Better Project', url: 'https://itgetsbetter.org/', category: 'national' },
+  { id: 'n8', title: 'Lambda Legal', url: 'https://lambdalegal.org/', category: 'national' },
+  { id: 'n9', title: 'PFLAG', url: 'https://pflag.org/', category: 'national' },
+  { id: 'n10', title: 'Planned Parenthood', url: 'https://www.plannedparenthood.org/', category: 'national' },
+  { id: 'n11', title: 'Trans Lifeline', url: 'https://translifeline.org/', category: 'national' },
+  { id: 'n12', title: 'Trevor Project', url: 'https://www.thetrevorproject.org/', category: 'national' },
 ]
 
-async function getResourceLinks(previewMode = false): Promise<ResourceLink[]> {
-  const query = `*[_type == "resourceLink" && active == true] | order(orderRank asc) {
-      _id,
-      name,
-      url,
-      category
-    }`
+async function getResourceLinks(): Promise<ResourceLink[]> {
+  const strapiResources = await strapiClient.getResourceLinks()
   
-  const sanityResources = previewMode 
-    ? await getDraftContent(query) as ResourceLink[]
-    : await client.fetch<ResourceLink[]>(query)
-    
-  // Merge Sanity resources with defaults - Sanity resources appear first, then defaults
+  // Convert Strapi resources to expected format
+  const convertedResources = strapiResources.map((resource) => ({
+    id: resource.documentId,
+    title: resource.name,
+    url: resource.url,
+    category: resource.category
+  }))
+  
+  // Merge with default resources - Strapi resources appear first, then defaults
   // Use a Set to track URLs and avoid duplicates
-  const seenUrls = new Set(sanityResources.map((r: ResourceLink) => r.url))
+  const seenUrls = new Set(convertedResources.map((r) => r.url))
   const uniqueDefaults = defaultResources.filter((r) => !seenUrls.has(r.url))
-  return [...sanityResources, ...uniqueDefaults]
+  return [...convertedResources, ...uniqueDefaults]
 }
 
-export default async function ResourcesPage({ searchParams }: { searchParams: Record<string, string> }) {
-  const preview = isPreviewMode(searchParams)
-  const resources = await getResourceLinks(preview)
+export default async function ResourcesPage() {
+  const resources = await getResourceLinks()
 
   const healthResources = resources.filter((r) => r.category === 'health')
   const advocacyResources = resources.filter((r) => r.category === 'advocacy')
@@ -218,11 +214,11 @@ export default async function ResourcesPage({ searchParams }: { searchParams: Re
   )
 
   const LinkItem = ({
-    name,
+    title,
     href,
     accent,
   }: {
-    name: string
+    title: string
     href: string
     accent: Accent
   }) => (
@@ -231,12 +227,12 @@ export default async function ResourcesPage({ searchParams }: { searchParams: Re
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label={`${name} — Visit website (opens in a new tab)`}
+        aria-label={`${title} — Visit website (opens in a new tab)`}
         className={`group flex h-full items-start justify-between gap-4 rounded-2xl border border-l-4 px-4 py-4 shadow transition focus-visible:outline-none focus-visible:ring-2 ${accent.cardBg} ${accent.cardHoverBg} ${accent.cardBorder} ${accent.cardHoverBorder} ${accent.stripe} ${accent.ring}`}
       >
         <span className="min-w-0">
           <span className="font-heading text-lg text-gray-900 group-hover:text-purple-950 group-hover:underline decoration-purple-300 underline-offset-4">
-            {name}
+            {title}
           </span>
           <span className="mt-1 block text-sm text-gray-600 break-words" title={href}>
             {getHostname(href)}
@@ -283,7 +279,7 @@ export default async function ResourcesPage({ searchParams }: { searchParams: Re
     accent,
   }: {
     title: string
-    items: Array<{ _id: string; name: string; url: string }>
+    items: Array<{ id: string; title: string; url: string }>
     id: string
     accent: Accent
   }) => (
@@ -294,8 +290,8 @@ export default async function ResourcesPage({ searchParams }: { searchParams: Re
       <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
           <LinkItem
-            key={item._id}
-            name={item.name}
+            key={item.id}
+            title={item.title}
             href={item.url}
             accent={accent}
           />
@@ -307,7 +303,6 @@ export default async function ResourcesPage({ searchParams }: { searchParams: Re
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
-      {preview && <PreviewBanner />}
       <section className="max-w-6xl mx-auto px-4 py-16">
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">

@@ -1,27 +1,8 @@
  'use client'
 
- import { useEffect, useState } from 'react'
- import { PortableText } from '@portabletext/react'
-
- import { client } from '@/sanity/lib/client'
-import { urlFor } from '@/sanity/lib/image'
-import { PreviewBanner } from '@/components/PreviewBanner'
-import { isPreviewMode, getDraftContent } from '@/lib/preview'
-
-type PortableTextValue = any[]
-
-type EventDoc = {
-  _id: string
-  title: string
-  start: string
-  end?: string
-  location?: string
-  externalUrl?: string
-  externalCtaLabel?: string
-  image?: unknown
-  summary?: PortableTextValue
-  published?: boolean
-}
+import { useEffect, useState, useMemo } from 'react'
+import { strapiClient, type StrapiEvent } from '@/lib/strapi'
+import StrapiRichText from '@/components/StrapiRichText'
 
 type EventItem = {
   id: string
@@ -29,14 +10,12 @@ type EventItem = {
   start: Date
   end?: Date
   location?: string
-  address?: string
-  directionsUrl?: string
   externalUrl?: string
   externalCtaLabel?: string
   imageSrc?: string
   imageAlt: string
-  summary?: PortableTextValue
- }
+  summary?: any // Strapi blocks content
+}
 
  export default function EventsPage() {
 
@@ -69,57 +48,34 @@ type EventItem = {
       year: 'numeric',
     }).format(date)
 
-  const [sanityEvents, setSanityEvents] = useState<EventDoc[]>([])
-  const [loadingSanity, setLoadingSanity] = useState(true)
+  const [strapiEvents, setStrapiEvents] = useState<StrapiEvent[]>([])
+  const [loadingStrapi, setLoadingStrapi] = useState(true)
   const [visibleCount, setVisibleCount] = useState(3)
-  // Derived in useEffect to avoid window.location access during SSR
-  const [isPreview, setIsPreview] = useState(false)
 
   useEffect(() => {
     const run = async () => {
       try {
-        const nowIso = new Date().toISOString()
-        const query = `*[_type == "event" && coalesce(published, true) == true && start >= $now] | order(start asc)[0...50]{
-          _id,
-          title,
-          start,
-          end,
-          location,
-          externalUrl,
-          externalCtaLabel,
-          image,
-          summary,
-          published
-        }`
-
-        // Safe to access window here — useEffect only runs in the browser
-        const searchParams = new URLSearchParams(window.location.search)
-        const preview = isPreviewMode(searchParams)
-        setIsPreview(preview)
-
-        const eventsResult = preview
-          ? (getDraftContent(query) as Promise<EventDoc[]>)
-          : client.fetch<EventDoc[]>(query, { now: nowIso })
-
-        setSanityEvents(await eventsResult)
+        const events = await strapiClient.getEvents()
+        setStrapiEvents(events)
       } catch (e) {
-        console.error('Failed to load events from Sanity', e)
-        setSanityEvents([])
+        console.error('Failed to load events from Strapi', e)
+        setStrapiEvents([])
       } finally {
-        setLoadingSanity(false)
+        setLoadingStrapi(false)
       }
     }
 
     run()
   }, [])
 
-  const sanityEventItems: EventItem[] = sanityEvents.map((event) => {
+  const strapiEventItems: EventItem[] = useMemo(() => {
+  return strapiEvents.map((event) => {
     const start = new Date(event.start)
     const end = event.end ? new Date(event.end) : undefined
-    const imageSrc = event.image ? urlFor(event.image).width(1400).quality(85).url() : undefined
+    const imageSrc = event.image ? strapiClient.getImageUrlWithSize(event.image, 'large') : undefined
 
     return {
-      id: event._id,
+      id: event.documentId,
       title: event.title,
       start,
       end,
@@ -127,20 +83,22 @@ type EventItem = {
       externalUrl: event.externalUrl,
       externalCtaLabel: event.externalCtaLabel,
       imageSrc,
-      imageAlt: event.title,
+      imageAlt: event.image?.alternativeText || event.title,
       summary: event.summary,
     }
   })
+}, [strapiEvents])
 
-  const allEvents = [...sanityEventItems]
-    .filter((e) => !Number.isNaN(e.start.getTime()))
-    .sort((a, b) => a.start.getTime() - b.start.getTime())
+  const allEvents = useMemo(() => {
+    return [...strapiEventItems]
+      .filter((e) => !Number.isNaN(e.start.getTime()))
+      .sort((a, b) => a.start.getTime() - b.start.getTime())
+  }, [strapiEventItems])
 
   const visibleEvents = allEvents.slice(0, visibleCount)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
-      {isPreview && <PreviewBanner />}
       <section className="max-w-6xl mx-auto px-4 py-16">
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
@@ -151,7 +109,7 @@ type EventItem = {
             Upcoming events and community gatherings.
           </p>
 
-          {loadingSanity && (
+          {loadingStrapi && (
             <p className="mt-6 text-gray-700">Loading events…</p>
           )}
 
@@ -215,31 +173,18 @@ type EventItem = {
                       <div>
                         <dt className="sr-only">Location</dt>
                         <dd>
-                          <div>{event.location || 'TBD'}</div>
-                          {event.address && (
-                            <div className="mt-1 text-sm text-gray-700">{event.address}</div>
-                          )}
-                          {event.directionsUrl && (
-                            <a
-                              href={event.directionsUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-1 inline-block font-heading text-xs font-semibold tracking-wide text-gray-900 underline underline-offset-2"
-                            >
-                              Get directions
-                            </a>
-                          )}
+                          {event.location || 'TBD'}
                         </dd>
                       </div>
                     </dl>
 
-                    {Array.isArray(event.summary) && event.summary.length > 0 && (
+                    {event.summary && (
                       <details className="mt-4 rounded-xl border border-black/10 bg-white px-4 py-3">
                         <summary className="cursor-pointer font-heading text-sm font-semibold text-gray-900">
                           More info
                         </summary>
                         <div className="mt-3 text-sm leading-relaxed text-gray-700">
-                          <PortableText value={event.summary} />
+                          <StrapiRichText content={event.summary} />
                         </div>
                       </details>
                     )}
