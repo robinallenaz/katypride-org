@@ -1,4 +1,4 @@
-import VendorSignupForm from '@/components/VendorSignupForm';
+import VendorApplicationForm from '@/components/VendorApplicationForm';
 
 const sponsorshipTiers = [
   {
@@ -203,7 +203,7 @@ export default function VendorSignupPage() {
           </div>
 
           {/* Vendor Form */}
-          <VendorSignupForm />
+          <VendorApplicationForm />
 
           {/* Sponsorship Tiers */}
           <div className="mt-16 pt-12 border-t border-purple-100">

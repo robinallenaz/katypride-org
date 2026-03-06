@@ -1,11 +1,37 @@
-import { client } from '@/sanity/lib/client'
-
 // Helper function to fetch draft content for preview
-export async function getDraftContent(query: string, params?: Record<string, any>) {
-  return client.fetch(query, params, {
-    // Include draft documents
-    perspective: 'previewDrafts',
-  })
+export async function getDraftContent(endpoint: string, params?: Record<string, any>) {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337'
+    const url = new URL(`/api/${endpoint}`, baseUrl)
+    
+    // Add query parameters
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        url.searchParams.append(key, String(value))
+      })
+    }
+    
+    // Add draft status parameter
+    url.searchParams.append('status', 'draft')
+    
+    const response = await fetch(url.toString(), {
+      headers: {
+        'Authorization': `Bearer ${process.env.STRAPI_API_TOKEN || ''}`,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    })
+    
+    if (!response.ok) {
+      console.error('Failed to fetch draft content:', response.status)
+      return null
+    }
+    
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching draft content:', error)
+    return null
+  }
 }
 
 // Check if we're in preview mode

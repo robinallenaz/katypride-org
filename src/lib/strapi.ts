@@ -79,6 +79,18 @@ export interface StrapiEvent {
   publishedAt: string
 }
 
+export interface StrapiCarouselImage {
+  id: number
+  documentId: string
+  title: string
+  image: StrapiImage[]
+  alt: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  publishedAt: string
+}
+
 export interface StrapiResponse<T> {
   data: T[]
   meta: {

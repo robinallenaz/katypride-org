@@ -1,5 +1,7 @@
 import { strapiClient, type StrapiResourceLink } from '@/lib/strapi'
 
+export const dynamic = 'force-dynamic'
+
 interface ResourceLink {
   id: string
   title: string
@@ -79,21 +81,27 @@ const defaultResources: ResourceLink[] = [
 ]
 
 async function getResourceLinks(): Promise<ResourceLink[]> {
-  const strapiResources = await strapiClient.getResourceLinks()
-  
-  // Convert Strapi resources to expected format
-  const convertedResources = strapiResources.map((resource) => ({
-    id: resource.documentId,
-    title: resource.name,
-    url: resource.url,
-    category: resource.category
-  }))
-  
-  // Merge with default resources - Strapi resources appear first, then defaults
-  // Use a Set to track URLs and avoid duplicates
-  const seenUrls = new Set(convertedResources.map((r) => r.url))
-  const uniqueDefaults = defaultResources.filter((r) => !seenUrls.has(r.url))
-  return [...convertedResources, ...uniqueDefaults]
+  try {
+    const strapiResources = await strapiClient.getResourceLinks()
+    
+    // Convert Strapi resources to expected format
+    const convertedResources = strapiResources.map((resource) => ({
+      id: resource.documentId,
+      title: resource.name,
+      url: resource.url,
+      category: resource.category
+    }))
+    
+    // Merge with default resources - Strapi resources appear first, then defaults
+    // Use a Set to track URLs and avoid duplicates
+    const seenUrls = new Set(convertedResources.map((r) => r.url))
+    const uniqueDefaults = defaultResources.filter((r) => !seenUrls.has(r.url))
+    return [...convertedResources, ...uniqueDefaults]
+  } catch (error) {
+    console.error('Failed to fetch resource links:', error)
+    // Return default resources if Strapi fails
+    return defaultResources
+  }
 }
 
 export default async function ResourcesPage() {

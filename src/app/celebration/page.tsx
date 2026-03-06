@@ -1,6 +1,8 @@
 import { strapiClient, type StrapiFormLink, type StrapiPageContent } from '@/lib/strapi'
 import StrapiRichText from '@/components/StrapiRichText'
 
+export const dynamic = 'force-dynamic'
+
 interface FormLink {
   id: string
   title: string
@@ -13,24 +15,34 @@ interface PageContent {
 }
 
 async function getFormLinks(page: string): Promise<FormLink[]> {
-  const strapiFormLinks = await strapiClient.getFormLinks(page)
-  
-  // Convert Strapi form links to expected format
-  return strapiFormLinks.map((link) => ({
-    id: link.documentId,
-    title: link.title,
-    url: link.url
-  }))
+  try {
+    const strapiFormLinks = await strapiClient.getFormLinks(page)
+    
+    // Convert Strapi form links to expected format
+    return strapiFormLinks.map((link) => ({
+      id: link.documentId,
+      title: link.title,
+      url: link.url
+    }))
+  } catch (error) {
+    console.error('Failed to fetch form links:', error)
+    return []
+  }
 }
 
 async function getPageContent(page: string): Promise<PageContent | null> {
-  const strapiContent = await strapiClient.getPageContent(page)
-  
-  if (!strapiContent) return null
-  
-  return {
-    heading: strapiContent.heading,
-    intro: strapiContent.intro
+  try {
+    const strapiContent = await strapiClient.getPageContent(page)
+    
+    if (!strapiContent) return null
+    
+    return {
+      heading: strapiContent.heading,
+      intro: strapiContent.intro
+    }
+  } catch (error) {
+    console.error('Failed to fetch page content:', error)
+    return null
   }
 }
 
@@ -90,6 +102,27 @@ export default async function CelebrationPage() {
                   </svg>
                 </a>
               ))}
+              {/* Add vendor application form link */}
+              <a
+                href="/vendor-signup"
+                className="inline-flex items-center gap-2 bg-orange-600 text-white font-semibold px-6 py-3 rounded-full hover:bg-orange-700 transition-colors"
+              >
+                2026 Vendor Application
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                  />
+                </svg>
+              </a>
             </div>
           )}
         </div>

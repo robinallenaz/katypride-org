@@ -2,7 +2,27 @@
 
 A modern, scalable website for **Katy Pride**, an LGBTQ+ community organization serving Katy and West Houston.
 
-## 🚀 Quick Start for Admins
+## � Security & Performance Features
+
+### Security Enhancements
+- **Rate Limiting**: 5 submissions per minute per IP with automatic cleanup
+- **Input Validation**: Comprehensive validation for all form submissions
+- **Bot Protection**: Honeypot fields and enhanced IP detection
+- **Safe URL Handling**: Validated image URLs to prevent XSS
+- **Authentication**: Secure admin dashboard with bearer token auth
+
+### Performance Optimizations
+- **CRM Caching**: 5-minute in-memory cache for dashboard data
+- **Optimized Pagination**: Reduced API calls for better performance
+- **Image Safety**: Validated and safely constructed image URLs
+- **Efficient State Management**: Reduced unnecessary re-renders
+
+### Monitoring & Reliability
+- **Health Checks**: `/health` endpoint for service monitoring
+- **Error Handling**: Comprehensive error logging and user feedback
+- **Graceful Degradation**: Fallbacks for API failures
+
+## �🚀 Quick Start for Admins
 
 **Access Strapi Admin Panel**: `https://katypride-7x4qno1sj-robinallenazs-projects.vercel.app/admin`
 
@@ -130,18 +150,213 @@ A modern, scalable website for **Katy Pride**, an LGBTQ+ community organization 
 
 ## 🔄 CRM Integration (GrowthSphere360)
 
-All form submissions automatically sync to GrowthSphere360 CRM:
+### Overview
+The Katy Pride website integrates with **GrowthSphere360** (GoHighLevel white-label) CRM to automatically capture and organize all form submissions. This integration provides centralized contact management for volunteers, donors, vendors, and community members.
 
-| Form | CRM Tags |
-|------|----------|
-| Volunteer | `volunteer` + selected interests |
-| Donor | `donor` |
-| Vendor | `vendor`, `vendor-{type}`, `chase-the-rainbow-5k-2026` |
+### Architecture
+```
+Frontend Forms → Next.js API Route → GrowthSphere360 API → CRM Dashboard
+```
 
-**View submissions**:
-1. Log in to GrowthSphere360
-2. Go to **Contacts**
-3. Filter by tags (`vendor`, `volunteer`, `donor`)
+### API Endpoint: `/api/crm`
+**Location**: `src/app/api/crm/route.ts`
+
+**Methods**:
+- `POST` - Submit new contact data from forms
+- `GET` - Retrieve CRM statistics (admin only)
+
+### Security Features
+- **Rate Limiting**: 5 submissions per minute per IP
+- **Honeypot Field**: Hidden `_gotcha` field to block bots
+- **Input Validation**: Strict validation of all form fields
+- **Tag Sanitization**: Only allows predefined interest tags
+- **Admin Authentication**: Bearer token required for dashboard access
+
+### Contact Types & Data Flow
+
+#### 1. Volunteer Submissions
+**Form Component**: `CRMContactForm` with `type="volunteer"`
+**CRM Tags**: `volunteer` + selected interests
+**Custom Fields**:
+- `availability` - Text description of availability
+- `interests` - Comma-separated interest list
+- `pronouns` - Optional pronoun field
+
+**Allowed Interests**:
+- Event Planning, Community Outreach, Youth Programs
+- Fundraising, Social Media, Administrative Support
+- Mentorship, Healthcare Support
+
+#### 2. Donor Submissions
+**Form Component**: `CRMContactForm` with `type="donor"`
+**CRM Tags**: `donor`
+**Custom Fields**:
+- `donation_frequency` - "one-time" or "monthly"
+- `last_donation_amount` - Numeric donation amount
+- `pronouns` - Optional pronoun field
+
+#### 3. Vendor Applications
+**Form Component**: Custom vendor form (planned)
+**CRM Tags**: `vendor`, `vendor-{type}`, `chase-the-rainbow-5k-2026`
+**Custom Fields**:
+- `company_name` - Business name
+- `website` - Business website
+- `social_media` - Social media links
+- `vendor_type` - Type of vendor
+- `vendor_fee` - Fee tier selected
+- `products_services` - Description of offerings
+- `address` - Full business address
+
+**Allowed Vendor Types**:
+- `nonprofit` - Non-profit organizations
+- `forprofit` - For-profit businesses
+- `food` - Food vendors
+- `political` - Political organizations
+- `government` - Government entities
+
+#### 4. Community Member Submissions
+**Form Component**: `CRMContactForm` with `type="community-member"`
+**CRM Tags**: `community-member` + selected interests
+**Custom Fields**:
+- `interests` - Comma-separated interest list
+- `pronouns` - Optional pronoun field
+
+**Allowed Interests**:
+- LGBTQ+ Advocacy, Youth Support, Parent Resources
+- Ally Programs, Education, Health & Wellness
+- Legal Support, Faith Communities
+
+### Environment Variables Required
+```env
+# GrowthSphere360 CRM Integration
+GHL_API_KEY=your_api_key_here
+GHL_LOCATION_ID=your_location_id_here
+CRM_ADMIN_SECRET=your_admin_secret_here
+```
+
+**Setup Instructions**:
+1. Get API credentials from GrowthSphere360 admin panel
+2. Add to Vercel environment variables (production)
+3. Add to `.env.local` for local development
+4. `CRM_ADMIN_SECRET` can be any random string for dashboard auth
+
+### API Request Flow
+
+#### POST /api/crm (Form Submission)
+```json
+{
+  "type": "volunteer|donor|vendor|community-member",
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone": "555-1234",
+  "_gotcha": "", // Hidden field - bots fill this
+  // Type-specific fields...
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Thank you! Your information has been submitted successfully.",
+  "data": { "contactId": "contact_123" }
+}
+```
+
+#### GET /api/crm (Dashboard Data)
+**Headers**: `Authorization: Bearer {CRM_ADMIN_SECRET}`
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "totalContacts": 150,
+    "totalVolunteers": 45,
+    "totalDonors": 28,
+    "totalVendors": 12,
+    "totalCommunityMembers": 65,
+    "recentContacts": [
+      {
+        "name": "John Doe",
+        "email": "john@example.com",
+        "tags": ["volunteer", "Event Planning"],
+        "dateAdded": "2024-01-15T10:30:00Z",
+        "company": "Doe Enterprises"
+      }
+    ]
+  }
+}
+```
+
+### CRM Dashboard
+**Location**: `/crm` (requires admin secret)
+**Component**: `CRMDashboard.tsx`
+
+**Features**:
+- Real-time contact statistics
+- Recent submissions table
+- Quick links to forms and GrowthSphere360
+- Automatic data refresh
+
+**Access Control**:
+- Requires `CRM_ADMIN_SECRET` bearer token
+- Token stored in sessionStorage for session persistence
+- Unauthorized users see 401 error
+
+### GrowthSphere360 Integration Details
+
+#### API Configuration
+- **Base URL**: `https://rest.gohighlevel.com/v1`
+- **Authentication**: Bearer token (API Key)
+- **Version**: `2021-04-15`
+- **Location ID**: Required for all requests
+
+#### Contact Creation
+```javascript
+const contactPayload = {
+  name: "John Doe",
+  email: "john@example.com",
+  phone: "555-1234",
+  tags: ["volunteer", "Event Planning"],
+  customFields: {
+    availability: "Weekends",
+    interests: "Event Planning, Community Outreach"
+  },
+  locationId: "your_location_id"
+};
+```
+
+#### Data Synchronization
+- **Real-time**: Form submissions create contacts immediately
+- **Bidirectional**: Changes in GrowthSphere360 reflect in dashboard
+- **Deduplication**: Email addresses prevent duplicate contacts
+- **Tag-based**: All organization happens via CRM tags
+
+### Monitoring & Troubleshooting
+
+#### Common Issues
+1. **Missing Environment Variables**: Check GHL_API_KEY and GHL_LOCATION_ID
+2. **Rate Limiting**: 5 submissions/minute per IP - wait and retry
+3. **Invalid Tags**: Only predefined interests allowed - check form validation
+4. **Auth Failures**: Verify CRM_ADMIN_SECRET matches dashboard token
+
+#### Logging
+- All API errors logged to console
+- GrowthSphere360 API errors include response details
+- Form submissions logged with contact IDs
+
+#### Testing
+- Use browser dev tools to inspect form submissions
+- Check Network tab for `/api/crm` requests
+- Verify GrowthSphere360 contact creation
+- Test dashboard with valid admin secret
+
+### Future Enhancements
+- **Webhooks**: Real-time updates from GrowthSphere360
+- **Custom Workflows**: Automated email sequences
+- **Advanced Reporting**: Export contact data
+- **Form Analytics**: Submission conversion tracking
 
 ---
 

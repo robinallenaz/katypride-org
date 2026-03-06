@@ -1,5 +1,7 @@
 import { getCalendarSettings } from '@/lib/calendar'
 
+export const dynamic = 'force-dynamic'
+
 export default async function CalendarPage() {
   const settings = await getCalendarSettings()
 

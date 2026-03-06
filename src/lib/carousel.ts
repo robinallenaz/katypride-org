@@ -1,55 +1,36 @@
-import { client } from '@/sanity/lib/client'
+import { strapiClient, type StrapiImage } from '@/lib/strapi'
 
 export interface CarouselImage {
-  _id: string
+  id: number
+  documentId: string
   title: string
-  image: {
-    asset: {
-      _id: string
-      url: string
-    }
-    alt?: string
-  }
+  image: StrapiImage[]
+  alt: string
   isActive: boolean
-  _createdAt: string
+  createdAt: string
+  updatedAt: string
+  publishedAt: string
 }
 
 export async function getCarouselImages(): Promise<CarouselImage[]> {
-  const query = `
-    *[_type == "carouselImage" && isActive == true] | order(_createdAt asc) {
-      _id,
-      title,
-      image {
-        asset->{
-          _id,
-          url
-        },
-        alt
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337'}/api/carousel-images?filters[isActive][$eq]=true&sort=createdAt:asc&populate=image`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.STRAPI_API_TOKEN || ''}`,
+        'Content-Type': 'application/json',
       },
-      isActive,
-      _createdAt
-    }
-  `
-  
-  // Add cache-busting to get fresh data
-  return await client.fetch(query, {}, { cache: 'no-store' })
-}
+      cache: 'no-store',
+    })
 
-export async function getWebsiteImages(category?: string): Promise<any[]> {
-  const categoryFilter = category ? '&& category == $category' : ''
-  const query = `
-    *[_type == "websiteImage" && isActive == true ${categoryFilter}] | order(name asc) {
-      _id,
-      name,
-      image {
-        asset->,
-        alt
-      },
-      category,
-      isActive,
-      notes
+    if (!response.ok) {
+      console.error('Failed to fetch carousel images:', response.status)
+      return []
     }
-  `
-  
-  return await client.fetch(query, category ? { category } : {})
+
+    const data = await response.json()
+    return data.data || []
+  } catch (error) {
+    console.error('Error fetching carousel images:', error)
+    return []
+  }
 }

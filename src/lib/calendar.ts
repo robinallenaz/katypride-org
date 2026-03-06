@@ -1,28 +1,35 @@
-import { client } from '@/sanity/lib/client'
+import { strapiClient } from '@/lib/strapi'
 
 export interface CalendarSettings {
-  _id: string
+  id: number
+  documentId: string
   calendarId: string
   timeZone: string
   calendarTitle?: string
   calendarDescription?: string
   showSubscribeButtons?: boolean
+  createdAt: string
+  updatedAt: string
+  publishedAt: string
 }
 
 export async function getCalendarSettings(): Promise<CalendarSettings | null> {
-  const query = `
-    *[_type == "calendarSettings"][0] {
-      _id,
-      calendarId,
-      timeZone,
-      calendarTitle,
-      calendarDescription,
-      showSubscribeButtons
-    }
-  `
-  
   try {
-    return await client.fetch(query, {}, { cache: 'no-store' })
+    const response = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337'}/api/calendar-settings`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.STRAPI_API_TOKEN || ''}`,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    })
+
+    if (!response.ok) {
+      console.error('Failed to fetch calendar settings:', response.status)
+      return null
+    }
+
+    const data = await response.json()
+    return data.data?.[0] || null
   } catch (error) {
     console.error('Failed to fetch calendar settings:', error)
     return null

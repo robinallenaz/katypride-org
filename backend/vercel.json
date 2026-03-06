@@ -17,7 +17,11 @@
     },
     {
       "src": "/health",
-      "dest": "/admin"
+      "dest": "/api/health-check/health"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.js"
     }
   ],
   "env": {

@@ -8,10 +8,39 @@ const CRM_ADMIN_SECRET = process.env.CRM_ADMIN_SECRET || '';
 const ALLOWED_CONTACT_TYPES = ['volunteer', 'donor', 'community-member', 'vendor'] as const;
 const ALLOWED_VENDOR_TYPES = ['nonprofit', 'forprofit', 'food', 'political', 'government'] as const;
 
-// Simple in-memory rate limiter: max submissions per IP within a window
+// Enhanced rate limiter with cleanup and better IP detection
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 const RATE_LIMIT_MAX = 5;
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+// Cleanup expired entries every 5 minutes
+const CLEANUP_INTERVAL_MS = 300_000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap.entries()) {
+    if (now > entry.resetAt) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}, CLEANUP_INTERVAL_MS);
+
+function getClientIP(request: NextRequest): string {
+  // Try multiple headers in order of reliability
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  const realIP = request.headers.get('x-real-ip');
+  const cfConnectingIP = request.headers.get('cf-connecting-ip'); // Cloudflare
+  const xClientIP = request.headers.get('x-client-ip');
+  
+  if (forwardedFor) {
+    // Take the first IP in the chain (original client)
+    return forwardedFor.split(',')[0].trim();
+  }
+  if (realIP) return realIP.trim();
+  if (cfConnectingIP) return cfConnectingIP.trim();
+  if (xClientIP) return xClientIP.trim();
+  
+  return 'unknown';
+}
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
@@ -83,12 +112,28 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Paginate to get all contacts for accurate stats
-    const MAX_PAGES = 50; // Safety cap to avoid runaway pagination
+    // Simple in-memory cache for dashboard data (5 minute cache)
+    const CACHE_KEY = 'crm_dashboard_data';
+    const CACHE_DURATION_MS = 300_000; // 5 minutes
+    const now = Date.now();
+    
+    // Check cache first
+    const cachedData = (global as any).crmCache?.[CACHE_KEY];
+    if (cachedData && (now - cachedData.timestamp) < CACHE_DURATION_MS) {
+      return NextResponse.json({
+        success: true,
+        data: cachedData.data,
+        cached: true,
+      });
+    }
+
+    // Paginate to get all contacts for accurate stats with optimization
+    const MAX_PAGES = 20; // Reduced from 50 for better performance
     let contacts: any[] = [];
     let startAfterId = '';
     let hasMore = true;
     let page = 0;
+    
     while (hasMore && page < MAX_PAGES) {
       page += 1;
       const url = '/contacts/?locationId=' + GHL_LOCATION_ID + '&limit=100'
@@ -113,7 +158,7 @@ export async function GET(request: NextRequest) {
     ).length;
     const totalCommunityMembers = contacts.filter((c: any) => c.tags?.includes('community-member')).length;
 
-    // Recent contacts (last 10)
+    // Recent contacts (last 10) - minimal data transfer
     const recentContacts = contacts
       .sort((a: any, b: any) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime())
       .slice(0, 10)
@@ -125,16 +170,28 @@ export async function GET(request: NextRequest) {
         company: c.companyName,
       }));
 
+    const dashboardData = {
+      totalContacts,
+      totalVolunteers,
+      totalDonors,
+      totalVendors,
+      totalCommunityMembers,
+      recentContacts,
+    };
+
+    // Cache the result
+    if (!(global as any).crmCache) {
+      (global as any).crmCache = {};
+    }
+    (global as any).crmCache[CACHE_KEY] = {
+      data: dashboardData,
+      timestamp: now,
+    };
+
     return NextResponse.json({
       success: true,
-      data: {
-        totalContacts,
-        totalVolunteers,
-        totalDonors,
-        totalVendors,
-        totalCommunityMembers,
-        recentContacts,
-      },
+      data: dashboardData,
+      cached: false,
     });
   } catch (error) {
     console.error('CRM Dashboard Error:', error);
@@ -151,7 +208,7 @@ export async function POST(request: NextRequest) {
     const {
       type, name, email, phone, interests, availability, amount, frequency, pronouns,
       company, address, city, state, postalCode, website, socialMedia,
-      vendorType, vendorFee, productsServices,
+      vendorType, vendorFee, productsServices, sponsorshipInterest, additionalInfo,
       _gotcha, // honeypot field — bots fill this, real users don't see it
     } = body;
 
@@ -175,7 +232,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate-limit public form submissions
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const ip = getClientIP(request);
     if (isRateLimited(ip)) {
       return NextResponse.json(
         { success: false, error: 'Too many submissions. Please try again later.' },
@@ -200,7 +257,7 @@ export async function POST(request: NextRequest) {
         );
       }
       tags.push(`vendor-${vendorType}`);
-      tags.push('chase-the-rainbow-5k-2026');
+      tags.push('katy-pride-celebration-2026');
     }
 
     // Build custom fields — scope donor fields to donor type only
@@ -217,6 +274,8 @@ export async function POST(request: NextRequest) {
     if (vendorType) customFields.vendor_type = vendorType;
     if (vendorFee) customFields.vendor_fee = vendorFee;
     if (productsServices) customFields.products_services = productsServices;
+    if (sponsorshipInterest) customFields.sponsorship_interest = sponsorshipInterest;
+    if (additionalInfo) customFields.additional_info = additionalInfo;
 
     // Build address object
     const contactAddress: Record<string, string> = {};
