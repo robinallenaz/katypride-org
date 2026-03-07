@@ -22,7 +22,7 @@ A modern, scalable website for **Katy Pride**, an LGBTQ+ community organization 
 - **Error Handling**: Comprehensive error logging and user feedback
 - **Graceful Degradation**: Fallbacks for API failures
 
-## �🚀 Quick Start for Admins
+## � Quick Start for Admins
 
 **Access Strapi Admin Panel**: `https://katypride-7x4qno1sj-robinallenazs-projects.vercel.app/admin`
 
@@ -61,7 +61,24 @@ A modern, scalable website for **Katy Pride**, an LGBTQ+ community organization 
    - **Published**: Toggle to show/hide
 3. Click **Save** then **Publish**
 
-**Important**: Events automatically appear in date order. Past events are hidden.
+**Recurring Events**:
+- **Is Recurring**: Toggle to enable recurring functionality
+- **Recurrence Pattern**: Choose daily, weekly, monthly, or yearly
+- **Recurrence Interval**: Set frequency (e.g., every 2 weeks)
+- **Recurrence End Date**: When to stop generating instances
+- **Recurrence Days of Week**: For weekly patterns, select specific days (JSON array: [0,2,4] for Sun, Tue, Thu)
+- **Recurrence Exceptions**: Dates to skip (JSON array of date strings)
+
+**Recurring Event Examples**:
+- **Monthly Coffee Meetup**: Pattern "monthly", Interval 1, no specific days
+- **Bi-weekly Support Group**: Pattern "weekly", Interval 2, Days [3] (Wednesdays)
+- **Daily Pride Month Events**: Pattern "daily", Interval 1, with specific date range
+
+**Important**: 
+- Events automatically appear in date order. Past events are hidden.
+- Recurring events generate individual instances up to 1 year in advance.
+- Maximum 100 instances per recurring event to prevent performance issues.
+- Exception dates use format: "2024-12-25T00:00:00.000Z”
 
 ### 🗓️ Calendar Page (`/calendar`)
 **Content managed via**: Google Calendar (not Strapi)

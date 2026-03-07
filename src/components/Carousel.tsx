@@ -57,25 +57,18 @@ export default function Carousel() {
     // Handle Strapi image array structure
     if (slide?.image && Array.isArray(slide.image) && slide.image.length > 0) {
       const image = slide.image[0];
+      console.log(`Processing slide ${slide.id}:`, { slide, image });
       if (image?.url) {
-        // Validate and construct URL safely
-        if (image.url.startsWith('http')) {
-          // Validate URL format
-          try {
-            new URL(image.url);
-            return image.url;
-          } catch {
-            console.warn('Invalid image URL:', image.url);
-            return '';
-          }
-        } else {
-          // Construct relative URL safely
-          const baseUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337';
-          const cleanPath = image.url.startsWith('/') ? image.url : `/${image.url}`;
-          return `${baseUrl}${cleanPath}`;
-        }
+        // Use the Strapi client's getImageUrl method for consistent URL handling
+        const baseUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337';
+        const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+        const cleanImageUrl = image.url.startsWith('/') ? image.url.slice(1) : image.url;
+        const fullUrl = `${cleanBaseUrl}/${cleanImageUrl}`;
+        console.log(`Generated URL for slide ${slide.id}:`, fullUrl);
+        return fullUrl;
       }
     }
+    console.warn(`No valid image found for slide:`, slide);
     return '';
   };
 
@@ -89,6 +82,11 @@ export default function Carousel() {
         <div className="relative w-full h-full">
           {currentSlide ? (
             <>
+              {/* Debug info */}
+              {console.log(`Current slide index: ${currentIndex}, Total slides: ${slides.length}`)}
+              {console.log(`Current slide data:`, currentSlide)}
+              {console.log(`Current slide image URL:`, getImageUrl(currentSlide))}
+              
               {/* Main image */}
               <picture>
                 <source
@@ -101,6 +99,8 @@ export default function Carousel() {
                   className="absolute inset-0 h-full w-full object-contain"
                   loading="lazy"
                   decoding="async"
+                  onError={(e) => console.error(`Failed to load image:`, getImageUrl(currentSlide), e)}
+                  onLoad={(e) => console.log(`Successfully loaded image:`, getImageUrl(currentSlide))}
                 />
               </picture>
 

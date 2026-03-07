@@ -518,17 +518,48 @@ export interface ApiEventEvent extends Struct.CollectionTypeSchema {
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     end: Schema.Attribute.DateTime;
-    eventCategory: Schema.Attribute.Enumeration<['general', 'coffee']> &
+    eventCategory: Schema.Attribute.Enumeration<
+      [
+        'general',
+        'coffee',
+        'social',
+        'fundraising',
+        'advocacy',
+        'education',
+        'health',
+        'youth',
+        'pride',
+        'volunteer',
+        'cultural',
+        'community',
+      ]
+    > &
       Schema.Attribute.DefaultTo<'general'>;
     externalCtaLabel: Schema.Attribute.String;
     externalUrl: Schema.Attribute.String;
     image: Schema.Attribute.Media<'images'>;
+    isRecurring: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::event.event'> &
       Schema.Attribute.Private;
     location: Schema.Attribute.String;
     published: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
     publishedAt: Schema.Attribute.DateTime;
+    recurrenceDaysOfWeek: Schema.Attribute.JSON &
+      Schema.Attribute.DefaultTo<[]>;
+    recurrenceEndDate: Schema.Attribute.DateTime;
+    recurrenceExceptions: Schema.Attribute.Text;
+    recurrenceInterval: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<1>;
+    recurrencePattern: Schema.Attribute.Enumeration<
+      ['daily', 'weekly', 'monthly', 'yearly']
+    >;
     start: Schema.Attribute.DateTime & Schema.Attribute.Required;
     summary: Schema.Attribute.Blocks;
     title: Schema.Attribute.String & Schema.Attribute.Required;

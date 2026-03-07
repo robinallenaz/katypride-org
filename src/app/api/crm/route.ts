@@ -11,6 +11,7 @@ const ALLOWED_VENDOR_TYPES = ['nonprofit', 'forprofit', 'food', 'political', 'go
 // Enhanced rate limiter with cleanup and better IP detection
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 const RATE_LIMIT_MAX = 5;
+const MAX_RATE_LIMIT_ENTRIES = 1000; // Prevent memory exhaustion
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 // Cleanup expired entries every 5 minutes
@@ -21,6 +22,14 @@ setInterval(() => {
     if (now > entry.resetAt) {
       rateLimitMap.delete(ip);
     }
+  }
+  
+  // Prevent memory exhaustion - remove oldest entries if too many
+  if (rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
+    const entries = Array.from(rateLimitMap.entries());
+    entries.sort((a, b) => a[1].resetAt - b[1].resetAt);
+    const toDelete = entries.slice(0, rateLimitMap.size - MAX_RATE_LIMIT_ENTRIES);
+    toDelete.forEach(([ip]) => rateLimitMap.delete(ip));
   }
 }, CLEANUP_INTERVAL_MS);
 
@@ -209,6 +218,8 @@ export async function POST(request: NextRequest) {
       type, name, email, phone, interests, availability, amount, frequency, pronouns,
       company, address, city, state, postalCode, website, socialMedia,
       vendorType, vendorFee, productsServices, sponsorshipInterest, additionalInfo,
+      donationAmount, donationFrequency, anonymous, comments,
+      paymentMethod, paymentIntentId, paymentStatus, transactionId,
       _gotcha, // honeypot field — bots fill this, real users don't see it
     } = body;
 
@@ -264,9 +275,23 @@ export async function POST(request: NextRequest) {
     const customFields: Record<string, any> = {};
     if (availability) customFields.availability = availability;
     if (pronouns) customFields.pronouns = pronouns;
+    if (type === 'donor') {
+      if (donationFrequency) customFields.donation_frequency = donationFrequency;
+      if (donationAmount) customFields.last_donation_amount = parseFloat(donationAmount);
+      if (anonymous) customFields.anonymous = anonymous;
+      if (comments) customFields.comments = comments;
+    }
+    // Legacy support for old field names
     if (type === 'donor' && frequency) customFields.donation_frequency = frequency;
     if (type === 'donor' && amount) customFields.last_donation_amount = amount;
     if (interests && Array.isArray(interests)) customFields.interests = interests.join(', ');
+    
+    // Payment tracking fields
+    if (paymentMethod) customFields.payment_method = paymentMethod;
+    if (paymentIntentId) customFields.payment_intent_id = paymentIntentId;
+    if (paymentStatus) customFields.payment_status = paymentStatus;
+    if (transactionId) customFields.transaction_id = transactionId;
+    
     // Vendor-specific fields
     if (company) customFields.company_name = company;
     if (website) customFields.website = website;

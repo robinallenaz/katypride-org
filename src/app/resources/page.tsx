@@ -123,83 +123,83 @@ export default async function ResourcesPage() {
 
   const accents: Record<string, Accent> = {
     health: {
-      cardBg: "bg-white/90",
+      cardBg: "bg-white/95 backdrop-blur-sm",
       cardHoverBg: "hover:bg-white",
-      cardBorder: "border-gray-200",
-      cardHoverBorder: "hover:border-[#06bd01]/50",
+      cardBorder: "border-gray-300/60 shadow-lg",
+      cardHoverBorder: "hover:border-[#06bd01]/60 hover:shadow-xl",
       stripe: "border-l-[#06bd01]",
       ring: "focus-visible:ring-[#06bd01]",
-      pillBorder: "border-[#06bd01]/30",
-      pillBg: "bg-[#06bd01]/10",
-      pillHoverBg: "group-hover:bg-[#06bd01]/20",
-      pillText: "text-[#025200]",
-      chipBorder: "border-[#06bd01]/40",
-      chipBg: "bg-white",
-      chipHoverBg: "hover:bg-[#06bd01]/10",
-      chipText: "text-[#025200]",
+      pillBorder: "border-[#06bd01]/40",
+      pillBg: "bg-[#06bd01]/15",
+      pillHoverBg: "group-hover:bg-[#06bd01]/25",
+      pillText: "text-[#047800]",
+      chipBorder: "border-[#06bd01]/50",
+      chipBg: "bg-white/90",
+      chipHoverBg: "hover:bg-[#06bd01]/15",
+      chipText: "text-[#047800]",
     },
     advocacy: {
-      cardBg: "bg-white/90",
+      cardBg: "bg-white/95 backdrop-blur-sm",
       cardHoverBg: "hover:bg-white",
-      cardBorder: "border-gray-200",
-      cardHoverBorder: "hover:border-[#ff1c25]/50",
+      cardBorder: "border-gray-300/60 shadow-lg",
+      cardHoverBorder: "hover:border-[#ff1c25]/60 hover:shadow-xl",
       stripe: "border-l-[#ff1c25]",
       ring: "focus-visible:ring-[#ff1c25]",
-      pillBorder: "border-[#ff1c25]/30",
-      pillBg: "bg-[#ff1c25]/10",
-      pillHoverBg: "group-hover:bg-[#ff1c25]/20",
+      pillBorder: "border-[#ff1c25]/40",
+      pillBg: "bg-[#ff1c25]/15",
+      pillHoverBg: "group-hover:bg-[#ff1c25]/25",
       pillText: "text-[#800000]",
-      chipBorder: "border-[#ff1c25]/40",
-      chipBg: "bg-white",
-      chipHoverBg: "hover:bg-[#ff1c25]/10",
+      chipBorder: "border-[#ff1c25]/50",
+      chipBg: "bg-white/90",
+      chipHoverBg: "hover:bg-[#ff1c25]/15",
       chipText: "text-[#800000]",
     },
     ally: {
-      cardBg: "bg-white/90",
+      cardBg: "bg-white/95 backdrop-blur-sm",
       cardHoverBg: "hover:bg-white",
-      cardBorder: "border-gray-200",
-      cardHoverBorder: "hover:border-[#760088]/50",
+      cardBorder: "border-gray-300/60 shadow-lg",
+      cardHoverBorder: "hover:border-[#760088]/60 hover:shadow-xl",
       stripe: "border-l-[#760088]",
       ring: "focus-visible:ring-[#760088]",
-      pillBorder: "border-[#760088]/30",
-      pillBg: "bg-[#760088]/10",
-      pillHoverBg: "group-hover:bg-[#760088]/20",
+      pillBorder: "border-[#760088]/40",
+      pillBg: "bg-[#760088]/15",
+      pillHoverBg: "group-hover:bg-[#760088]/25",
       pillText: "text-[#5a0066]",
-      chipBorder: "border-[#760088]/40",
-      chipBg: "bg-white",
-      chipHoverBg: "hover:bg-[#760088]/10",
+      chipBorder: "border-[#760088]/50",
+      chipBg: "bg-white/90",
+      chipHoverBg: "hover:bg-[#760088]/15",
       chipText: "text-[#5a0066]",
     },
     regional: {
-      cardBg: "bg-white/90",
+      cardBg: "bg-white/95 backdrop-blur-sm",
       cardHoverBg: "hover:bg-white",
-      cardBorder: "border-gray-200",
-      cardHoverBorder: "hover:border-[#fe931f]/50",
+      cardBorder: "border-gray-300/60 shadow-lg",
+      cardHoverBorder: "hover:border-[#fe931f]/60 hover:shadow-xl",
       stripe: "border-l-[#fe931f]",
       ring: "focus-visible:ring-[#fe931f]",
-      pillBorder: "border-[#fe931f]/30",
-      pillBg: "bg-[#fe931f]/10",
-      pillHoverBg: "group-hover:bg-[#fe931f]/20",
+      pillBorder: "border-[#fe931f]/40",
+      pillBg: "bg-[#fe931f]/15",
+      pillHoverBg: "group-hover:bg-[#fe931f]/25",
       pillText: "text-[#804000]",
-      chipBorder: "border-[#fe931f]/40",
-      chipBg: "bg-white",
-      chipHoverBg: "hover:bg-[#fe931f]/10",
+      chipBorder: "border-[#fe931f]/50",
+      chipBg: "bg-white/90",
+      chipHoverBg: "hover:bg-[#fe931f]/15",
       chipText: "text-[#804000]",
     },
     national: {
-      cardBg: "bg-white/90",
+      cardBg: "bg-white/95 backdrop-blur-sm",
       cardHoverBg: "hover:bg-white",
-      cardBorder: "border-gray-200",
-      cardHoverBorder: "hover:border-[#021999]/50",
+      cardBorder: "border-gray-300/60 shadow-lg",
+      cardHoverBorder: "hover:border-[#021999]/60 hover:shadow-xl",
       stripe: "border-l-[#021999]",
       ring: "focus-visible:ring-[#021999]",
-      pillBorder: "border-[#021999]/30",
-      pillBg: "bg-[#021999]/10",
-      pillHoverBg: "group-hover:bg-[#021999]/20",
+      pillBorder: "border-[#021999]/40",
+      pillBg: "bg-[#021999]/15",
+      pillHoverBg: "group-hover:bg-[#021999]/25",
       pillText: "text-[#001566]",
-      chipBorder: "border-[#021999]/40",
-      chipBg: "bg-white",
-      chipHoverBg: "hover:bg-[#021999]/10",
+      chipBorder: "border-[#021999]/50",
+      chipBg: "bg-white/90",
+      chipHoverBg: "hover:bg-[#021999]/15",
       chipText: "text-[#001566]",
     },
   }
@@ -396,6 +396,61 @@ export default async function ResourcesPage() {
             accent={accents.national}
             items={nationalResources}
           />
+
+          {/* Support Section */}
+          <section className="mt-16 pt-12 border-t border-gray-200">
+            <div className="text-center mb-8">
+              <h2 className="font-heading text-3xl font-bold text-[#760088] mb-4">Support Katy Pride</h2>
+              <p className="text-lg text-gray-700 max-w-2xl mx-auto mb-8">
+                Your generosity helps us continue our mission of empowering the LGBTQ+ community in Katy and West Houston through inclusive events, advocacy, and supportive community programs.
+              </p>
+              
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-8 border border-purple-100">
+                <h3 className="font-heading text-xl font-bold text-purple-700 mb-4">Make a Donation</h3>
+                <p className="text-gray-600 mb-6">
+                  Every contribution makes a difference in creating a more inclusive community for all.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <a
+                    href="/donate"
+                    className="inline-flex items-center justify-center bg-purple-600 text-white font-semibold px-8 py-3 rounded-full hover:bg-purple-700 transition-colors shadow-lg"
+                  >
+                    💝 Donate Now
+                  </a>
+                  <a
+                    href="/vendor-signup"
+                    className="inline-flex items-center justify-center bg-orange-600 text-white font-semibold px-8 py-3 rounded-full hover:bg-orange-700 transition-colors shadow-lg"
+                  >
+                    🏪 Become a Vendor
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+              <div className="text-center p-6 bg-white/80 rounded-xl border border-purple-100">
+                <div className="text-3xl mb-3">🏳️‍🌈</div>
+                <h4 className="font-heading text-lg font-semibold text-purple-700 mb-2">Community Events</h4>
+                <p className="text-gray-600 text-sm">
+                  Support our Pride celebrations, monthly meet-ups, and community gatherings.
+                </p>
+              </div>
+              <div className="text-center p-6 bg-white/80 rounded-xl border border-purple-100">
+                <div className="text-3xl mb-3">📚</div>
+                <h4 className="font-heading text-lg font-semibold text-purple-700 mb-2">Education & Advocacy</h4>
+                <p className="text-gray-600 text-sm">
+                  Fund educational programs and advocacy efforts for LGBTQ+ rights and inclusion.
+                </p>
+              </div>
+              <div className="text-center p-6 bg-white/80 rounded-xl border border-purple-100">
+                <div className="text-3xl mb-3">🤝</div>
+                <h4 className="font-heading text-lg font-semibold text-purple-700 mb-2">Support Services</h4>
+                <p className="text-gray-600 text-sm">
+                  Provide resources and support for LGBTQ+ individuals and families in our community.
+                </p>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
     </div>

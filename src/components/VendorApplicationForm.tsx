@@ -11,7 +11,7 @@ interface VendorFormData {
   
   // Business Information
   company: string;
-  vendorType: 'nonprofit' | 'forprofit' | 'food' | 'political' | 'government';
+  vendorType: 'nonprofit' | 'forprofit' | 'political' | 'government' | 'food';
   website: string;
   socialMedia: string;
   
@@ -30,6 +30,8 @@ interface VendorFormData {
   // Terms
   agreeToTerms: boolean;
   agreeToPhotoRelease: boolean;
+  agreeToTextMessages: boolean;
+  understandContract: boolean;
 }
 
 const VendorApplicationForm: React.FC = () => {
@@ -52,6 +54,8 @@ const VendorApplicationForm: React.FC = () => {
     additionalInfo: '',
     agreeToTerms: false,
     agreeToPhotoRelease: false,
+    agreeToTextMessages: false,
+    understandContract: false,
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,9 +65,9 @@ const VendorApplicationForm: React.FC = () => {
   const vendorTypes = [
     { value: 'nonprofit', label: 'Non-Profit Organization', fee: '$225' },
     { value: 'forprofit', label: 'For-Profit Business', fee: '$275' },
-    { value: 'food', label: 'Food Vendor', fee: '$300' },
     { value: 'political', label: 'Political Organization', fee: '$300' },
     { value: 'government', label: 'Government Entity', fee: '$300' },
+    { value: 'food', label: 'Food Vendor', fee: '$300' },
   ];
 
   const sponsorshipLevels = [
@@ -237,6 +241,8 @@ const VendorApplicationForm: React.FC = () => {
           additionalInfo: '',
           agreeToTerms: false,
           agreeToPhotoRelease: false,
+          agreeToTextMessages: false,
+          understandContract: false,
         });
       } else {
         throw new Error(result.error || 'Submission failed');
@@ -510,7 +516,7 @@ const VendorApplicationForm: React.FC = () => {
           <div className="space-y-6">
             <div>
               <label htmlFor="productsServices" className="block text-sm font-medium text-gray-700 mb-2">
-                Products/Services Description *
+                Products/Services/Menu Sold *
               </label>
               <textarea
                 id="productsServices"
@@ -609,6 +615,32 @@ const VendorApplicationForm: React.FC = () => {
                 </span>
               </label>
               {errors.agreeToPhotoRelease && <p className="text-sm text-red-600">{errors.agreeToPhotoRelease}</p>}
+
+              <label className="flex items-start">
+                <input
+                  type="checkbox"
+                  name="agreeToTextMessages"
+                  checked={formData.agreeToTextMessages}
+                  onChange={handleInputChange}
+                  className="mt-1 mr-3 text-purple-600 focus:ring-purple-500"
+                />
+                <span className="text-sm text-gray-700">
+                  By providing my phone number, I agree to receive text messages from Katy Pride.
+                </span>
+              </label>
+
+              <label className="flex items-start">
+                <input
+                  type="checkbox"
+                  name="understandContract"
+                  checked={formData.understandContract}
+                  onChange={handleInputChange}
+                  className="mt-1 mr-3 text-purple-600 focus:ring-purple-500"
+                />
+                <span className="text-sm text-gray-700">
+                  I understand that a contract will be sent after payment. The contract must be signed to complete my vendor registration.
+                </span>
+              </label>
             </div>
           </div>
         </div>

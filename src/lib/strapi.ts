@@ -74,6 +74,13 @@ export interface StrapiEvent {
   externalCtaLabel?: string
   image?: StrapiImage
   published: boolean
+  eventCategory?: 'general' | 'coffee' | 'social' | 'fundraising' | 'advocacy' | 'education' | 'health' | 'youth' | 'pride' | 'volunteer' | 'cultural' | 'community'
+  isRecurring?: boolean
+  recurrencePattern?: 'daily' | 'weekly' | 'monthly' | 'yearly'
+  recurrenceInterval?: number
+  recurrenceEndDate?: string
+  recurrenceDaysOfWeek?: number[] // 0-6 (Sunday-Saturday)
+  recurrenceExceptions?: string // JSON string of exception dates
   createdAt: string
   updatedAt: string
   publishedAt: string

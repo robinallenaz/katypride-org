@@ -13,6 +13,7 @@ Welcome to the Katy Pride website administration guide. This document explains h
 - **Page Content** – Page headings and introductory text
 - **Carousel Images** – Photos displayed in the home page carousel
 - **Website Images** – General image library for website use
+- **Payment Processing** – Payment processor information and configuration
 
 ## Accessing the Admin Panel
 

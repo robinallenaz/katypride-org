@@ -1,33 +1,11 @@
-import { strapiClient, type StrapiFormLink, type StrapiPageContent } from '@/lib/strapi'
+import { strapiClient, type StrapiPageContent } from '@/lib/strapi'
 import StrapiRichText from '@/components/StrapiRichText'
 
 export const dynamic = 'force-dynamic'
 
-interface FormLink {
-  id: string
-  title: string
-  url: string
-}
-
 interface PageContent {
   heading?: string
   intro?: any[]
-}
-
-async function getFormLinks(page: string): Promise<FormLink[]> {
-  try {
-    const strapiFormLinks = await strapiClient.getFormLinks(page)
-    
-    // Convert Strapi form links to expected format
-    return strapiFormLinks.map((link) => ({
-      id: link.documentId,
-      title: link.title,
-      url: link.url
-    }))
-  } catch (error) {
-    console.error('Failed to fetch form links:', error)
-    return []
-  }
 }
 
 async function getPageContent(page: string): Promise<PageContent | null> {
@@ -47,7 +25,7 @@ async function getPageContent(page: string): Promise<PageContent | null> {
 }
 
 export default async function CelebrationPage() {
-  const [formLinks, pageContent] = await Promise.all([getFormLinks('celebration'), getPageContent('celebration')])
+  const pageContent = await getPageContent('celebration')
 
   const heading = pageContent?.heading || 'Katy Pride Celebration'
   const intro = pageContent?.intro
@@ -74,57 +52,29 @@ export default async function CelebrationPage() {
             )}
           </div>
 
-          {/* Form Links */}
-          {formLinks.length > 0 && (
-            <div className="mt-6 flex flex-wrap gap-4">
-              {formLinks.map((link) => (
-                <a
-                  key={link.id}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-[#760088] text-white font-semibold px-6 py-3 rounded-full hover:bg-[#5a0066] transition-colors"
-                >
-                  {link.title}
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                    />
-                  </svg>
-                </a>
-              ))}
-              {/* Add vendor application form link */}
-              <a
-                href="/vendor-signup"
-                className="inline-flex items-center gap-2 bg-orange-600 text-white font-semibold px-6 py-3 rounded-full hover:bg-orange-700 transition-colors"
+          {/* Vendor Application Link */}
+          <div className="mt-6 flex flex-wrap gap-4">
+            <a
+              href="/vendor-signup"
+              className="inline-flex items-center gap-2 bg-orange-600 text-white font-semibold px-6 py-3 rounded-full hover:bg-orange-700 transition-colors"
+            >
+              2026 Vendor Application
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
               >
-                2026 Vendor Application
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                  />
-                </svg>
-              </a>
-            </div>
-          )}
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
+            </a>
+          </div>
         </div>
 
         {/* 2026 Sponsors */}

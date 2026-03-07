@@ -17,7 +17,7 @@
     },
     {
       "src": "/health",
-      "dest": "/api/health-check/health"
+      "dest": "/api/health-check"
     },
     {
       "src": "/(.*)",

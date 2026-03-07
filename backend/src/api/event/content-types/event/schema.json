@@ -51,8 +51,46 @@
       "default": "general",
       "enum": [
         "general",
-        "coffee"
+        "coffee",
+        "social",
+        "fundraising",
+        "advocacy",
+        "education",
+        "health",
+        "youth",
+        "pride",
+        "volunteer",
+        "cultural",
+        "community"
       ]
+    },
+    "isRecurring": {
+      "type": "boolean",
+      "default": false
+    },
+    "recurrencePattern": {
+      "type": "enumeration",
+      "enum": [
+        "daily",
+        "weekly",
+        "monthly",
+        "yearly"
+      ]
+    },
+    "recurrenceInterval": {
+      "type": "integer",
+      "default": 1,
+      "min": 1
+    },
+    "recurrenceEndDate": {
+      "type": "datetime"
+    },
+    "recurrenceDaysOfWeek": {
+      "type": "json",
+      "default": []
+    },
+    "recurrenceExceptions": {
+      "type": "text"
     }
   }
 }
