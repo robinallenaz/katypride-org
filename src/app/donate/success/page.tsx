@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-export default function DonationSuccessPage() {
+function DonationSuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isProcessing, setIsProcessing] = useState(true)
@@ -117,6 +117,21 @@ export default function DonationSuccessPage() {
           </div>
         </div>
       </div>
-    </>
+    </div>
+  )
+}
+
+export default function DonationSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">⏳</div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <DonationSuccessContent />
+    </Suspense>
   )
 }

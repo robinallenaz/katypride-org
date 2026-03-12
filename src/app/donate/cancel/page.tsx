@@ -38,6 +38,6 @@ export default function DonationCancelPage() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
