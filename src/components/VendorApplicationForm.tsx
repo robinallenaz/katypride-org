@@ -260,10 +260,17 @@ const VendorApplicationForm: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-purple-600 mb-4">Katy Pride 2026 Vendor Application</h1>
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full mb-4">
+          <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+        </div>
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-700 to-indigo-600 bg-clip-text text-transparent mb-4">Katy Pride 2026 Vendor Application</h1>
         <p className="text-lg text-gray-700 mb-2">Saturday, October 3, 2026 • 11AM - 4PM</p>
         <p className="text-md text-gray-600">Bear Creek Rodeo Arena, Houston, TX</p>
-        <p className="text-sm text-gray-500 mt-4">STAND TALL, Y'ALL! 🏳️‍🌈</p>
+        <div className="mt-4 inline-flex items-center px-4 py-2 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full">
+          <span className="text-white font-bold text-sm">STAND TALL, Y'ALL!</span>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">

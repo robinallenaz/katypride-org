@@ -32,6 +32,7 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${ebGaramond.variable} ${montserrat.variable} antialiased`}
+        suppressHydrationWarning={true}
       >
         <a
           href="#main-content"

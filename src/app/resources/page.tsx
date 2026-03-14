@@ -98,7 +98,11 @@ async function getResourceLinks(): Promise<ResourceLink[]> {
     const uniqueDefaults = defaultResources.filter((r) => !seenUrls.has(r.url))
     return [...convertedResources, ...uniqueDefaults]
   } catch (error) {
-    console.error('Failed to fetch resource links:', error)
+    console.error('Failed to fetch resource links from Strapi:', error)
+    // In development, show a more detailed error message
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Strapi API error details - check if API is running and permissions are set correctly')
+    }
     // Return default resources if Strapi fails
     return defaultResources
   }
@@ -106,6 +110,8 @@ async function getResourceLinks(): Promise<ResourceLink[]> {
 
 export default async function ResourcesPage() {
   const resources = await getResourceLinks()
+  const usingFallback = resources.length === defaultResources.length && 
+    resources.every((r, i) => r.id === defaultResources[i].id)
 
   const healthResources = resources.filter((r) => r.category === 'health')
   const advocacyResources = resources.filter((r) => r.category === 'advocacy')
@@ -123,84 +129,84 @@ export default async function ResourcesPage() {
 
   const accents: Record<string, Accent> = {
     health: {
-      cardBg: "bg-white/95 backdrop-blur-sm",
-      cardHoverBg: "hover:bg-white",
-      cardBorder: "border-gray-300/60 shadow-lg",
-      cardHoverBorder: "hover:border-[#06bd01]/60 hover:shadow-xl",
+      cardBg: "bg-gradient-to-br from-green-50 to-emerald-50 border-green-200",
+      cardHoverBg: "hover:from-green-100 hover:to-emerald-100",
+      cardBorder: "border-green-300/80 shadow-lg shadow-green-200/30",
+      cardHoverBorder: "hover:border-green-400 hover:shadow-xl hover:shadow-green-300/40",
       stripe: "border-l-[#06bd01]",
       ring: "focus-visible:ring-[#06bd01]",
-      pillBorder: "border-[#06bd01]/40",
-      pillBg: "bg-[#06bd01]/15",
-      pillHoverBg: "group-hover:bg-[#06bd01]/25",
-      pillText: "text-[#047800]",
-      chipBorder: "border-[#06bd01]/50",
-      chipBg: "bg-white/90",
-      chipHoverBg: "hover:bg-[#06bd01]/15",
-      chipText: "text-[#047800]",
+      pillBorder: "border-[#06bd01]/50",
+      pillBg: "bg-[#06bd01]/20",
+      pillHoverBg: "group-hover:bg-[#06bd01]/30",
+      pillText: "text-[#047800] font-semibold",
+      chipBorder: "border-[#06bd01]/60",
+      chipBg: "bg-white/95",
+      chipHoverBg: "hover:bg-[#06bd01]/10",
+      chipText: "text-[#047800] font-medium",
     },
     advocacy: {
-      cardBg: "bg-white/95 backdrop-blur-sm",
-      cardHoverBg: "hover:bg-white",
-      cardBorder: "border-gray-300/60 shadow-lg",
-      cardHoverBorder: "hover:border-[#ff1c25]/60 hover:shadow-xl",
+      cardBg: "bg-gradient-to-br from-red-50 to-rose-50 border-red-200",
+      cardHoverBg: "hover:from-red-100 hover:to-rose-100",
+      cardBorder: "border-red-300/80 shadow-lg shadow-red-200/30",
+      cardHoverBorder: "hover:border-red-400 hover:shadow-xl hover:shadow-red-300/40",
       stripe: "border-l-[#ff1c25]",
       ring: "focus-visible:ring-[#ff1c25]",
-      pillBorder: "border-[#ff1c25]/40",
-      pillBg: "bg-[#ff1c25]/15",
-      pillHoverBg: "group-hover:bg-[#ff1c25]/25",
-      pillText: "text-[#800000]",
-      chipBorder: "border-[#ff1c25]/50",
-      chipBg: "bg-white/90",
-      chipHoverBg: "hover:bg-[#ff1c25]/15",
-      chipText: "text-[#800000]",
+      pillBorder: "border-[#ff1c25]/50",
+      pillBg: "bg-[#ff1c25]/20",
+      pillHoverBg: "group-hover:bg-[#ff1c25]/30",
+      pillText: "text-[#800000] font-semibold",
+      chipBorder: "border-[#ff1c25]/60",
+      chipBg: "bg-white/95",
+      chipHoverBg: "hover:bg-[#ff1c25]/10",
+      chipText: "text-[#800000] font-medium",
     },
     ally: {
-      cardBg: "bg-white/95 backdrop-blur-sm",
-      cardHoverBg: "hover:bg-white",
-      cardBorder: "border-gray-300/60 shadow-lg",
-      cardHoverBorder: "hover:border-[#760088]/60 hover:shadow-xl",
+      cardBg: "bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200",
+      cardHoverBg: "hover:from-purple-100 hover:to-violet-100",
+      cardBorder: "border-purple-300/80 shadow-lg shadow-purple-200/30",
+      cardHoverBorder: "hover:border-purple-400 hover:shadow-xl hover:shadow-purple-300/40",
       stripe: "border-l-[#760088]",
       ring: "focus-visible:ring-[#760088]",
-      pillBorder: "border-[#760088]/40",
-      pillBg: "bg-[#760088]/15",
-      pillHoverBg: "group-hover:bg-[#760088]/25",
-      pillText: "text-[#5a0066]",
-      chipBorder: "border-[#760088]/50",
-      chipBg: "bg-white/90",
-      chipHoverBg: "hover:bg-[#760088]/15",
-      chipText: "text-[#5a0066]",
+      pillBorder: "border-[#760088]/50",
+      pillBg: "bg-[#760088]/20",
+      pillHoverBg: "group-hover:bg-[#760088]/30",
+      pillText: "text-[#5a0066] font-semibold",
+      chipBorder: "border-[#760088]/60",
+      chipBg: "bg-white/95",
+      chipHoverBg: "hover:bg-[#760088]/10",
+      chipText: "text-[#5a0066] font-medium",
     },
     regional: {
-      cardBg: "bg-white/95 backdrop-blur-sm",
-      cardHoverBg: "hover:bg-white",
-      cardBorder: "border-gray-300/60 shadow-lg",
-      cardHoverBorder: "hover:border-[#fe931f]/60 hover:shadow-xl",
+      cardBg: "bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200",
+      cardHoverBg: "hover:from-amber-100 hover:to-orange-100",
+      cardBorder: "border-amber-300/80 shadow-lg shadow-amber-200/30",
+      cardHoverBorder: "hover:border-amber-400 hover:shadow-xl hover:shadow-amber-300/40",
       stripe: "border-l-[#fe931f]",
       ring: "focus-visible:ring-[#fe931f]",
-      pillBorder: "border-[#fe931f]/40",
-      pillBg: "bg-[#fe931f]/15",
-      pillHoverBg: "group-hover:bg-[#fe931f]/25",
-      pillText: "text-[#804000]",
-      chipBorder: "border-[#fe931f]/50",
-      chipBg: "bg-white/90",
-      chipHoverBg: "hover:bg-[#fe931f]/15",
-      chipText: "text-[#804000]",
+      pillBorder: "border-[#fe931f]/50",
+      pillBg: "bg-[#fe931f]/20",
+      pillHoverBg: "group-hover:bg-[#fe931f]/30",
+      pillText: "text-[#804000] font-semibold",
+      chipBorder: "border-[#fe931f]/60",
+      chipBg: "bg-white/95",
+      chipHoverBg: "hover:bg-[#fe931f]/10",
+      chipText: "text-[#804000] font-medium",
     },
     national: {
-      cardBg: "bg-white/95 backdrop-blur-sm",
-      cardHoverBg: "hover:bg-white",
-      cardBorder: "border-gray-300/60 shadow-lg",
-      cardHoverBorder: "hover:border-[#021999]/60 hover:shadow-xl",
+      cardBg: "bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200",
+      cardHoverBg: "hover:from-blue-100 hover:to-indigo-100",
+      cardBorder: "border-blue-300/80 shadow-lg shadow-blue-200/30",
+      cardHoverBorder: "hover:border-blue-400 hover:shadow-xl hover:shadow-blue-300/40",
       stripe: "border-l-[#021999]",
       ring: "focus-visible:ring-[#021999]",
-      pillBorder: "border-[#021999]/40",
-      pillBg: "bg-[#021999]/15",
-      pillHoverBg: "group-hover:bg-[#021999]/25",
-      pillText: "text-[#001566]",
-      chipBorder: "border-[#021999]/50",
-      chipBg: "bg-white/90",
-      chipHoverBg: "hover:bg-[#021999]/15",
-      chipText: "text-[#001566]",
+      pillBorder: "border-[#021999]/50",
+      pillBg: "bg-[#021999]/20",
+      pillHoverBg: "group-hover:bg-[#021999]/30",
+      pillText: "text-[#001566] font-semibold",
+      chipBorder: "border-[#021999]/60",
+      chipBg: "bg-white/95",
+      chipHoverBg: "hover:bg-[#021999]/10",
+      chipText: "text-[#001566] font-medium",
     },
   }
 
@@ -216,7 +222,7 @@ export default async function ResourcesPage() {
     <a
       href={href}
       role="tab"
-      className={`font-heading antialiased inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-[13px] font-semibold leading-none tracking-wide shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${accent.chipBorder} ${accent.chipBg} ${accent.chipHoverBg} ${accent.chipText} ${accent.ring}`}
+      className={`font-heading antialiased inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-[13px] font-semibold leading-none tracking-wide shadow-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${accent.chipBorder} ${accent.chipBg} ${accent.chipHoverBg} ${accent.chipText} ${accent.ring} motion-reduce:transition-none`}
     >
       {label}
     </a>
@@ -237,20 +243,20 @@ export default async function ResourcesPage() {
         target="_blank"
         rel="noopener noreferrer"
         aria-label={`${title} — Visit website (opens in a new tab)`}
-        className={`group flex h-full items-start justify-between gap-4 rounded-2xl border border-l-4 px-4 py-4 shadow transition focus-visible:outline-none focus-visible:ring-2 ${accent.cardBg} ${accent.cardHoverBg} ${accent.cardBorder} ${accent.cardHoverBorder} ${accent.stripe} ${accent.ring}`}
+        className={`group flex h-full items-start justify-between gap-4 rounded-2xl border-2 border-l-4 px-5 py-5 shadow-lg transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${accent.cardBg} ${accent.cardHoverBg} ${accent.cardBorder} ${accent.cardHoverBorder} ${accent.stripe} ${accent.ring} motion-reduce:transition-none`}
       >
         <span className="min-w-0">
-          <span className="font-heading text-lg text-gray-900 group-hover:text-purple-950 group-hover:underline decoration-purple-300 underline-offset-4">
+          <span className="font-heading text-lg font-semibold text-gray-900 group-hover:text-purple-950 group-hover:underline decoration-2 underline-offset-4 transition-colors duration-200 motion-reduce:transition-none">
             {title}
           </span>
-          <span className="mt-1 block text-sm text-gray-600 break-words" title={href}>
+          <span className="mt-1.5 block text-sm text-gray-600 font-medium break-words" title={href}>
             {getHostname(href)}
           </span>
         </span>
 
         <span
           aria-hidden="true"
-          className={`font-heading antialiased mt-0.5 shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold leading-none tracking-wide transition-all duration-200 ${accent.pillBorder} ${accent.pillBg} ${accent.pillText} ${accent.pillHoverBg}`}
+          className={`font-heading antialiased mt-1 shrink-0 rounded-full border-2 px-3.5 py-2 text-[11px] font-bold leading-none tracking-wide transition-colors duration-200 ${accent.pillBorder} ${accent.pillBg} ${accent.pillText} ${accent.pillHoverBg} motion-reduce:transition-none`}
         >
           Visit <span aria-hidden="true">→</span>
         </span>
@@ -329,6 +335,24 @@ export default async function ResourcesPage() {
             Community resources and support links.
           </p>
 
+          {usingFallback && (
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-amber-800">
+                    Using offline resource list
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    Admin: Check Strapi API connection to manage resources dynamically.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <nav id="categories" aria-label="Resource categories" className="mt-6 scroll-mt-24">
             <p className="text-sm text-gray-700 mb-3" id="category-description">
               Select a category to jump to that section.
@@ -397,61 +421,7 @@ export default async function ResourcesPage() {
             items={nationalResources}
           />
 
-          {/* Support Section */}
-          <section className="mt-16 pt-12 border-t border-gray-200">
-            <div className="text-center mb-8">
-              <h2 className="font-heading text-3xl font-bold text-[#760088] mb-4">Support Katy Pride</h2>
-              <p className="text-lg text-gray-700 max-w-2xl mx-auto mb-8">
-                Your generosity helps us continue our mission of empowering the LGBTQ+ community in Katy and West Houston through inclusive events, advocacy, and supportive community programs.
-              </p>
-              
-              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-8 border border-purple-100">
-                <h3 className="font-heading text-xl font-bold text-purple-700 mb-4">Make a Donation</h3>
-                <p className="text-gray-600 mb-6">
-                  Every contribution makes a difference in creating a more inclusive community for all.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <a
-                    href="/donate"
-                    className="inline-flex items-center justify-center bg-purple-600 text-white font-semibold px-8 py-3 rounded-full hover:bg-purple-700 transition-colors shadow-lg"
-                  >
-                    💝 Donate Now
-                  </a>
-                  <a
-                    href="/vendor-signup"
-                    className="inline-flex items-center justify-center bg-orange-600 text-white font-semibold px-8 py-3 rounded-full hover:bg-orange-700 transition-colors shadow-lg"
-                  >
-                    🏪 Become a Vendor
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-              <div className="text-center p-6 bg-white/80 rounded-xl border border-purple-100">
-                <div className="text-3xl mb-3">🏳️‍🌈</div>
-                <h4 className="font-heading text-lg font-semibold text-purple-700 mb-2">Community Events</h4>
-                <p className="text-gray-600 text-sm">
-                  Support our Pride celebrations, monthly meet-ups, and community gatherings.
-                </p>
-              </div>
-              <div className="text-center p-6 bg-white/80 rounded-xl border border-purple-100">
-                <div className="text-3xl mb-3">📚</div>
-                <h4 className="font-heading text-lg font-semibold text-purple-700 mb-2">Education & Advocacy</h4>
-                <p className="text-gray-600 text-sm">
-                  Fund educational programs and advocacy efforts for LGBTQ+ rights and inclusion.
-                </p>
-              </div>
-              <div className="text-center p-6 bg-white/80 rounded-xl border border-purple-100">
-                <div className="text-3xl mb-3">🤝</div>
-                <h4 className="font-heading text-lg font-semibold text-purple-700 mb-2">Support Services</h4>
-                <p className="text-gray-600 text-sm">
-                  Provide resources and support for LGBTQ+ individuals and families in our community.
-                </p>
-              </div>
-            </div>
-          </section>
-        </div>
+                  </div>
       </section>
     </div>
     </>

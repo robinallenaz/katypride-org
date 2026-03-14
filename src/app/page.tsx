@@ -15,8 +15,8 @@ export default function Home() {
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
         }}></div>
         
-        <section id="main-content" className="relative z-10 max-w-6xl mx-auto px-4 py-16 md:py-20 text-center">
-        <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10 mb-10">
+        <section id="main-content" className="relative z-10 max-w-6xl mx-auto px-4 py-12 md:py-16 text-center">
+        <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10 mb-8">
           <h1 className="font-heading text-5xl md:text-6xl font-bold bg-gradient-to-r from-purple-700 to-indigo-600 bg-clip-text text-transparent mb-6 leading-tight">
             Welcome to Katy Pride
           </h1>
@@ -47,14 +47,16 @@ export default function Home() {
             </a>
           </div>
         </div>
-        </section>
-      </div>
 
-      <Carousel />
-
-      <section className="relative z-10 max-w-6xl mx-auto px-4 py-16">
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-8 mb-12">
-          <h2 className="font-heading text-3xl md:text-4xl font-bold bg-gradient-to-r from-purple-700 to-indigo-600 bg-clip-text text-transparent mb-8 text-center">Get Involved</h2>
+        {/* Carousel Section */}
+        <div className="mb-12">
+          <Carousel />
+        </div>
+        
+        {/* Get Involved Section */}
+        <div className="w-full">
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-8 mb-12">
+            <h2 className="font-heading text-3xl md:text-4xl font-bold bg-gradient-to-r from-purple-700 to-indigo-600 bg-clip-text text-transparent mb-8 text-center">Get Involved</h2>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-2 border-[#06bd01]">
               <h3 className="font-heading text-xl font-semibold text-[#06bd01] mb-2">Events</h3>
@@ -70,7 +72,9 @@ export default function Home() {
             </div>
           </div>
         </div>
-      </section>
+        </div>
+        </section>
+      </div>
     </>
   );
 }

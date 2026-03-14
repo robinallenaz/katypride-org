@@ -77,10 +77,12 @@ export default function EventsPage() {
   useEffect(() => {
     const run = async () => {
       try {
+        setLoadingStrapi(true)
         const events = await strapiClient.getEvents()
         setStrapiEvents(events)
       } catch (e) {
-        console.error('Failed to load events from Strapi', e)
+        console.warn('Failed to load events from Strapi (permissions may need to be set in admin):', e)
+        // Set empty array for now - board meeting will still work
         setStrapiEvents([])
       } finally {
         setLoadingStrapi(false)

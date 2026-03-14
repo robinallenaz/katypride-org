@@ -56,7 +56,7 @@ export default async function CelebrationPage() {
           <div className="mt-6 flex flex-wrap gap-4">
             <a
               href="/vendor-signup"
-              className="inline-flex items-center gap-2 bg-orange-600 text-white font-semibold px-6 py-3 rounded-full hover:bg-orange-700 transition-colors"
+              className="inline-flex items-center gap-2 bg-purple-600 text-white font-semibold px-6 py-3 rounded-full hover:bg-purple-700 transition-colors"
             >
               2026 Vendor Application
               <svg

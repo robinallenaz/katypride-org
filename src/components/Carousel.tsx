@@ -1,35 +1,168 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { cloudinaryUrl } from '@/lib/cloudinary'
 import { getCarouselImages, type CarouselImage } from '@/lib/carousel'
+
+// Hardcoded fallback images for development/demo
+const HARDCODED_IMAGES: CarouselImage[] = [
+  {
+    id: 1,
+    documentId: 'hardcoded-1',
+    title: 'Katy Pride 2026 Celebration',
+    image: [{
+      id: 1,
+      name: 'Katy Pride 2026 Celebration',
+      alternativeText: 'Katy Pride Celebration with rainbow flags and community',
+      caption: 'Katy Pride 2026 Celebration',
+      width: 1200,
+      height: 600,
+      url: '/carousel/3-Attendees-At-Celebration.jpg',
+      provider: 'hardcoded',
+      provider_metadata: null,
+      createdAt: '2026-03-14T00:00:00.000Z',
+      updatedAt: '2026-03-14T00:00:00.000Z',
+      publishedAt: '2026-03-14T00:00:00.000Z'
+    }],
+    alt: 'Katy Pride 2026 Celebration',
+    isActive: true,
+    createdAt: '2026-03-14T00:00:00.000Z',
+    updatedAt: '2026-03-14T00:00:00.000Z',
+    publishedAt: '2026-03-14T00:00:00.000Z'
+  },
+  {
+    id: 2,
+    documentId: 'hardcoded-2',
+    title: 'Community Unity',
+    image: [{
+      id: 2,
+      name: 'Community Unity',
+      alternativeText: 'Diverse community members celebrating together',
+      caption: 'Community Unity at Katy Pride',
+      width: 1200,
+      height: 600,
+      url: '/carousel/DJ-Krazy-V.jpg',
+      provider: 'hardcoded',
+      provider_metadata: null,
+      createdAt: '2026-03-14T00:00:00.000Z',
+      updatedAt: '2026-03-14T00:00:00.000Z',
+      publishedAt: '2026-03-14T00:00:00.000Z'
+    }],
+    alt: 'Community Unity at Katy Pride',
+    isActive: true,
+    createdAt: '2026-03-14T00:00:00.000Z',
+    updatedAt: '2026-03-14T00:00:00.000Z',
+    publishedAt: '2026-03-14T00:00:00.000Z'
+  },
+  {
+    id: 3,
+    documentId: 'hardcoded-3',
+    title: 'Pride Parade',
+    image: [{
+      id: 3,
+      name: 'Pride Parade',
+      alternativeText: 'Colorful pride parade with participants celebrating',
+      caption: 'Katy Pride Parade Celebration',
+      width: 1200,
+      height: 600,
+      url: '/carousel/katy-pride-volunteers.jpg',
+      provider: 'hardcoded',
+      provider_metadata: null,
+      createdAt: '2026-03-14T00:00:00.000Z',
+      updatedAt: '2026-03-14T00:00:00.000Z',
+      publishedAt: '2026-03-14T00:00:00.000Z'
+    }],
+    alt: 'Katy Pride Parade Celebration',
+    isActive: true,
+    createdAt: '2026-03-14T00:00:00.000Z',
+    updatedAt: '2026-03-14T00:00:00.000Z',
+    publishedAt: '2026-03-14T00:00:00.000Z'
+  }
+]
 
 export default function Carousel() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [slides, setSlides] = useState<CarouselImage[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [loadAttempted, setLoadAttempted] = useState(false)
 
   useEffect(() => {
     const loadImages = async () => {
+      // Prevent multiple simultaneous loads
+      if (loadAttempted) return
+      setLoadAttempted(true)
+      
       try {
         setIsLoading(true)
-        const images = await getCarouselImages()
-        console.log('Loaded Strapi carousel images:', images.length, images)
-        setSlides(images)
-        // Reset to first slide when images are loaded
+        
+        // Try to load from Strapi API first, fallback to hardcoded if it fails
+        let finalSlides: CarouselImage[] = []
+        
+        try {
+          const images = await getCarouselImages()
+          if (images.length > 0) {
+            finalSlides = images
+          } else {
+            finalSlides = HARDCODED_IMAGES
+          }
+        } catch (apiError) {
+          console.warn('Strapi API failed, using hardcoded images:', apiError)
+          finalSlides = HARDCODED_IMAGES
+        }
+        
+        // Single state update to prevent race conditions
+        setSlides(finalSlides)
         setCurrentIndex(0)
+        
       } catch (error) {
         console.error('Failed to load carousel images:', error)
-        setSlides([]) // Clear any existing images on error
+        // Use fallback on error
+        setSlides(HARDCODED_IMAGES)
+        setCurrentIndex(0)
       } finally {
         setIsLoading(false)
       }
     }
 
     loadImages()
-  }, [])
+  }, [loadAttempted])
 
   const currentSlide = slides[currentIndex] || null
+
+  // Define getImageUrl before using it in useMemo
+  const getImageUrl = (slide: any): string => {
+    // Handle Strapi image array structure
+    if (slide?.image && Array.isArray(slide.image) && slide.image.length > 0) {
+      const image = slide.image[0];
+      if (image?.url) {
+        // For hardcoded images, return URL directly with full Strapi URL
+        if (image.provider === 'hardcoded') {
+          // Use full Strapi URL for hardcoded images in backend/public/carousel
+          const baseUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337';
+          return `${baseUrl}${image.url}`;
+        }
+        
+        // Use the Strapi client's getImageUrl method for consistent URL handling
+        const baseUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337';
+        const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+        const cleanImageUrl = image.url.startsWith('/') ? image.url.slice(1) : image.url;
+        const fullUrl = `${cleanBaseUrl}/${cleanImageUrl}`;
+        return fullUrl;
+      }
+    }
+    return '';
+  }
+
+  // Memoize image URL generation to prevent unnecessary recalculations
+  const imageUrls = useMemo(() => {
+    const urls: Record<string, string> = {}
+    slides.forEach((slide) => {
+      urls[slide.id] = getImageUrl(slide)
+    })
+    return urls
+  }, [slides])
+
+  const currentImageUrl = currentSlide ? imageUrls[currentSlide.id] : ''
 
   const goToPrevious = () => {
     if (slides.length === 0) return;
@@ -53,25 +186,6 @@ export default function Carousel() {
     }
   };
 
-  const getImageUrl = (slide: any): string => {
-    // Handle Strapi image array structure
-    if (slide?.image && Array.isArray(slide.image) && slide.image.length > 0) {
-      const image = slide.image[0];
-      console.log(`Processing slide ${slide.id}:`, { slide, image });
-      if (image?.url) {
-        // Use the Strapi client's getImageUrl method for consistent URL handling
-        const baseUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337';
-        const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-        const cleanImageUrl = image.url.startsWith('/') ? image.url.slice(1) : image.url;
-        const fullUrl = `${cleanBaseUrl}/${cleanImageUrl}`;
-        console.log(`Generated URL for slide ${slide.id}:`, fullUrl);
-        return fullUrl;
-      }
-    }
-    console.warn(`No valid image found for slide:`, slide);
-    return '';
-  };
-
   const getAltText = (slide: any) => {
     return slide?.alt || slide?.title || 'Katy Pride image'
   }
@@ -82,25 +196,18 @@ export default function Carousel() {
         <div className="relative w-full h-full">
           {currentSlide ? (
             <>
-              {/* Debug info */}
-              {console.log(`Current slide index: ${currentIndex}, Total slides: ${slides.length}`)}
-              {console.log(`Current slide data:`, currentSlide)}
-              {console.log(`Current slide image URL:`, getImageUrl(currentSlide))}
-              
               {/* Main image */}
               <picture>
                 <source
                   media="(min-width: 768px)"
-                  srcSet={getImageUrl(currentSlide)}
+                  srcSet={currentImageUrl}
                 />
                 <img
-                  src={getImageUrl(currentSlide)}
+                  src={currentImageUrl}
                   alt={getAltText(currentSlide)}
                   className="absolute inset-0 h-full w-full object-contain"
                   loading="lazy"
                   decoding="async"
-                  onError={(e) => console.error(`Failed to load image:`, getImageUrl(currentSlide), e)}
-                  onLoad={(e) => console.log(`Successfully loaded image:`, getImageUrl(currentSlide))}
                 />
               </picture>
 

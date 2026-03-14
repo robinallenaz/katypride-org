@@ -79,7 +79,7 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
     const colors: Record<string, string> = {
       volunteer: 'bg-green-100 text-green-800',
       donor: 'bg-purple-100 text-purple-800',
-      vendor: 'bg-orange-100 text-orange-800',
+      vendor: 'bg-purple-100 text-purple-800',
       'community-member': 'bg-pink-100 text-pink-800',
     };
     const match = Object.keys(colors).find((key) => tag.includes(key));
@@ -139,7 +139,7 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
           <StatCard title="Total Contacts" value={stats.totalContacts} icon="👥" color="bg-blue-600" />
           <StatCard title="Volunteers" value={stats.totalVolunteers} icon="🤝" color="bg-green-600" />
           <StatCard title="Donors" value={stats.totalDonors} icon="💝" color="bg-purple-600" />
-          <StatCard title="Vendors" value={stats.totalVendors} icon="🏪" color="bg-orange-500" />
+          <StatCard title="Vendors" value={stats.totalVendors} icon="📋" color="bg-purple-600" />
           <StatCard title="Community" value={stats.totalCommunityMembers} icon="🏳️‍🌈" color="bg-pink-600" />
         </div>
 
@@ -201,7 +201,7 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 p-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
                 >
-                  <span className="text-xl">📊</span>
+                  <span className="text-xl">�</span>
                   <div>
                     <p className="font-medium">Open GrowthSphere360</p>
                     <p className="text-xs text-purple-600">Full CRM dashboard</p>
@@ -212,9 +212,9 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
                   href="/vendor-signup"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition-colors"
+                  className="flex items-center gap-3 p-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
                 >
-                  <span className="text-xl">🏪</span>
+                  <span className="text-xl">�</span>
                   <div>
                     <p className="font-medium">Vendor Signup Form</p>
                     <p className="text-xs text-orange-600">Chase the Rainbow 5K</p>

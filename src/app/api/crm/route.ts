@@ -16,22 +16,60 @@ const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 // Cleanup expired entries every 5 minutes
 const CLEANUP_INTERVAL_MS = 300_000;
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, entry] of rateLimitMap.entries()) {
-    if (now > entry.resetAt) {
-      rateLimitMap.delete(ip);
-    }
-  }
+let cleanupInterval: NodeJS.Timeout | null = null;
+
+// Initialize cleanup interval
+const startCleanupInterval = () => {
+  if (cleanupInterval) return; // Prevent multiple intervals
   
-  // Prevent memory exhaustion - remove oldest entries if too many
-  if (rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
-    const entries = Array.from(rateLimitMap.entries());
-    entries.sort((a, b) => a[1].resetAt - b[1].resetAt);
-    const toDelete = entries.slice(0, rateLimitMap.size - MAX_RATE_LIMIT_ENTRIES);
-    toDelete.forEach(([ip]) => rateLimitMap.delete(ip));
+  cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    const entriesToDelete: string[] = [];
+    
+    // Collect entries to delete
+    rateLimitMap.forEach((entry, ip) => {
+      if (now > entry.resetAt) {
+        entriesToDelete.push(ip);
+      }
+    });
+    
+    // Delete expired entries
+    entriesToDelete.forEach(ip => rateLimitMap.delete(ip));
+    
+    // Prevent memory exhaustion - remove oldest entries if too many
+    if (rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
+      const entries = Array.from(rateLimitMap.entries());
+      entries.sort((a, b) => a[1].resetAt - b[1].resetAt);
+      const toDelete = entries.slice(0, rateLimitMap.size - MAX_RATE_LIMIT_ENTRIES);
+      toDelete.forEach(([ip]) => rateLimitMap.delete(ip));
+    }
+  }, CLEANUP_INTERVAL_MS);
+};
+
+// Cleanup interval on process exit
+process.on('beforeExit', () => {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
   }
-}, CLEANUP_INTERVAL_MS);
+});
+
+process.on('SIGINT', () => {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+});
+
+process.on('SIGTERM', () => {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+});
+
+// Start the cleanup interval
+startCleanupInterval();
 
 function getClientIP(request: NextRequest): string {
   // Try multiple headers in order of reliability
@@ -80,7 +118,24 @@ const ALLOWED_COMMUNITY_INTERESTS = [
   'Education', 'Health & Wellness', 'Legal Support', 'Faith Communities',
 ];
 
-// Constant-time string comparison — hash both sides so length is never leaked
+// Enhanced text sanitization to prevent XSS
+function sanitizeText(text: string): string {
+  if (!text || typeof text !== 'string') return '';
+  
+  return text
+    // Remove HTML tags and script content
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<[^>]*>/g, '')
+    // Remove potentially dangerous characters
+    .replace(/[<>"'&]/g, '')
+    // Remove JavaScript event handlers and protocols
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    // Remove excessive whitespace
+    .replace(/\s+/g, ' ')
+    .trim()
+    .substring(0, 500);
+}
 function safeEqual(a: string, b: string): boolean {
   const hashA = createHash('sha256').update(a).digest();
   const hashB = createHash('sha256').update(b).digest();
@@ -145,16 +200,33 @@ export async function GET(request: NextRequest) {
     
     while (hasMore && page < MAX_PAGES) {
       page += 1;
-      const url = '/contacts/?locationId=' + GHL_LOCATION_ID + '&limit=100'
-        + (startAfterId ? '&startAfterId=' + startAfterId : '');
-      const data = await ghlRequest(url);
-      const batch = data?.contacts || [];
-      contacts = contacts.concat(batch);
-      // Stop when a page returns fewer than 100 or no results
-      if (batch.length < 100) {
-        hasMore = false;
-      } else {
-        startAfterId = batch[batch.length - 1].id;
+      try {
+        const url = '/contacts/?locationId=' + GHL_LOCATION_ID + '&limit=100'
+          + (startAfterId ? '&startAfterId=' + startAfterId : '');
+        const data = await ghlRequest(url);
+        
+        if (!data || typeof data !== 'object') {
+          console.warn('Invalid response from GHL API, stopping pagination');
+          break;
+        }
+        
+        const batch = data?.contacts || [];
+        if (!Array.isArray(batch)) {
+          console.warn('Invalid contacts array from GHL API, stopping pagination');
+          break;
+        }
+        
+        contacts = contacts.concat(batch);
+        // Stop when a page returns fewer than 100 or no results
+        if (batch.length < 100) {
+          hasMore = false;
+        } else {
+          startAfterId = batch[batch.length - 1].id;
+        }
+      } catch (paginationError) {
+        console.error('Error during pagination:', paginationError);
+        // Continue with whatever contacts we have so far
+        break;
       }
     }
 
@@ -284,30 +356,44 @@ export async function POST(request: NextRequest) {
     // Legacy support for old field names
     if (type === 'donor' && frequency) customFields.donation_frequency = frequency;
     if (type === 'donor' && amount) customFields.last_donation_amount = amount;
-    if (interests && Array.isArray(interests)) customFields.interests = interests.join(', ');
-    
-    // Payment tracking fields
-    if (paymentMethod) customFields.payment_method = paymentMethod;
-    if (paymentIntentId) customFields.payment_intent_id = paymentIntentId;
-    if (paymentStatus) customFields.payment_status = paymentStatus;
-    if (transactionId) customFields.transaction_id = transactionId;
-    
-    // Vendor-specific fields
-    if (company) customFields.company_name = company;
-    if (website) customFields.website = website;
-    if (socialMedia) customFields.social_media = socialMedia;
-    if (vendorType) customFields.vendor_type = vendorType;
-    if (vendorFee) customFields.vendor_fee = vendorFee;
-    if (productsServices) customFields.products_services = productsServices;
-    if (sponsorshipInterest) customFields.sponsorship_interest = sponsorshipInterest;
-    if (additionalInfo) customFields.additional_info = additionalInfo;
 
-    // Build address object
+    // Build address object with validation
     const contactAddress: Record<string, string> = {};
-    if (address) contactAddress.street = address;
-    if (city) contactAddress.city = city;
-    if (state) contactAddress.state = state;
-    if (postalCode) contactAddress.postalCode = postalCode;
+    if (address && typeof address === 'string' && address.trim().length > 0) {
+      contactAddress.street = address.trim().substring(0, 200);
+    }
+    if (city && typeof city === 'string' && city.trim().length > 0) {
+      contactAddress.city = city.trim().substring(0, 100);
+    }
+    if (state && typeof state === 'string' && state.trim().length > 0) {
+      contactAddress.state = state.trim().substring(0, 50);
+    }
+    if (postalCode && typeof postalCode === 'string' && postalCode.trim().length > 0) {
+      // Enhanced postal code validation supporting international formats
+      const cleanPostalCode = postalCode.trim().replace(/[^0-9A-Z-\s]/g, '').substring(0, 20);
+      
+      // Support multiple postal code formats:
+      // US: 12345 or 12345-6789
+      // UK: SW1A 1AA, M1 1AA, B33 8TH
+      // Canada: K1A 0A1, A1A 1A1
+      // General: 3-10 alphanumeric characters with optional spaces/hyphens
+      const postalCodePatterns = [
+        /^\d{5}(-\d{4})?$/, // US ZIP+4
+        /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/, // UK format
+        /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/, // Canada format
+        /^[A-Z0-9]{3,10}([-\s][A-Z0-9]{3,10})?$/ // General international
+      ];
+      
+      const isValidPostalCode = postalCodePatterns.some(pattern => pattern.test(cleanPostalCode));
+      
+      if (isValidPostalCode) {
+        contactAddress.postalCode = cleanPostalCode;
+      } else {
+        // Log warning but don't reject - allow admin to review
+        console.warn('Postal code format may be invalid:', cleanPostalCode);
+        contactAddress.postalCode = cleanPostalCode; // Still include for manual review
+      }
+    }
 
     // Create contact in GrowthSphere360
     const contactPayload: Record<string, any> = {
@@ -320,6 +406,15 @@ export async function POST(request: NextRequest) {
     };
     if (company) contactPayload.companyName = company;
     if (Object.keys(contactAddress).length > 0) contactPayload.address = contactAddress;
+    
+    // Add vendor details to contact note for visibility (enhanced sanitization)
+    if (type === 'vendor' && productsServices) {
+      const sanitizedVendorType = sanitizeText(vendorType || 'Not specified');
+      const sanitizedProductsServices = sanitizeText(productsServices);
+      const sanitizedAdditionalInfo = additionalInfo ? sanitizeText(additionalInfo) : '';
+      
+      contactPayload.contactNote = `Vendor Type: ${sanitizedVendorType}\nProducts/Services: ${sanitizedProductsServices}${sanitizedAdditionalInfo ? `\nAdditional Info: ${sanitizedAdditionalInfo}` : ''}`;
+    }
 
     const contact = await ghlRequest('/contacts/', {
       method: 'POST',

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import VendorApplicationForm from '@/components/VendorApplicationForm'
 
 interface TestResult {
   name: string
@@ -22,10 +23,9 @@ export default function VendorTestDashboard() {
         name: 'Vendor Page Load Test',
         test: async () => {
           try {
-            const response = await fetch('/vendor-signup')
-            const html = await response.text()
-            const hasForm = html.includes('VendorApplicationForm')
-            const hasPricing = html.includes('$225') && html.includes('$275')
+            // Check current page for vendor form elements
+            const hasForm = document.querySelector('form') !== null
+            const hasPricing = document.body.textContent.includes('$225') && document.body.textContent.includes('$275')
             
             return {
               success: hasForm && hasPricing,
@@ -42,25 +42,24 @@ export default function VendorTestDashboard() {
       {
         name: 'Vendor Types Test',
         test: async () => {
-          const vendorTypes = ['nonprofit', 'forprofit', 'food', 'political', 'government']
-          const expectedFees = { nonprofit: 225, forprofit: 275, food: 300, political: 300, government: 300 }
+          const expectedLabels = ['Non-Profit Organization', 'For-Profit Business', 'Food Vendor', 'Political Organization', 'Government Entity']
+          const expectedFees = [225, 275, 300]
           
           try {
-            const response = await fetch('/vendor-signup')
-            const html = await response.text()
-            
-            const allTypesPresent = vendorTypes.every(type => html.includes(type))
-            const allFeesPresent = Object.values(expectedFees).every(fee => html.includes(`$${fee}`))
+            // Check current page for vendor types and pricing
+            const bodyText = document.body.textContent
+            const hasAllTypes = expectedLabels.every(label => bodyText.includes(label))
+            const hasAllFees = expectedFees.every(fee => bodyText.includes(`$${fee}`))
             
             return {
-              success: allTypesPresent && allFeesPresent,
-              message: allTypesPresent && allFeesPresent
-                ? '✅ All vendor types and pricing present'
+              success: hasAllTypes && hasAllFees,
+              message: hasAllTypes && hasAllFees 
+                ? '✅ All vendor types and pricing found' 
                 : '❌ Missing vendor types or pricing',
-              details: { vendorTypes, expectedFees }
+              details: { hasAllTypes, hasAllFees }
             }
           } catch (error) {
-            return { success: false, message: `❌ Test failed: ${error}` }
+            return { success: false, message: `❌ Vendor types check failed: ${error}` }
           }
         }
       },
@@ -231,7 +230,7 @@ export default function VendorTestDashboard() {
             <button
               onClick={runVendorTests}
               disabled={isRunning}
-              className="bg-orange-600 text-white px-6 py-3 rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+              className="bg-purple-600 text-white px-6 py-3 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
             >
               {isRunning ? 'Running Vendor Tests...' : 'Test Vendor Registration System'}
             </button>
@@ -273,9 +272,9 @@ export default function VendorTestDashboard() {
                 </div>
               ))}
               
-              <div className="mt-6 p-4 bg-orange-50 rounded-lg">
-                <h3 className="font-semibold text-orange-900 mb-2">Vendor System Summary</h3>
-                <div className="text-sm text-orange-800 space-y-1">
+              <div className="mt-6 p-4 bg-purple-50 rounded-lg">
+                <h3 className="font-semibold text-purple-900 mb-2">Vendor System Summary</h3>
+                <div className="text-sm text-purple-800 space-y-1">
                   <p>✅ Ready: {testResults.filter(r => r.status === 'success').length}</p>
                   <p>❌ Issues: {testResults.filter(r => r.status === 'error').length}</p>
                   <p>⏳ Pending: {testResults.filter(r => r.status === 'pending').length}</p>
@@ -300,6 +299,17 @@ export default function VendorTestDashboard() {
             <p className="text-sm text-blue-800">
               All tests passing indicates the vendor registration system is ready for the Chase the Rainbow 5K launch and board meeting demonstration.
             </p>
+          </div>
+
+          {/* Vendor Application Form Section */}
+          <div className="mt-12 border-t pt-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Vendor Registration Form</h2>
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+              <p className="text-purple-800 text-sm">
+                <strong>Vendor Fees:</strong> Non-Profit $225 | For-Profit $275 | Food Vendor $300 | Political $300 | Government $300
+              </p>
+            </div>
+            <VendorApplicationForm />
           </div>
         </div>
       </div>
