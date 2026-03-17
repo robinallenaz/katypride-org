@@ -13,6 +13,7 @@ interface TestResult {
 export default function VendorTestDashboard() {
   const [testResults, setTestResults] = useState<TestResult[]>([])
   const [isRunning, setIsRunning] = useState(false)
+  const [showForm, setShowForm] = useState(false)
 
   const runVendorTests = async () => {
     setIsRunning(true)
@@ -97,7 +98,7 @@ export default function VendorTestDashboard() {
               return {
                 success: true,
                 message: '✅ Vendor data successfully sent to CRM',
-                details: { contactId: result.contactId, vendorName: testVendor.name }
+                details: { contactId: result.data?.contactId || result.contactId, vendorName: testVendor.name }
               }
             } else {
               const error = await response.text()
@@ -220,99 +221,174 @@ export default function VendorTestDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow-md p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Vendor Registration Test Dashboard</h1>
-          <p className="text-gray-600 mb-8">Comprehensive testing of Chase the Rainbow 5K vendor registration system</p>
+    <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-[#760088] text-white px-4 py-2 rounded-md font-semibold z-50"
+      >
+        Skip to main content
+      </a>
+      
+      <section id="main-content" className="max-w-6xl mx-auto px-4 py-16">
+        <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
+          <div className="text-center mb-8">
+            <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
+              Vendor System Testing
+            </h1>
+            <p className="text-lg text-gray-900 leading-relaxed max-w-3xl mx-auto font-medium">
+              Comprehensive testing dashboard for the Katy Pride vendor registration system
+            </p>
+          </div>
           
-          <div className="mb-8">
+          <div className="text-center mb-8">
             <button
               onClick={runVendorTests}
               disabled={isRunning}
-              className="bg-purple-600 text-white px-6 py-3 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+              className="inline-flex items-center justify-center bg-[#760088] text-white font-semibold px-8 py-3 rounded-full hover:bg-[#5a0066] transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isRunning ? 'Running Vendor Tests...' : 'Test Vendor Registration System'}
+              {isRunning ? 'Running Tests...' : 'Run Vendor System Tests'}
             </button>
           </div>
 
           {testResults.length > 0 && (
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Vendor System Test Results</h2>
+              <h2 className="font-heading text-2xl md:text-3xl font-bold text-[#760088] mb-6 text-center">Test Results</h2>
               
-              {testResults.map((result, index) => (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg border ${getStatusColor(result.status)}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-xl">{getStatusIcon(result.status)}</span>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{result.name}</h3>
-                        <p className="text-sm text-gray-600 mt-1">{result.message}</p>
-                        {result.details && (
-                          <details className="mt-2">
-                            <summary className="text-xs text-gray-500 cursor-pointer">Details</summary>
-                            <pre className="text-xs text-gray-600 mt-1 bg-gray-50 p-2 rounded">
-                              {JSON.stringify(result.details, null, 2)}
-                            </pre>
-                          </details>
-                        )}
-                      </div>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {testResults.map((result, index) => (
+                  <div
+                    key={index}
+                    className={`p-6 rounded-2xl border-2 shadow-lg transition-all duration-200 ${
+                      result.status === 'success' 
+                        ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-300/80 shadow-green-200/30'
+                        : result.status === 'error'
+                        ? 'bg-gradient-to-br from-red-50 to-rose-50 border-red-300/80 shadow-red-200/30'
+                        : 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-300/80 shadow-yellow-200/30'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <span className="text-2xl">
+                        {result.status === 'success' ? '✅' : result.status === 'error' ? '❌' : '⏳'}
+                      </span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        result.status === 'success' ? 'bg-green-100 text-green-800' :
+                        result.status === 'error' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {result.status.toUpperCase()}
+                      </span>
                     </div>
-                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      result.status === 'success' ? 'bg-green-100 text-green-800' :
-                      result.status === 'error' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {result.status.toUpperCase()}
-                    </div>
+                    
+                    <h3 className="font-heading text-lg font-bold text-gray-900 mb-2">
+                      {result.name}
+                    </h3>
+                    <p className="text-sm text-gray-800 leading-relaxed font-medium">
+                      {result.message}
+                    </p>
+                    
+                    {result.details && (
+                      <details className="mt-4">
+                        <summary className="text-xs text-purple-600 cursor-pointer font-semibold hover:text-purple-800 transition-colors">
+                          View Details
+                        </summary>
+                        <div className="mt-2 p-3 bg-white/70 rounded-lg border border-purple-200">
+                          <pre className="text-xs text-gray-800 font-mono font-medium">
+                            {JSON.stringify(result.details, null, 2)}
+                          </pre>
+                        </div>
+                      </details>
+                    )}
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
               
-              <div className="mt-6 p-4 bg-purple-50 rounded-lg">
-                <h3 className="font-semibold text-purple-900 mb-2">Vendor System Summary</h3>
-                <div className="text-sm text-purple-800 space-y-1">
-                  <p>✅ Ready: {testResults.filter(r => r.status === 'success').length}</p>
-                  <p>❌ Issues: {testResults.filter(r => r.status === 'error').length}</p>
-                  <p>⏳ Pending: {testResults.filter(r => r.status === 'pending').length}</p>
+              <div className="mt-8 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-6 border border-purple-200">
+                <h3 className="font-heading text-xl font-bold text-purple-900 mb-4">System Status Summary</h3>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="bg-white/80 rounded-xl p-4">
+                    <div className="text-2xl font-bold text-green-600">
+                      {testResults.filter(r => r.status === 'success').length}
+                    </div>
+                    <div className="text-sm text-gray-800 font-semibold">Passed</div>
+                  </div>
+                  <div className="bg-white/80 rounded-xl p-4">
+                    <div className="text-2xl font-bold text-red-600">
+                      {testResults.filter(r => r.status === 'error').length}
+                    </div>
+                    <div className="text-sm text-gray-800 font-semibold">Failed</div>
+                  </div>
+                  <div className="bg-white/80 rounded-xl p-4">
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {testResults.filter(r => r.status === 'pending').length}
+                    </div>
+                    <div className="text-sm text-gray-800 font-semibold">Pending</div>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-semibold text-gray-800 mb-2">What These Tests Verify</h3>
-            <ul className="text-sm text-gray-600 space-y-1">
-              <li>• <strong>Page Load</strong>: Vendor signup page loads correctly</li>
-              <li>• <strong>Vendor Types</strong>: All vendor categories and pricing present</li>
-              <li>• <strong>CRM Integration</strong>: Vendor data flows to GrowthSphere360</li>
-              <li>• <strong>Form Validation</strong>: Input validation working properly</li>
-              <li>• <strong>Mobile Design</strong>: Responsive layout for all devices</li>
-            </ul>
-          </div>
-
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <h3 className="font-semibold text-blue-900 mb-2">Ready for 3/17 Board Meeting</h3>
-            <p className="text-sm text-blue-800">
-              All tests passing indicates the vendor registration system is ready for the Chase the Rainbow 5K launch and board meeting demonstration.
-            </p>
-          </div>
-
-          {/* Vendor Application Form Section */}
-          <div className="mt-12 border-t pt-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Vendor Registration Form</h2>
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
-              <p className="text-purple-800 text-sm">
-                <strong>Vendor Fees:</strong> Non-Profit $225 | For-Profit $275 | Food Vendor $300 | Political $300 | Government $300
-              </p>
+          <div className="mt-8 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200">
+            <h3 className="font-heading text-xl font-bold text-blue-900 mb-4">What These Tests Verify</h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <span className="text-green-500 text-xl mt-1">✓</span>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">Page Load</h4>
+                    <p className="text-sm text-gray-800 font-medium">Vendor signup page loads correctly with all elements</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-green-500 text-xl mt-1">✓</span>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">Vendor Types</h4>
+                    <p className="text-sm text-gray-800 font-medium">All vendor categories and pricing present</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-green-500 text-xl mt-1">✓</span>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">CRM Integration</h4>
+                    <p className="text-sm text-gray-800 font-medium">Vendor data flows to GrowthSphere360</p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <span className="text-green-500 text-xl mt-1">✓</span>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">Form Validation</h4>
+                    <p className="text-sm text-gray-800 font-medium">Input validation working properly</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-green-500 text-xl mt-1">✓</span>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">Mobile Design</h4>
+                    <p className="text-sm text-gray-800 font-medium">Responsive layout for all devices</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <VendorApplicationForm />
           </div>
+
+          <div className="mt-8 text-center">
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="inline-flex items-center justify-center bg-orange-600 text-white font-semibold px-8 py-3 rounded-full hover:bg-orange-700 transition-colors shadow-lg"
+            >
+              {showForm ? 'Hide' : 'Show'} Vendor Registration Form
+            </button>
+          </div>
+
+          {showForm && (
+            <div className="mt-8 border-t border-gray-200 pt-8">
+              <VendorApplicationForm />
+            </div>
+          )}
         </div>
-      </div>
+      </section>
     </div>
   )
 }

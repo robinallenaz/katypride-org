@@ -1,6 +1,15 @@
 const STRAPI_URL = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337'
 const STRAPI_API_TOKEN = process.env.STRAPI_API_TOKEN || ''
 
+// Validate environment variables at startup
+if (process.env.NODE_ENV === 'production' && (!STRAPI_URL || STRAPI_URL === 'http://localhost:1337')) {
+  console.error('[STRAPI] CRITICAL: NEXT_PUBLIC_STRAPI_URL is not configured for production')
+}
+
+if (process.env.NODE_ENV === 'production' && !STRAPI_API_TOKEN) {
+  console.error('[STRAPI] CRITICAL: STRAPI_API_TOKEN is not configured for production')
+}
+
 export interface StrapiImage {
   id: number
   name: string
@@ -125,6 +134,13 @@ class StrapiClient {
       ...options.headers,
     }
 
+    // Debug logging (remove in production)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Strapi Request: ${url}`)
+      console.log(`Token exists: ${!!STRAPI_API_TOKEN}`)
+      console.log(`Token length: ${STRAPI_API_TOKEN?.length || 0}`)
+    }
+
     try {
       const response = await fetch(url, {
         ...options,
@@ -132,12 +148,39 @@ class StrapiClient {
       })
 
       if (!response.ok) {
-        throw new Error(`Strapi API error: ${response.status} ${response.statusText}`)
+        // Enhanced error handling for debugging
+        let errorMessage = `Strapi API error: ${response.status} ${response.statusText}`
+        
+        if (response.status === 403) {
+          errorMessage += ' - This usually means the API token is invalid, expired, or missing permissions'
+        } else if (response.status === 401) {
+          errorMessage += ' - Authentication failed - check API token'
+        } else if (response.status === 404) {
+          errorMessage += ' - Endpoint not found - check Strapi URL and API routes'
+        }
+        
+        // Try to get more error details
+        try {
+          const errorData = await response.json()
+          if (errorData.error) {
+            errorMessage += ` - ${errorData.error.message || JSON.stringify(errorData.error)}`
+          }
+        } catch (e) {
+          // If we can't parse error JSON, continue with original error
+        }
+        
+        throw new Error(errorMessage)
       }
 
       return response.json()
     } catch (error) {
       console.error('Strapi API request failed:', error)
+      
+      // If it's a network error or the Strapi server is down
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error(`Unable to connect to Strapi at ${this.baseUrl}. Please check if the Strapi server is running and accessible.`)
+      }
+      
       throw error
     }
   }

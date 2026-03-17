@@ -20,7 +20,8 @@ export async function getCalendarSettings(): Promise<CalendarSettings | null> {
         'Authorization': `Bearer ${process.env.STRAPI_API_TOKEN || ''}`,
         'Content-Type': 'application/json',
       },
-      cache: 'no-store',
+      // Cache for 5 minutes to improve performance
+      next: { revalidate: 300 },
     })
 
     if (!response.ok) {

@@ -1,35 +1,98 @@
-# Katy Pride Website
+# 🌈 Katy Pride Website
 
-A modern, scalable website for **Katy Pride**, an LGBTQ+ community organization serving Katy and West Houston.
+> **Building community, advocating for equality, and celebrating diversity in Katy and West Houston**  
+> **Status**: ✅ Production Ready | **Last Updated**: March 2026  
+> **Tech Stack**: Next.js + Strapi CMS + GrowthSphere360 CRM
 
-## � Security & Performance Features
+---
 
-### Security Enhancements
-- **Rate Limiting**: 5 submissions per minute per IP with automatic cleanup
-- **Input Validation**: Comprehensive validation for all form submissions
+## 🚀 **5-Minute Admin Quick Start**
+
+### **Step 1: Access Admin Panel**
+```
+Strapi Admin: https://katypride-strapi.onrender.com/admin
+```
+
+### **Step 2: Daily Tasks (2 minutes)**
+- [ ] **Check new submissions** → Content Manager → Review forms
+- [ ] **Update events** → Events → Add upcoming activities
+- [ ] **Check homepage** → Carousel Images → Refresh photos
+
+### **Step 3: Emergency Help**
+- 🆘 **Website Issues**: [Troubleshooting Guide](./TROUBLESHOOTING.md)
+- 🆘 **Quick Questions**: [FAQ](./FAQ.md)
+- 📞 **Support**: info@katypride.org
+
+---
+
+## 📋 **What You Can Manage**
+
+| **Area** | **What You Can Do** | **Where to Manage** |
+|----------|-------------------|-------------------|
+| **📅 Events** | Add/edit community events, coffee meetups | Strapi → Events |
+| **🎨 Homepage** | Update carousel images, welcome text | Strapi → Carousel Images |
+| **🏪 Vendors** | Process applications, manage fees | Vendor Forms + CRM |
+| **📧 Newsletter** | Send campaigns, manage subscribers | Newsletter Form + CRM |
+| **🔗 Resources** | Update community support links | Strapi → Resource Links |
+| **📝 Forms** | Monitor volunteer, donor, contact submissions | CRM Dashboard |
+
+---
+
+## 🔒 **Security & Performance Features**
+
+### **🛡️ Security Protections**
+- **Rate Limiting**: 5 submissions/minute per IP with automatic cleanup
 - **Bot Protection**: Honeypot fields and enhanced IP detection
-- **Safe URL Handling**: Validated image URLs to prevent XSS
+- **Input Validation**: Comprehensive validation for all form submissions
+- **Safe URL Handling**: Validated image URLs to prevent XSS attacks
 - **Authentication**: Secure admin dashboard with bearer token auth
+- **Data Sanitization**: XSS protection with comprehensive input filtering
 
-### Performance Optimizations
-- **CRM Caching**: 5-minute in-memory cache for dashboard data
+### **⚡ Performance Optimizations**
+- **Smart Caching**: 5-minute in-memory cache for CRM dashboard data
 - **Optimized Pagination**: Reduced API calls for better performance
 - **Image Safety**: Validated and safely constructed image URLs
 - **Efficient State Management**: Reduced unnecessary re-renders
+- **Lazy Loading**: Components load only when needed
+- **Request Timeouts**: 15-second timeouts prevent hanging requests
 
-### Monitoring & Reliability
+### **📊 Monitoring & Reliability**
 - **Health Checks**: `/health` endpoint for service monitoring
 - **Error Handling**: Comprehensive error logging and user feedback
 - **Graceful Degradation**: Fallbacks for API failures
+- **Rate Limit Cleanup**: Automatic memory management
+- **Service Status**: Real-time monitoring of all integrations
 
-## � Quick Start for Admins
+---
 
-**Access Strapi Admin Panel**: `https://katypride-7x4qno1sj-robinallenazs-projects.vercel.app/admin`
+## 🛠️ **Technical Architecture**
 
-**What you can manage**:
-- Events, Resources, Forms, Page Content
-- Form links for volunteer/donor/vendor signup  
-- Carousel images and calendar settings
+### **Frontend (Next.js 16)**
+- **Framework**: Next.js with App Router
+- **Styling**: Tailwind CSS with custom purple theme
+- **Icons**: Lucide React
+- **Deployment**: Vercel (free tier)
+- **Performance**: Optimized builds with automatic caching
+
+### **Backend (Strapi v5)**
+- **CMS**: Strapi v5 headless CMS
+- **Database**: Neon PostgreSQL (free tier, 512MB)
+- **Deployment**: Render (free tier)
+- **API**: RESTful API with webhook support
+- **Admin**: Built-in admin panel at `/admin`
+
+### **CRM Integration (GrowthSphere360)**
+- **System**: GoHighLevel white-label (GrowthSphere360)
+- **API**: RESTful API with webhook support
+- **Data Types**: Volunteers, donors, vendors, community members
+- **Features**: Contact management, tagging, notes, custom fields
+- **Security**: API key authentication with rate limiting
+
+### **Payment Processing**
+- **Processor**: Stripe (test mode available)
+- **Features**: One-time payments, recurring donations
+- **Security**: PCI compliant, webhook verification
+- **Status**: Ready for production activation
 
 ---
 
@@ -81,7 +144,7 @@ A modern, scalable website for **Katy Pride**, an LGBTQ+ community organization 
 - Exception dates use format: "2024-12-25T00:00:00.000Z”
 
 ### 🗓️ Calendar Page (`/calendar`)
-**Content managed via**: Google Calendar (not Strapi)
+**Content managed via**: Google Calendar
 
 **How to manage**:
 1. Access Google Calendar with admin permissions

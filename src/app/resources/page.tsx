@@ -110,8 +110,6 @@ async function getResourceLinks(): Promise<ResourceLink[]> {
 
 export default async function ResourcesPage() {
   const resources = await getResourceLinks()
-  const usingFallback = resources.length === defaultResources.length && 
-    resources.every((r, i) => r.id === defaultResources[i].id)
 
   const healthResources = resources.filter((r) => r.category === 'health')
   const advocacyResources = resources.filter((r) => r.category === 'advocacy')
@@ -335,7 +333,7 @@ export default async function ResourcesPage() {
             Community resources and support links.
           </p>
 
-          {usingFallback && (
+          {resources.length === defaultResources.length && (
             <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

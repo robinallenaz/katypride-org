@@ -1,4 +1,5 @@
 import { getCalendarSettings } from '@/lib/calendar'
+import CalendarIframe from '@/components/CalendarIframe'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +27,7 @@ export default async function CalendarPage() {
       </a>
       <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
         <section id="main-content" className="max-w-6xl mx-auto px-4 py-16">
-        <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
+        <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-purple-100/20 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
             {calendarTitle}
           </h1>
@@ -58,15 +59,10 @@ export default async function CalendarPage() {
           )}
 
           <div className="mt-8 rounded-2xl border border-black/10 bg-white overflow-hidden shadow-sm">
-            <div className="relative w-full" style={{ paddingTop: '75%' }}>
-              <iframe
-                src={embedUrl}
-                title={`${calendarTitle} Google Calendar`}
-                className="absolute inset-0 h-full w-full"
-                style={{ border: 0 }}
-                scrolling="no"
-              />
-            </div>
+            <CalendarIframe 
+              src={embedUrl} 
+              title={`${calendarTitle} Google Calendar`} 
+            />
           </div>
         </div>
       </section>

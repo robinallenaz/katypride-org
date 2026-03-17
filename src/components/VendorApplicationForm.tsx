@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 
 interface VendorFormData {
   // Contact Information
@@ -257,6 +257,20 @@ const VendorApplicationForm: React.FC = () => {
 
   const selectedVendorType = vendorTypes.find(t => t.value === formData.vendorType);
 
+  const progressPercentage = useMemo(() => {
+    const requiredFields = ['name', 'email', 'company', 'address', 'city', 'state', 'postalCode', 'vendorType', 'productsServices'];
+    const filledFields = requiredFields.filter(field => {
+      const value = formData[field as keyof VendorFormData];
+      return typeof value === 'string' ? value.trim() !== '' : Boolean(value);
+    });
+    const checkboxFields = ['agreeToTerms', 'agreeToPhotoRelease'];
+    const checkedBoxes = checkboxFields.filter(field => Boolean(formData[field as keyof VendorFormData]));
+    
+    const totalRequired = requiredFields.length + checkboxFields.length;
+    const completed = filledFields.length + checkedBoxes.length;
+    return Math.round((completed / totalRequired) * 100);
+  }, [formData]);
+
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
       <div className="text-center mb-8">
@@ -273,7 +287,20 @@ const VendorApplicationForm: React.FC = () => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-gray-700">Application Progress</span>
+          <span className="text-sm font-medium text-[#760088]">{progressPercentage}%</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div 
+            className="bg-[#760088] h-2 rounded-full transition-all duration-300"
+            style={{ width: `${progressPercentage}%` }}
+          />
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit}>
         {/* Honeypot - hidden from real users, bots auto-fill it */}
         <input type="text" name="_gotcha" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" />
 

@@ -9,7 +9,7 @@ export default function AboutPage() {
       </a>
       <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
         <section id="main-content" className="max-w-6xl mx-auto px-4 py-16">
-        <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
+        <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-purple-100/20 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
             About Us
           </h1>

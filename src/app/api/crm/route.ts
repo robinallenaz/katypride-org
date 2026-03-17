@@ -5,7 +5,7 @@ const GHL_API_KEY = process.env.GHL_API_KEY || '';
 const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID || '';
 const GHL_BASE_URL = 'https://rest.gohighlevel.com/v1';
 const CRM_ADMIN_SECRET = process.env.CRM_ADMIN_SECRET || '';
-const ALLOWED_CONTACT_TYPES = ['volunteer', 'donor', 'community-member', 'vendor'] as const;
+const ALLOWED_CONTACT_TYPES = ['volunteer', 'donor', 'community-member', 'vendor', 'sponsor'] as const;
 const ALLOWED_VENDOR_TYPES = ['nonprofit', 'forprofit', 'food', 'political', 'government'] as const;
 
 // Enhanced rate limiter with cleanup and better IP detection
@@ -14,12 +14,12 @@ const RATE_LIMIT_MAX = 5;
 const MAX_RATE_LIMIT_ENTRIES = 1000; // Prevent memory exhaustion
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
-// Cleanup expired entries every 5 minutes
-const CLEANUP_INTERVAL_MS = 300_000;
+// Cleanup interval reference
 let cleanupInterval: NodeJS.Timeout | null = null;
+let cleanupInitialized = false;
 
-// Initialize cleanup interval
-const startCleanupInterval = () => {
+// Initialize cleanup interval only when needed
+const initializeCleanupInterval = () => {
   if (cleanupInterval) return; // Prevent multiple intervals
   
   cleanupInterval = setInterval(() => {
@@ -43,8 +43,109 @@ const startCleanupInterval = () => {
       const toDelete = entries.slice(0, rateLimitMap.size - MAX_RATE_LIMIT_ENTRIES);
       toDelete.forEach(([ip]) => rateLimitMap.delete(ip));
     }
-  }, CLEANUP_INTERVAL_MS);
+  }, 300_000); // 5 minutes
 };
+
+// Ensure cleanup interval is initialized only when needed
+const ensureCleanupInitialized = () => {
+  if (!cleanupInitialized) {
+    initializeCleanupInterval();
+    initializeRateLockCleanup(); // Also initialize rate lock cleanup
+    cleanupInitialized = true;
+  }
+};
+
+// Enhanced rate limiting with atomic operations using Map-based locking
+const rateLimitLock = new Map<string, { locked: boolean; timestamp: number }>();
+
+// Cleanup stale rate limit locks periodically
+const RATE_LOCK_CLEANUP_INTERVAL = 300_000; // 5 minutes
+const RATE_LOCK_MAX_AGE = 60_000; // 1 minute
+
+async function cleanupStaleRateLocks(): Promise<void> {
+  const now = Date.now();
+  const staleLocks: string[] = [];
+  
+  for (const [ip, lock] of rateLimitLock.entries()) {
+    if (now - lock.timestamp > RATE_LOCK_MAX_AGE) {
+      staleLocks.push(ip);
+    }
+  }
+  
+  staleLocks.forEach(ip => rateLimitLock.delete(ip));
+}
+
+// Initialize rate lock cleanup
+let rateLockCleanupInterval: NodeJS.Timeout | null = null;
+
+const initializeRateLockCleanup = () => {
+  if (rateLockCleanupInterval) return;
+  
+  rateLockCleanupInterval = setInterval(() => {
+    cleanupStaleRateLocks();
+  }, RATE_LOCK_CLEANUP_INTERVAL);
+};
+
+// Cleanup on process exit
+process.on('beforeExit', () => {
+  if (rateLockCleanupInterval) {
+    clearInterval(rateLockCleanupInterval);
+    rateLockCleanupInterval = null;
+  }
+});
+
+process.on('SIGINT', () => {
+  if (rateLockCleanupInterval) {
+    clearInterval(rateLockCleanupInterval);
+    rateLockCleanupInterval = null;
+  }
+});
+
+process.on('SIGTERM', () => {
+  if (rateLockCleanupInterval) {
+    clearInterval(rateLockCleanupInterval);
+    rateLockCleanupInterval = null;
+  }
+});
+
+function acquireLock(ip: string): boolean {
+  const now = Date.now();
+  const existing = rateLimitLock.get(ip);
+  
+  // Clean up expired lock
+  if (existing && (now - existing.timestamp > RATE_LOCK_MAX_AGE)) {
+    rateLimitLock.delete(ip);
+  }
+  
+  // Check if already locked
+  if (rateLimitLock.has(ip)) {
+    return false; // Already locked
+  }
+  
+  // Acquire lock atomically
+  rateLimitLock.set(ip, { locked: true, timestamp: now });
+  
+  // Auto-release after 100ms
+  setTimeout(() => {
+    rateLimitLock.delete(ip);
+  }, 100);
+  
+  return true; // Lock acquired
+}
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  
+  const newCount = entry.count + 1;
+  entry.count = newCount;
+  return newCount > RATE_LIMIT_MAX;
+}
 
 // Cleanup interval on process exit
 process.on('beforeExit', () => {
@@ -68,8 +169,14 @@ process.on('SIGTERM', () => {
   }
 });
 
-// Start the cleanup interval
-startCleanupInterval();
+// Cache validation helper function
+function validateCacheEntry(entry: any, now: number, maxAge: number): boolean {
+  return entry && 
+         typeof entry === 'object' && 
+         typeof entry.timestamp === 'number' &&
+         typeof entry.data === 'object' &&
+         (now - entry.timestamp) < maxAge;
+}
 
 function getClientIP(request: NextRequest): string {
   // Try multiple headers in order of reliability
@@ -89,23 +196,27 @@ function getClientIP(request: NextRequest): string {
   return 'unknown';
 }
 
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-  entry.count += 1;
-  return entry.count > RATE_LIMIT_MAX;
-}
 
-// Warn at startup if critical env vars are missing
+// Critical environment variable validation with production-safe error handling
 if (!GHL_API_KEY || !GHL_LOCATION_ID) {
-  console.warn('[CRM] GHL_API_KEY or GHL_LOCATION_ID is not set — CRM requests will fail');
+  const errorMsg = process.env.NODE_ENV === 'production' 
+    ? '[CRM] CRITICAL: CRM service configuration missing' 
+    : '[CRM] CRITICAL: GHL_API_KEY or GHL_LOCATION_ID is not set — CRM functionality will fail';
+  console.error(errorMsg);
+  
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[CRM] CRM functionality disabled until environment variables are configured');
+  }
 }
 if (!CRM_ADMIN_SECRET) {
-  console.warn('[CRM] CRM_ADMIN_SECRET is not set — dashboard access will be blocked');
+  const errorMsg = process.env.NODE_ENV === 'production'
+    ? '[CRM] CRITICAL: Admin dashboard configuration missing'
+    : '[CRM] CRITICAL: CRM_ADMIN_SECRET is not set — dashboard access will be blocked';
+  console.error(errorMsg);
+  
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[CRM] Admin dashboard disabled until secret is configured');
+  }
 }
 
 // Allowed interest values to prevent arbitrary tag injection
@@ -118,19 +229,37 @@ const ALLOWED_COMMUNITY_INTERESTS = [
   'Education', 'Health & Wellness', 'Legal Support', 'Faith Communities',
 ];
 
-// Enhanced text sanitization to prevent XSS
+// Enhanced text sanitization to prevent XSS with comprehensive protection
 function sanitizeText(text: string): string {
   if (!text || typeof text !== 'string') return '';
   
   return text
     // Remove HTML tags and script content
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<[^>]*>/g, '')
+    .replace(/<\/?[^>]*>/gi, '')
     // Remove potentially dangerous characters
-    .replace(/[<>"'&]/g, '')
+    .replace(/[<>"'`&]/g, '')
     // Remove JavaScript event handlers and protocols
     .replace(/javascript:/gi, '')
     .replace(/on\w+\s*=/gi, '')
+    .replace(/data:(?:text\/html|application\/javascript|text\/css)/gi, '')
+    // Remove dangerous protocols
+    .replace(/vbscript:/gi, '')
+    .replace(/file:\/\//gi, '')
+    .replace(/ftp:\/\//gi, '')
+    // Remove CSS expressions and imports (more specific)
+    .replace(/expression\s*\(/gi, '')
+    .replace(/@import\s+/gi, '')
+    .replace(/style\s*=\s*["'][^"']*["']/gi, '')
+    // Remove template literal patterns
+    .replace(/\${[^}]*}/g, '')
+    // Remove SVG and XML dangerous patterns
+    .replace(/<\?xml[^>]*>/gi, '')
+    .replace(/<svg[^>]*>/gi, '')
+    .replace(/<script[^>]*>/gi, '')
+    // Remove Unicode control characters and dangerous whitespace
+    .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, '')
+    // Remove potential CSS injection (more specific)
+    .replace(/url\s*\([^)]*\)/gi, '')
     // Remove excessive whitespace
     .replace(/\s+/g, ' ')
     .trim()
@@ -144,26 +273,79 @@ function safeEqual(a: string, b: string): boolean {
 
 async function ghlRequest(endpoint: string, options: RequestInit = {}) {
   const url = `${GHL_BASE_URL}${endpoint}`;
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${GHL_API_KEY}`,
-      'Content-Type': 'application/json',
-      'Version': '2021-04-15',
-      ...options.headers,
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    console.error('GHL API Error:', response.status, error);
-    throw new Error('CRM service request failed');
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Authorization': `Bearer ${GHL_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Version': '2021-04-15',
+        ...options.headers,
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let errorMessage = 'CRM service request failed';
+      let errorDetails = {};
+
+      try {
+        errorDetails = await response.json();
+        errorMessage = (errorDetails as any).message || (errorDetails as any).error || errorMessage;
+        
+        // Provide more specific error messages based on status code
+        switch (response.status) {
+          case 401:
+            errorMessage = 'Authentication failed';
+            break;
+          case 403:
+            errorMessage = 'Access denied';
+            break;
+          case 404:
+            errorMessage = 'Resource not found';
+            break;
+          case 429:
+            errorMessage = 'Too many requests';
+            break;
+          case 500:
+            errorMessage = 'Service temporarily unavailable';
+            break;
+          default:
+            errorMessage = 'Request failed';
+        }
+      } catch (parseError) {
+        console.error('Failed to parse CRM error response:', parseError);
+        errorMessage = `CRM API error (${response.status}): Unable to connect to CRM service`;
+      }
+
+      console.error('GHL API Error:', response.status, errorDetails);
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error('CRM service timeout - request took too long');
+      }
+      throw error;
+    }
+    
+    throw new Error('CRM service request failed - unknown error');
   }
-
-  return response.json();
 }
 
 export async function GET(request: NextRequest) {
+  // Ensure cleanup interval is initialized
+  ensureCleanupInitialized();
+  
   // Require a non-empty admin secret and valid bearer token
   const authHeader = request.headers.get('authorization');
   const token = authHeader?.replace('Bearer ', '');
@@ -176,24 +358,105 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Simple in-memory cache for dashboard data (5 minute cache)
-    const CACHE_KEY = 'crm_dashboard_data';
+    // Improved cache management with proper cleanup
+    const CACHE_KEY = `crm_dashboard_data_${GHL_LOCATION_ID}`; // Include location ID to prevent collisions
     const CACHE_DURATION_MS = 300_000; // 5 minutes
+    const MAX_CACHE_SIZE = 10; // Maximum number of cache entries
     const now = Date.now();
     
-    // Check cache first
-    const cachedData = (global as any).crmCache?.[CACHE_KEY];
-    if (cachedData && (now - cachedData.timestamp) < CACHE_DURATION_MS) {
-      return NextResponse.json({
-        success: true,
-        data: cachedData.data,
-        cached: true,
+    // Initialize cache with proper structure and error handling
+    try {
+      if (!(global as any).crmCache) {
+        (global as any).crmCache = new Map();
+        (global as any).crmCacheMetadata = { 
+          entries: new Map(), 
+          lastCleanup: now 
+        };
+      }
+    } catch (error) {
+      console.error('Failed to initialize CRM cache:', error);
+      // Fallback to in-memory cache if global fails
+      const fallbackCache = new Map();
+      const fallbackMetadata = { 
+        entries: new Map(), 
+        lastCleanup: now 
+      };
+      (global as any).crmCache = fallbackCache;
+      (global as any).crmCacheMetadata = fallbackMetadata;
+    }
+    
+    const cache = (global as any).crmCache as Map<string, any>;
+    const cacheMetadata = (global as any).crmCacheMetadata;
+    
+    // Periodic cache cleanup with immediate cleanup if needed
+    if (now - cacheMetadata.lastCleanup > 300_000 || cache.size > MAX_CACHE_SIZE * 1.5) {
+      // Remove expired entries and cleanup metadata atomically
+      const keysToDelete: string[] = [];
+      
+      for (const [key, value] of cache.entries()) {
+        if (value && typeof value === 'object' && 'timestamp' in value && (now - value.timestamp) > CACHE_DURATION_MS) {
+          keysToDelete.push(key);
+        }
+      }
+      
+      // Delete entries and metadata atomically
+      keysToDelete.forEach(key => {
+        cache.delete(key);
+        cacheMetadata.entries.delete(key);
       });
+      
+      // Remove oldest entries if cache is too large
+      if (cache.size > MAX_CACHE_SIZE) {
+        const entries = Array.from(cache.entries())
+          .filter(([, value]) => value && typeof value === 'object' && 'timestamp' in value)
+          .sort(([, a], [, b]) => a.timestamp - b.timestamp);
+        
+        const oldestKeys: string[] = [];
+        while (entries.length > MAX_CACHE_SIZE) {
+          const [oldestKey] = entries.shift()!;
+          oldestKeys.push(oldestKey);
+        }
+        
+        // Delete oldest entries and metadata atomically
+        oldestKeys.forEach(key => {
+          cache.delete(key);
+          cacheMetadata.entries.delete(key);
+        });
+      }
+      
+      cacheMetadata.lastCleanup = now;
+    }
+    
+    // Check cache with validation
+    const cachedData = cache.get(CACHE_KEY);
+    if (cachedData && validateCacheEntry(cachedData, now, CACHE_DURATION_MS)) {
+      // Validate cached data structure
+      const { data } = cachedData;
+      if (typeof data === 'object' && 
+          typeof data.totalContacts === 'number' &&
+          Array.isArray(data.recentContacts)) {
+        return NextResponse.json({
+          success: true,
+          data: data,
+          cached: true,
+        });
+      } else {
+        // Invalid cache data, remove it immediately
+        cache.delete(CACHE_KEY);
+        cacheMetadata.entries.delete(CACHE_KEY);
+      }
     }
 
-    // Paginate to get all contacts for accurate stats with optimization
-    const MAX_PAGES = 20; // Reduced from 50 for better performance
-    let contacts: any[] = [];
+    // Optimized pagination with streaming and memory management
+    const MAX_PAGES = 10; // Further reduced for better performance
+    const BATCH_SIZE = 50; // Smaller batches to reduce memory usage
+    let totalContacts = 0;
+    let totalVolunteers = 0;
+    let totalDonors = 0;
+    let totalVendors = 0;
+    let totalCommunityMembers = 0;
+    let recentContacts: any[] = [];
+    
     let startAfterId = '';
     let hasMore = true;
     let page = 0;
@@ -201,7 +464,7 @@ export async function GET(request: NextRequest) {
     while (hasMore && page < MAX_PAGES) {
       page += 1;
       try {
-        const url = '/contacts/?locationId=' + GHL_LOCATION_ID + '&limit=100'
+        const url = '/contacts/?locationId=' + GHL_LOCATION_ID + '&limit=' + BATCH_SIZE
           + (startAfterId ? '&startAfterId=' + startAfterId : '');
         const data = await ghlRequest(url);
         
@@ -216,40 +479,72 @@ export async function GET(request: NextRequest) {
           break;
         }
         
-        contacts = contacts.concat(batch);
-        // Stop when a page returns fewer than 100 or no results
-        if (batch.length < 100) {
+        // Process batch immediately to avoid memory buildup
+        batch.forEach((contact: any) => {
+          totalContacts++;
+          
+          // Count by tags
+          if (contact.tags?.includes('volunteer')) totalVolunteers++;
+          if (contact.tags?.includes('donor')) totalDonors++;
+          if (contact.tags?.some((t: string) => t.startsWith('vendor'))) totalVendors++;
+          if (contact.tags?.includes('community-member')) totalCommunityMembers++;
+        });
+        
+        // Keep only recent contacts (last 10) to minimize memory with safe date parsing
+        // Move parseDate function outside the sort for better performance
+        const parseDate = (dateStr: string | undefined): number => {
+          if (!dateStr) return 0;
+          try {
+            const parsed = new Date(dateStr).getTime();
+            return isNaN(parsed) ? 0 : parsed;
+          } catch {
+            return 0;
+          }
+        };
+        
+        const allRecent = [...recentContacts, ...batch]
+          .sort((a: any, b: any) => {
+            try {
+              const dateA = parseDate(a.dateAdded);
+              const dateB = parseDate(b.dateAdded);
+              return dateB - dateA; // Sort descending (newest first)
+            } catch (error) {
+              console.warn('Date parsing failed for contact sorting:', error);
+              return 0; // Keep original order if date parsing fails
+            }
+          })
+          .slice(0, 10)
+          .map((c: any) => ({
+            name: c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+            email: c.email,
+            tags: c.tags || [],
+            dateAdded: c.dateAdded,
+            company: c.companyName,
+          }));
+        
+        recentContacts = allRecent;
+        
+        // Stop when a page returns fewer than BATCH_SIZE or no results
+        if (batch.length < BATCH_SIZE) {
           hasMore = false;
+        } else if (batch.length > 0) {
+          const lastContact = batch[batch.length - 1];
+          if (lastContact?.id && typeof lastContact.id === 'string') {
+            startAfterId = lastContact.id;
+          } else {
+            console.warn('Last contact in batch missing valid ID, stopping pagination');
+            hasMore = false;
+          }
         } else {
-          startAfterId = batch[batch.length - 1].id;
+          // Empty batch, stop pagination
+          hasMore = false;
         }
       } catch (paginationError) {
         console.error('Error during pagination:', paginationError);
-        // Continue with whatever contacts we have so far
+        // Continue with whatever data we have so far
         break;
       }
     }
-
-    // Calculate stats from tags
-    const totalContacts = contacts.length;
-    const totalVolunteers = contacts.filter((c: any) => c.tags?.includes('volunteer')).length;
-    const totalDonors = contacts.filter((c: any) => c.tags?.includes('donor')).length;
-    const totalVendors = contacts.filter((c: any) =>
-      c.tags?.some((t: string) => t.startsWith('vendor'))
-    ).length;
-    const totalCommunityMembers = contacts.filter((c: any) => c.tags?.includes('community-member')).length;
-
-    // Recent contacts (last 10) - minimal data transfer
-    const recentContacts = contacts
-      .sort((a: any, b: any) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime())
-      .slice(0, 10)
-      .map((c: any) => ({
-        name: c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
-        email: c.email,
-        tags: c.tags || [],
-        dateAdded: c.dateAdded,
-        company: c.companyName,
-      }));
 
     const dashboardData = {
       totalContacts,
@@ -260,14 +555,14 @@ export async function GET(request: NextRequest) {
       recentContacts,
     };
 
-    // Cache the result
-    if (!(global as any).crmCache) {
-      (global as any).crmCache = {};
-    }
-    (global as any).crmCache[CACHE_KEY] = {
+    // Cache the result with proper Map usage
+    cache.set(CACHE_KEY, {
       data: dashboardData,
       timestamp: now,
-    };
+    });
+    
+    // Update cache metadata
+    cacheMetadata.entries.set(CACHE_KEY, now);
 
     return NextResponse.json({
       success: true,
@@ -292,6 +587,10 @@ export async function POST(request: NextRequest) {
       vendorType, vendorFee, productsServices, sponsorshipInterest, additionalInfo,
       donationAmount, donationFrequency, anonymous, comments,
       paymentMethod, paymentIntentId, paymentStatus, transactionId,
+      // Sponsor-specific fields
+      contactName, contactTitle, organizationName, organizationType,
+      sponsorshipLevel, customSponsorshipAmount, interestedInExclusives, wantInvoice,
+      event,
       _gotcha, // honeypot field — bots fill this, real users don't see it
     } = body;
 
@@ -314,8 +613,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rate-limit public form submissions
+    // Rate-limit public form submissions with proper locking
     const ip = getClientIP(request);
+    
+    // Try to acquire lock - if failed, reject request
+    if (!acquireLock(ip)) {
+      return NextResponse.json(
+        { success: false, error: 'Too many concurrent requests. Please try again.' },
+        { status: 429 }
+      );
+    }
+    
+    // Check rate limit after acquiring lock
     if (isRateLimited(ip)) {
       return NextResponse.json(
         { success: false, error: 'Too many submissions. Please try again later.' },
@@ -368,30 +677,39 @@ export async function POST(request: NextRequest) {
     if (state && typeof state === 'string' && state.trim().length > 0) {
       contactAddress.state = state.trim().substring(0, 50);
     }
+    // Enhanced postal code validation with stricter security and comprehensive patterns
     if (postalCode && typeof postalCode === 'string' && postalCode.trim().length > 0) {
-      // Enhanced postal code validation supporting international formats
-      const cleanPostalCode = postalCode.trim().replace(/[^0-9A-Z-\s]/g, '').substring(0, 20);
+      // Clean and validate postal code more strictly
+      const cleanPostalCode = postalCode.trim()
+        .replace(/[^0-9A-Z-\s]/g, '') // Remove special characters except letters, numbers, hyphens, spaces
+        .replace(/\s+/g, ' ') // Normalize multiple spaces to single space
+        .substring(0, 20); // Limit length
       
-      // Support multiple postal code formats:
-      // US: 12345 or 12345-6789
-      // UK: SW1A 1AA, M1 1AA, B33 8TH
-      // Canada: K1A 0A1, A1A 1A1
-      // General: 3-10 alphanumeric characters with optional spaces/hyphens
+      // Comprehensive validation patterns with stricter matching
       const postalCodePatterns = [
-        /^\d{5}(-\d{4})?$/, // US ZIP+4
-        /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/, // UK format
-        /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/, // Canada format
-        /^[A-Z0-9]{3,10}([-\s][A-Z0-9]{3,10})?$/ // General international
+        // US ZIP and ZIP+4 formats
+        /^\d{5}(-\d{4})?$/,
+        // UK postcode formats (more comprehensive)
+        /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/,
+        /^[A-Z]{1,2}\d{2}[A-Z]\s?\d[A-Z]{2}$/,
+        // Canada format
+        /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/,
+        // Australian postcode
+        /^\d{4}$/,
+        // General international (more restrictive)
+        /^[A-Z0-9]{3,10}([\-\s][A-Z0-9]{3,10})?$/
       ];
       
-      const isValidPostalCode = postalCodePatterns.some(pattern => pattern.test(cleanPostalCode));
+      const isValidPostalCode = postalCodePatterns.some(pattern => 
+        pattern.test(cleanPostalCode) && cleanPostalCode.length >= 3
+      );
       
-      if (isValidPostalCode) {
+      if (isValidPostalCode && cleanPostalCode.length >= 3) {
         contactAddress.postalCode = cleanPostalCode;
       } else {
-        // Log warning but don't reject - allow admin to review
-        console.warn('Postal code format may be invalid:', cleanPostalCode);
-        contactAddress.postalCode = cleanPostalCode; // Still include for manual review
+        // Reject invalid postal codes and log for monitoring without exposing input
+        console.warn('Invalid postal code format rejected');
+        // Don't include invalid postal code - ensures data quality
       }
     }
 
@@ -416,6 +734,37 @@ export async function POST(request: NextRequest) {
       contactPayload.contactNote = `Vendor Type: ${sanitizedVendorType}\nProducts/Services: ${sanitizedProductsServices}${sanitizedAdditionalInfo ? `\nAdditional Info: ${sanitizedAdditionalInfo}` : ''}`;
     }
 
+    // Add sponsor details to contact note for visibility
+    if (type === 'sponsor') {
+      const sanitizedSponsorshipLevel = sanitizeText(sponsorshipLevel || 'Not specified');
+      const sanitizedOrganizationType = sanitizeText(organizationType || 'Not specified');
+      const sanitizedCustomAmount = customSponsorshipAmount ? sanitizeText(customSponsorshipAmount) : '';
+      const sanitizedExclusives = interestedInExclusives && Array.isArray(interestedInExclusives) 
+        ? interestedInExclusives.map(e => sanitizeText(e)).filter(Boolean).join(', ')
+        : '';
+      const sanitizedEvent = sanitizeText(event || 'General');
+      
+      let sponsorNote = `Sponsorship Level: ${sanitizedSponsorshipLevel}\nOrganization Type: ${sanitizedOrganizationType}\nEvent: ${sanitizedEvent}`;
+      
+      if (sanitizedCustomAmount) sponsorNote += `\nCustom Amount: ${sanitizedCustomAmount}`;
+      if (sanitizedExclusives) sponsorNote += `\nExclusive Opportunities: ${sanitizedExclusives}`;
+      if (wantInvoice) sponsorNote += '\nInvoice Requested: Yes';
+      
+      contactPayload.contactNote = sponsorNote;
+      
+      // Add sponsor-specific tags
+      tags.push('sponsor');
+      if (sponsorshipLevel) tags.push(`sponsor-${sponsorshipLevel}`);
+      if (event) tags.push(`event-${event.toLowerCase().replace(/\s+/g, '-')}`);
+      if (interestedInExclusives && Array.isArray(interestedInExclusives)) {
+        interestedInExclusives.forEach(exclusive => {
+          if (exclusive && typeof exclusive === 'string') {
+            tags.push(`exclusive-${exclusive}`);
+          }
+        });
+      }
+    }
+
     const contact = await ghlRequest('/contacts/', {
       method: 'POST',
       body: JSON.stringify(contactPayload),
@@ -425,6 +774,8 @@ export async function POST(request: NextRequest) {
       success: true,
       message: type === 'vendor'
         ? 'Thank you for your vendor application! A contract will be sent to your email after payment is processed.'
+        : type === 'sponsor'
+        ? 'Thank you for your sponsorship interest! We will contact you within 2 business days with next steps and payment information.'
         : 'Thank you! Your information has been submitted successfully.',
       data: { contactId: contact?.contact?.id },
     });

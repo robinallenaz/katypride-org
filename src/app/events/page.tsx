@@ -72,17 +72,115 @@ export default function EventsPage() {
 
   const [strapiEvents, setStrapiEvents] = useState<StrapiEvent[]>([])
   const [loadingStrapi, setLoadingStrapi] = useState(true)
+  const [strapiError, setStrapiError] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(3)
+
+  // Static coffee meet-up fallback
+  const createStaticCoffeeMeetup = (): StrapiEvent => ({
+    id: 999999,
+    documentId: 'coffee-meetup-static',
+    title: 'Espresso Yourself Coffee Meet-Up',
+    start: getNextSundayDate().toISOString(),
+    end: new Date(getNextSundayDate().getTime() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours later
+    location: 'Coffee Fellows, 3329 Grand Parkway, Katy, TX 77449',
+    summary: {
+      type: 'doc',
+      children: [{
+        type: 'paragraph',
+        children: [{
+          type: 'text',
+          text: 'Join us for a casual coffee meet up at an LGBTQ-affirming business, Coffee Fellows, to meet other LGBTQ+ community members and allies. Grab a coffee, tea, pastry or whatever suits your fancy, and make new connections or even get some work done. Enjoy a safe space of community and allyship!'
+        }]
+      }]
+    },
+    published: true,
+    eventCategory: 'coffee',
+    isRecurring: true,
+    recurrencePattern: 'monthly',
+    recurrenceInterval: 1,
+    recurrenceDaysOfWeek: [0], // Sunday
+    recurrenceEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year from now
+    externalUrl: 'https://www.google.com/maps/dir//3329%20Grand%20Parkway,%20Katy,%20TX%2077449',
+    externalCtaLabel: 'Get Directions',
+    image: {
+      id: 999999,
+      name: 'coffee-meetup.png',
+      alternativeText: 'Coffee Fellows meetup - LGBTQ+ community gathering',
+      url: '/events/coffee-meetup.png',
+      width: 1200,
+      height: 800,
+      provider: 'local',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      publishedAt: new Date().toISOString()
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    publishedAt: new Date().toISOString()
+  })
+
+  // Helper function to get next Sunday
+  const getNextSundayDate = (): Date => {
+    const today = new Date()
+    const currentDay = today.getDay()
+    // If today is Sunday (0), get next Sunday (7 days away). Otherwise, calculate days until next Sunday.
+    const daysUntilSunday = currentDay === 0 ? 7 : 7 - currentDay
+    const nextSunday = new Date(today)
+    nextSunday.setDate(today.getDate() + daysUntilSunday)
+    nextSunday.setHours(9, 0, 0, 0) // 9:00 AM
+    return nextSunday
+  }
 
   useEffect(() => {
     const run = async () => {
       try {
         setLoadingStrapi(true)
+        setStrapiError(null)
+        
+        // Check cache first (5-minute cache)
+        const cacheKey = 'strapi-events-cache'
+        const cachedData = sessionStorage.getItem(cacheKey)
+        
+        if (cachedData) {
+          try {
+            const { events, timestamp } = JSON.parse(cachedData)
+            const now = Date.now()
+            
+            // Use cache if less than 5 minutes old
+            if (now - timestamp < 300000) {
+              setStrapiEvents(events)
+              setLoadingStrapi(false)
+              return
+            }
+          } catch (cacheError) {
+            console.warn('Failed to parse events cache:', cacheError)
+            sessionStorage.removeItem(cacheKey)
+          }
+        }
+        
+        // Fetch fresh data
         const events = await strapiClient.getEvents()
-        setStrapiEvents(events)
+        
+        // Add static coffee meet-up if no events from Strapi
+        const eventsWithFallback = events.length === 0 ? [createStaticCoffeeMeetup()] : events
+        
+        setStrapiEvents(eventsWithFallback)
+        
+        // Cache the results
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            events,
+            timestamp: Date.now()
+          }))
+        } catch (cacheError) {
+          console.warn('Failed to cache events:', cacheError)
+        }
+        
       } catch (e) {
-        console.warn('Failed to load events from Strapi (permissions may need to be set in admin):', e)
-        // Set empty array for now - board meeting will still work
+        const errorMessage = e instanceof Error ? e.message : 'Unknown error'
+        console.warn('Failed to load events from Strapi:', errorMessage)
+        setStrapiError(errorMessage)
+        // Set empty array for now - page will still work with static content
         setStrapiEvents([])
       } finally {
         setLoadingStrapi(false)
@@ -114,7 +212,7 @@ export default function EventsPage() {
         parentId: event.parentId,
       }
     })
-  }, [strapiEvents])
+  }, [strapiEvents.length, strapiEvents.map(e => e.id + e.updatedAt).join(',')])
 
   const allEvents = useMemo(() => {
     return [...strapiEventItems]
@@ -141,7 +239,7 @@ export default function EventsPage() {
       </a>
       <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
         <section id="main-content" className="max-w-6xl mx-auto px-4 py-16">
-        <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
+        <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-purple-100/20 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
             Events
           </h1>
@@ -182,7 +280,7 @@ export default function EventsPage() {
                 <button
                   key={category.value}
                   onClick={() => setSelectedCategory(category.value)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${
                     selectedCategory === category.value
                       ? `${category.color} text-white`
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -196,6 +294,34 @@ export default function EventsPage() {
 
           {loadingStrapi && (
             <p className="mt-6 text-gray-700">Loading events…</p>
+          )}
+
+          {strapiError && (
+            <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-amber-800">
+                    Event loading temporarily unavailable
+                  </h3>
+                  <div className="mt-2 text-sm text-amber-700">
+                    <p>We're having trouble loading events from our content management system. This doesn't affect the rest of the website functionality.</p>
+                    {process.env.NODE_ENV === 'development' && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer font-medium">Technical details</summary>
+                        <pre className="mt-1 text-xs bg-amber-100 p-2 rounded overflow-auto">
+                          {strapiError}
+                        </pre>
+                      </details>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {!loadingStrapi && allEvents.length === 0 && (
@@ -218,7 +344,7 @@ export default function EventsPage() {
                 {selectedCategory !== 'all' && ` in ${eventCategories.find(c => c.value === selectedCategory)?.label}`}
               </div>
 
-              <div className="mt-8 grid gap-5 md:grid-cols-2">
+              <div className="mt-8 grid gap-4 sm:gap-5 md:grid-cols-2">
               {visibleEvents.map((event, index) => {
               const startDate = event.start
               const accent = monthAccents[startDate.getMonth() % monthAccents.length]
@@ -227,7 +353,7 @@ export default function EventsPage() {
               return (
                 <article
                   key={event.id}
-                  className={`overflow-hidden rounded-2xl border bg-white shadow-sm border-l-8 ${accent.stripe} ${accent.border}`}
+                  className={`overflow-hidden rounded-xl sm:rounded-2xl border bg-white shadow-sm border-l-4 sm:border-l-8 ${accent.stripe} ${accent.border}`}
                 >
                   <div className="relative bg-white">
                     {event.imageSrc ? (
@@ -241,31 +367,31 @@ export default function EventsPage() {
                       <div className="w-full bg-white" style={{ paddingTop: '56.25%' }} />
                     )}
 
-                    <div className="absolute left-3 top-3 rounded-md bg-[#feef4a] px-3 py-1.5 shadow-sm">
-                      <span className="font-heading text-sm font-bold tracking-wide text-black">
+                    <div className="absolute left-2 sm:left-3 top-2 sm:top-3 rounded-md bg-[#feef4a] px-2 sm:px-3 py-1 sm:py-1.5 shadow-sm">
+                      <span className="font-heading text-xs sm:text-sm font-bold tracking-wide text-black">
                         {formatBadgeDate(startDate)}
                       </span>
                     </div>
 
                     {label && (
-                      <div className="absolute right-3 top-3 rounded-full border border-black/70 bg-white px-3.5 py-1.5 shadow-md">
-                        <span className="font-heading text-sm font-extrabold tracking-wide text-gray-900">
+                      <div className="absolute right-2 sm:right-3 top-2 sm:top-3 rounded-full border border-black/70 bg-white px-2.5 sm:px-3.5 py-1 sm:py-1.5 shadow-md">
+                        <span className="font-heading text-xs sm:text-sm font-extrabold tracking-wide text-gray-900">
                           {label}
                         </span>
                       </div>
                     )}
 
                     {event.isRecurring && (
-                      <div className="absolute right-3 top-14 rounded-full border border-purple-500/50 bg-purple-100 px-3 py-1 shadow-md">
-                        <span className="font-heading text-xs font-semibold tracking-wide text-purple-700">
+                      <div className="absolute right-2 sm:right-3 top-10 sm:top-14 rounded-full border border-purple-500/50 bg-purple-100 px-2 sm:px-3 py-0.5 sm:py-1 shadow-md">
+                        <span className="font-heading text-xs sm:text-xs font-semibold tracking-wide text-purple-700">
                           🔄 Recurring
                         </span>
                       </div>
                     )}
                   </div>
 
-                  <div className="p-5">
-                    <h2 className="font-heading text-xl font-bold text-[#760088]">{event.title}</h2>
+                  <div className="p-4 sm:p-5">
+                    <h2 className="font-heading text-lg sm:text-xl font-bold text-[#760088]">{event.title}</h2>
 
                     <dl className="mt-3 grid gap-1 text-gray-800">
                       <div>
@@ -291,11 +417,11 @@ export default function EventsPage() {
                     </dl>
 
                     {event.summary && (
-                      <details className="mt-4 rounded-xl border border-black/10 bg-white px-4 py-3">
-                        <summary className="cursor-pointer font-heading text-sm font-semibold text-gray-900">
+                      <details className="mt-3 sm:mt-4 rounded-xl border border-black/10 bg-white px-3 sm:px-4 py-2 sm:py-3">
+                        <summary className="cursor-pointer font-heading text-xs sm:text-sm font-semibold text-gray-900">
                           More info
                         </summary>
-                        <div className="mt-3 text-sm leading-relaxed text-gray-700">
+                        <div className="mt-2 sm:mt-3 text-xs sm:text-sm leading-relaxed text-gray-700">
                           <StrapiRichText content={event.summary} />
                         </div>
                       </details>
@@ -307,7 +433,7 @@ export default function EventsPage() {
                           href={event.externalUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center rounded-full border border-[#1a1a1a]/55 px-4 py-2 font-heading text-xs font-semibold tracking-wide text-gray-900 shadow-sm transition bg-white hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a1a]/75"
+                          className="inline-flex items-center justify-center rounded-full border border-[#1a1a1a]/55 px-3 sm:px-4 py-1.5 sm:py-2 font-heading text-xs sm:text-xs font-semibold tracking-wide text-gray-900 shadow-sm transition bg-white hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a1a]/75"
                         >
                           {event.externalCtaLabel || 'Learn more'}
                         </a>
@@ -322,11 +448,11 @@ export default function EventsPage() {
           )}
 
           {visibleCount < allEvents.length && (
-            <div className="mt-8 flex justify-center">
+            <div className="mt-6 sm:mt-8 flex justify-center">
               <button
                 type="button"
                 onClick={() => setVisibleCount((current) => Math.min(current + 3, allEvents.length))}
-                className="inline-flex items-center justify-center rounded-full border border-[#1a1a1a]/55 px-5 py-3 font-heading text-sm font-semibold tracking-wide text-gray-900 shadow-sm transition bg-white hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a1a]/75"
+                className="inline-flex items-center justify-center rounded-full border border-[#1a1a1a]/55 px-4 sm:px-5 py-2.5 sm:py-3 font-heading text-sm font-semibold tracking-wide text-gray-900 shadow-sm transition bg-white hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a1a]/75"
               >
                 Show more
               </button>

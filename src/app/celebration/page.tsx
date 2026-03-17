@@ -40,7 +40,7 @@ export default async function CelebrationPage() {
       </a>
       <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
         <section id="main-content" className="max-w-6xl mx-auto px-4 py-16">
-        <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10">
+        <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-purple-100/20 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
             {heading}
           </h1>
@@ -48,7 +48,17 @@ export default async function CelebrationPage() {
             {intro ? (
               <StrapiRichText content={intro} />
             ) : (
-              <p>This page is a placeholder. Details for Katy Pride Celebration will live here.</p>
+              <div className="space-y-6">
+                <p>
+                  Join us for the <strong>Katy Pride 2026 Celebration</strong> on <strong>Saturday, October 3, 2026</strong> from <strong>11AM to 4PM</strong> at the <strong>Bear Creek Rodeo Arena</strong> in Houston, Texas. This year's theme "<strong>STAND TALL, Y'ALL!</strong>" celebrates the strength, resilience, and vibrant diversity of our LGBTQ+ community in Katy and West Houston.
+                </p>
+                <p>
+                  Expected to draw <strong>2,000+ attendees</strong>, our annual celebration is the cornerstone of Katy Pride's mission to empower LGBTQ+ individuals and allies through inclusive events, advocacy, and community building. Serving Katy, Harris, Fort Bend, and Waller counties, we're creating safe spaces where everyone can live authentically and proudly.
+                </p>
+                <p>
+                  The celebration features <strong>70+ vendor booths</strong>, live entertainment, community resources, family-friendly activities, and opportunities to connect with local LGBTQ+ organizations and allies. Whether you're looking to celebrate, volunteer, or simply show your support, the Katy Pride Celebration is where our community comes together to stand tall, speak out, and build a more inclusive future for all.
+                </p>
+              </div>
             )}
           </div>
 
@@ -80,7 +90,7 @@ export default async function CelebrationPage() {
         {/* 2026 Sponsors */}
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10 mt-8">
           <h2 className="font-heading text-3xl md:text-4xl font-bold text-[#760088] mb-8 text-center">
-            Katy Pride 2026 Sponsors
+            Katy Pride 2025 Sponsors
           </h2>
 
           {/* Platinum Sponsor */}
