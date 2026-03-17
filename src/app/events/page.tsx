@@ -180,8 +180,8 @@ export default function EventsPage() {
         const errorMessage = e instanceof Error ? e.message : 'Unknown error'
         console.warn('Failed to load events from Strapi:', errorMessage)
         setStrapiError(errorMessage)
-        // Set empty array for now - page will still work with static content
-        setStrapiEvents([])
+        // Use fallback events when Strapi is down
+        setStrapiEvents([createStaticCoffeeMeetup()])
       } finally {
         setLoadingStrapi(false)
       }
@@ -296,7 +296,7 @@ export default function EventsPage() {
             <p className="mt-6 text-gray-700">Loading events…</p>
           )}
 
-          {strapiError && (
+          {strapiError && strapiEvents.length === 0 && (
             <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
               <div className="flex">
                 <div className="flex-shrink-0">
