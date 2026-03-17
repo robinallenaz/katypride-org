@@ -202,8 +202,8 @@ const VendorApplicationForm: React.FC = () => {
         city: formData.city,
         state: formData.state,
         postalCode: formData.postalCode,
-        productsServices: formData.productsServices,
-        vendorFee: vendorTypes.find(t => t.value === formData.vendorType)?.fee || '',
+        productsservices: formData.productsServices,
+        vendor_fee: vendorTypes.find(t => t.value === formData.vendorType)?.fee || '',
         sponsorshipInterest: formData.sponsorshipInterest,
         additionalInfo: formData.additionalInfo,
         _gotcha: '', // Honeypot field
@@ -302,7 +302,7 @@ const VendorApplicationForm: React.FC = () => {
 
       <form onSubmit={handleSubmit}>
         {/* Honeypot - hidden from real users, bots auto-fill it */}
-        <input type="text" name="_gotcha" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" />
+        <input type="text" name="_gotcha" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" suppressHydrationWarning={true} />
 
         {/* Contact Information */}
         <div className="border-b pb-8">

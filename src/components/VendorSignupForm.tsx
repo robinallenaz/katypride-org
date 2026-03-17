@@ -154,8 +154,8 @@ export default function VendorSignupForm() {
           website: formData.website,
           socialMedia: formData.socialMedia,
           vendorType: formData.vendorType,
-          vendorFee: selectedVendorType?.price,
-          productsServices: formData.productsServices,
+          vendor_fee: selectedVendorType?.price,
+          productsservices: formData.productsServices,
         }),
       });
 
@@ -261,7 +261,7 @@ export default function VendorSignupForm() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Honeypot — hidden from real users, bots auto-fill it */}
-        <input type="text" name="_gotcha" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" />
+        <input type="text" name="_gotcha" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" suppressHydrationWarning={true} />
 
         {/* Company/Organization */}
         <div>

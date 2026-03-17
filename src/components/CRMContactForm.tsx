@@ -135,7 +135,7 @@ const CRMContactForm: React.FC<CRMContactFormProps> = ({ type, onSuccess, onErro
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Honeypot — hidden from real users, bots auto-fill it */}
-        <input type="text" name="_gotcha" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" />
+        <input type="text" name="_gotcha" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" suppressHydrationWarning={true} />
 
         {/* Basic Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

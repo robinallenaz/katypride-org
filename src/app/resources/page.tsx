@@ -77,7 +77,8 @@ const defaultResources: ResourceLink[] = [
   { id: 'n9', title: 'PFLAG', url: 'https://pflag.org/', category: 'national' },
   { id: 'n10', title: 'Planned Parenthood', url: 'https://www.plannedparenthood.org/', category: 'national' },
   { id: 'n11', title: 'Trans Lifeline', url: 'https://translifeline.org/', category: 'national' },
-  { id: 'n12', title: 'Trevor Project', url: 'https://www.thetrevorproject.org/', category: 'national' },
+  { id: 'n12', title: 'LGBTQ+ Life in College: Identity, Belonging, and Support', url: 'https://www.socialworkdegree.net/lgbtq-in-college-resources/', category: 'national' },
+  { id: 'n13', title: 'Trevor Project', url: 'https://www.thetrevorproject.org/', category: 'national' },
 ]
 
 async function getResourceLinks(): Promise<ResourceLink[]> {

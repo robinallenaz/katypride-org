@@ -50,13 +50,13 @@ export default async function CelebrationPage() {
             ) : (
               <div className="space-y-6">
                 <p>
-                  Join us for the <strong>Katy Pride 2026 Celebration</strong> on <strong>Saturday, October 3, 2026</strong> from <strong>11AM to 4PM</strong> at the <strong>Bear Creek Rodeo Arena</strong> in Houston, Texas. This year's theme "<strong>STAND TALL, Y'ALL!</strong>" celebrates the strength, resilience, and vibrant diversity of our LGBTQ+ community in Katy and West Houston.
+                  Join us for the Katy Pride 2026 Celebration on Saturday, October 3, 2026 from 11AM to 4PM at the Bear Creek Rodeo Arena in Houston, Texas. This year's theme "STAND TALL, Y'ALL!" celebrates the strength, resilience, and vibrant diversity of our LGBTQ+ community in Katy and West Houston.
                 </p>
                 <p>
-                  Expected to draw <strong>2,000+ attendees</strong>, our annual celebration is the cornerstone of Katy Pride's mission to empower LGBTQ+ individuals and allies through inclusive events, advocacy, and community building. Serving Katy, Harris, Fort Bend, and Waller counties, we're creating safe spaces where everyone can live authentically and proudly.
+                  Expected to draw 2,000+ attendees, our annual celebration is the cornerstone of Katy Pride's mission to empower LGBTQ+ individuals and allies through inclusive events, advocacy, and community building. Serving Katy, Harris, Fort Bend, and Waller counties, we're creating safe spaces where everyone can live authentically and proudly.
                 </p>
                 <p>
-                  The celebration features <strong>70+ vendor booths</strong>, live entertainment, community resources, family-friendly activities, and opportunities to connect with local LGBTQ+ organizations and allies. Whether you're looking to celebrate, volunteer, or simply show your support, the Katy Pride Celebration is where our community comes together to stand tall, speak out, and build a more inclusive future for all.
+                  The celebration features 70+ vendor booths, live entertainment, community resources, family-friendly activities, and opportunities to connect with local LGBTQ+ organizations and allies. Whether you're looking to celebrate, volunteer, or simply show your support, the Katy Pride Celebration is where our community comes together to stand tall, speak out, and build a more inclusive future for all.
                 </p>
               </div>
             )}

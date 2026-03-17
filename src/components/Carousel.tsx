@@ -133,11 +133,9 @@ export default function Carousel() {
     if (slide?.image && Array.isArray(slide.image) && slide.image.length > 0) {
       const image = slide.image[0];
       if (image?.url) {
-        // For hardcoded images, return URL directly with full Strapi URL
+        // For hardcoded images, return URL directly from frontend public folder
         if (image.provider === 'hardcoded') {
-          // Use full Strapi URL for hardcoded images in backend/public/carousel
-          const baseUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337';
-          return `${baseUrl}${image.url}`;
+          return image.url; // Use direct path from frontend public/carousel/
         }
         
         // Use the Strapi client's getImageUrl method for consistent URL handling

@@ -271,6 +271,7 @@ const NewsletterForm: React.FC = () => {
             style={{ display: 'none' }}
             tabIndex={-1}
             autoComplete="off"
+            suppressHydrationWarning={true}
           />
         </form>
       </div>
