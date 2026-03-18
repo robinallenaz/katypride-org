@@ -5,7 +5,7 @@ services:
     plan: free
     buildCommand: cd backend && npm install && npm run build && npx strapi migrate
     startCommand: cd backend && npm start
-    healthCheckPath: /health
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
@@ -13,7 +13,19 @@ services:
         value: 0.0.0.0
       - key: PORT
         value: 1337
+      - key: DATABASE_CLIENT
+        value: postgres
       - key: DATABASE_URL
+        fromDatabase: true
+      - key: DATABASE_HOST
+        fromDatabase: true
+      - key: DATABASE_PORT
+        fromDatabase: true
+      - key: DATABASE_NAME
+        fromDatabase: true
+      - key: DATABASE_USERNAME
+        fromDatabase: true
+      - key: DATABASE_PASSWORD
         fromDatabase: true
       - key: ADMIN_JWT_SECRET
         generateValue: true
@@ -27,6 +39,8 @@ services:
         generateValue: true
       - key: JWT_SECRET
         generateValue: true
+      - key: STRAPI_DISABLE_UPDATE_CHECK
+        value: "true"
 
 databases:
   - name: katypride-db
