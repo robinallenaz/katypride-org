@@ -1,5 +1,5 @@
 export default {
-  type: 'admin',
+  type: 'content-api',
   routes: [
     {
       method: 'GET',
