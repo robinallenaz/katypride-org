@@ -1,8 +1,2 @@
-const config = {
-  plugins: {
-    "tailwindcss": {},
-    "autoprefixer": {},
-  },
-};
-
-export default config;
+// PostCSS config removed - Strapi backend doesn't need Tailwind
+// Tailwind is used by the frontend only
