@@ -1,0 +1,16 @@
+# Backend deployment (handled by Render)
+backend/
+backend/**/*
+
+# Dependencies and cache
+node_modules/
+.next/
+
+# Environment and logs
+.env*
+*.log
+
+# Development files
+.git/
+.gitignore
+README.md

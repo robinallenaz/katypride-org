@@ -14,11 +14,11 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/admin/:path*',
-        destination: `${process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337'}/admin/:path*`,
+        destination: `${process.env.NEXT_PUBLIC_STRAPI_URL || 'https://katypride-strapi.onrender.com'}/admin/:path*`,
       },
       {
         source: '/api/strapi/:path*',
-        destination: `${process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337'}/api/:path*`,
+        destination: `${process.env.NEXT_PUBLIC_STRAPI_URL || 'https://katypride-strapi.onrender.com'}/api/:path*`,
       },
     ];
   },
