@@ -76,13 +76,16 @@ export default function EventsPage() {
   const [visibleCount, setVisibleCount] = useState(3)
 
   // Static coffee meet-up fallback
-  const createStaticCoffeeMeetup = (): StrapiEvent => ({
-    id: 999999,
-    documentId: 'coffee-meetup-static',
-    title: 'Espresso Yourself Coffee Meet-Up',
-    start: getNextSundayDate().toISOString(),
-    end: new Date(getNextSundayDate().getTime() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours later
-    location: 'Coffee Fellows, 3329 Grand Parkway, Katy, TX 77449',
+  const createStaticCoffeeMeetup = (): StrapiEvent => {
+    const nextSunday = getNextSundayDate()
+    const endDate = new Date(nextSunday.getTime() + 2 * 60 * 60 * 1000) // 2 hours later
+    return {
+      id: 999999,
+      documentId: 'coffee-meetup-static',
+      title: 'Espresso Yourself Coffee Meet-Up',
+      start: nextSunday.toISOString(),
+      end: endDate.toISOString(),
+      location: 'Coffee Fellows, 3329 Grand Parkway, Katy, TX 77449',
     summary: {
       type: 'doc',
       children: [{
@@ -107,20 +110,14 @@ export default function EventsPage() {
       name: 'coffee-meetup.png',
       alternativeText: 'Coffee Fellows meetup - LGBTQ+ community gathering',
       url: '/events/coffee-meetup.png',
-      width: 1200,
-      height: 800,
-      provider: 'local',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       publishedAt: new Date().toISOString()
-    },
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    publishedAt: new Date().toISOString()
-  })
+    }
+  }
 
   // Helper function to get next Sunday
-  const getNextSundayDate = (): Date => {
+  function getNextSundayDate(): Date {
     const today = new Date()
     const currentDay = today.getDay()
     // If today is Sunday (0), get next Sunday (7 days away). Otherwise, calculate days until next Sunday.
@@ -143,15 +140,18 @@ export default function EventsPage() {
         
         if (cachedData) {
           try {
-            const { events, timestamp } = JSON.parse(cachedData)
+            const { events, timestamp, source } = JSON.parse(cachedData)
             const now = Date.now()
             
-            // Use cache if less than 5 minutes old
-            if (now - timestamp < 300000) {
+            // Use only successful Strapi cache if less than 5 minutes old.
+            // Legacy entries (without source) and fallback cache are ignored.
+            if (source === 'strapi' && now - timestamp < 300000) {
               setStrapiEvents(events)
               setLoadingStrapi(false)
               return
             }
+
+            sessionStorage.removeItem(cacheKey)
           } catch (cacheError) {
             console.warn('Failed to parse events cache:', cacheError)
             sessionStorage.removeItem(cacheKey)
@@ -169,8 +169,9 @@ export default function EventsPage() {
         // Cache the results
         try {
           sessionStorage.setItem(cacheKey, JSON.stringify({
-            events,
-            timestamp: Date.now()
+            events: eventsWithFallback,
+            timestamp: Date.now(),
+            source: 'strapi'
           }))
         } catch (cacheError) {
           console.warn('Failed to cache events:', cacheError)
@@ -181,7 +182,20 @@ export default function EventsPage() {
         console.warn('Failed to load events from Strapi:', errorMessage)
         setStrapiError(errorMessage)
         // Use fallback events when Strapi is down
-        setStrapiEvents([createStaticCoffeeMeetup()])
+        const fallbackEvents = [createStaticCoffeeMeetup()]
+        setStrapiEvents(fallbackEvents)
+
+        // Cache fallback with shorter TTL (1 minute) to retry Strapi soon
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            events: fallbackEvents,
+            timestamp: Date.now(),
+            source: 'fallback'
+          }))
+        } catch (cacheError) {
+          console.warn('Failed to cache fallback events:', cacheError)
+        }
+
       } finally {
         setLoadingStrapi(false)
       }
@@ -215,8 +229,18 @@ export default function EventsPage() {
   }, [strapiEvents.length, strapiEvents.map(e => e.id + e.updatedAt).join(',')])
 
   const allEvents = useMemo(() => {
+    // Use local date for consistent date-based comparison with event times
+    const now = new Date()
+    const todayDateString = now.toDateString()
+
     return [...strapiEventItems]
       .filter((e) => !Number.isNaN(e.start.getTime()))
+      .filter((e) => {
+        const validEnd = e.end && !Number.isNaN(e.end.getTime()) ? e.end : null
+        const comparisonDate = validEnd ?? e.start
+        // Compare using local date strings to handle timezone correctly
+        return comparisonDate.toDateString() >= todayDateString
+      })
       .filter((event) => {
         const matchesCategory = selectedCategory === 'all' || event.eventCategory === selectedCategory
         const matchesSearch = searchTerm === '' || 

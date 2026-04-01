@@ -189,7 +189,7 @@ class StrapiClient {
     // Use UTC time for consistent filtering regardless of server timezone
     const now = encodeURIComponent(new Date().toISOString())
     const response = await this.request<StrapiResponse<StrapiEvent>>(
-      `/events?filters[published][$eq]=true&filters[start][$gte]=${now}&sort=start:asc&populate=image`
+      `/events?filters[published][$eq]=true&filters[$or][0][start][$gte]=${now}&filters[$or][1][isRecurring][$eq]=true&filters[$or][1][$or][0][recurrenceEndDate][$null]=true&filters[$or][1][$or][1][recurrenceEndDate][$gte]=${now}&sort=start:asc&populate=image`
     )
     return response.data
   }
@@ -219,6 +219,9 @@ class StrapiClient {
     if (image.url.startsWith('http')) {
       return image.url
     }
+    if (image.provider === 'hardcoded') {
+      return image.url
+    }
     // Remove leading slash from image.url to prevent double slashes
     const cleanImageUrl = image.url.startsWith('/') ? image.url.slice(1) : image.url
     // Remove trailing slash from baseUrl to prevent double slashes
@@ -230,6 +233,9 @@ class StrapiClient {
     if (image.formats && image.formats[size]) {
       const format = image.formats[size]
       if (format.url.startsWith('http')) {
+        return format.url
+      }
+      if (image.provider === 'hardcoded') {
         return format.url
       }
       // Remove leading slash from format.url to prevent double slashes
