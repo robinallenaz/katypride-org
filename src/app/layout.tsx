@@ -21,6 +21,7 @@ const ebGaramond = EB_Garamond({
 export const metadata: Metadata = {
   title: "Katy Pride",
   description: "Katy Pride – Building community, advocating for equality, celebrating diversity.",
+  metadataBase: new URL('https://katypride.org'),
 };
 
 export default function RootLayout({

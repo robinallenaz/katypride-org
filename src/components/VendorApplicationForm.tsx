@@ -202,7 +202,7 @@ const VendorApplicationForm: React.FC = () => {
         city: formData.city,
         state: formData.state,
         postalCode: formData.postalCode,
-        productsservices: formData.productsServices,
+        productsServices: formData.productsServices,
         vendor_fee: vendorTypes.find(t => t.value === formData.vendorType)?.fee || '',
         sponsorshipInterest: formData.sponsorshipInterest,
         additionalInfo: formData.additionalInfo,

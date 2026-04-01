@@ -1,0 +1,13 @@
+# Ignore frontend files when deploying backend to Render
+src/
+public/
+.next/
+out/
+node_modules/
+.vercel/
+.env.local
+.env*.local
+*.md
+!backend/
+
+# Only include backend directory
