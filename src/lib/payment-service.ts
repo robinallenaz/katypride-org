@@ -212,31 +212,6 @@ class PaymentService {
     }
   }
 
-  async trackPaymentInCRM(paymentIntentId: string, status: string, transactionId: string, paymentMethod: string) {
-    try {
-      const response = await fetch('/api/track-payment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          paymentIntentId,
-          status,
-          transactionId,
-          paymentMethod,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to track payment in CRM')
-      }
-
-      return await response.json()
-    } catch (error) {
-      console.error('Error tracking payment in CRM:', error)
-      throw error
-    }
-  }
 }
 
 export const paymentService = new PaymentService()

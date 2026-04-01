@@ -218,7 +218,6 @@ export default function SponsorSignupForm() {
       });
 
       const result = await response.json();
-      console.log('CRM API Response:', result);
 
       if (result.success) {
         setSubmitStatus('success');

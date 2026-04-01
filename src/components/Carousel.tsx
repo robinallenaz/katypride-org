@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { cloudinaryUrl } from '@/lib/cloudinary'
 import { getCarouselImages, type CarouselImage } from '@/lib/carousel'
 
@@ -80,17 +80,32 @@ const HARDCODED_IMAGES: CarouselImage[] = [
   }
 ]
 
+function getImageUrl(slide: any): string {
+  if (slide?.image && Array.isArray(slide.image) && slide.image.length > 0) {
+    const image = slide.image[0];
+    if (image?.url) {
+      if (image.provider === 'hardcoded') {
+        return image.url;
+      }
+      const baseUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337';
+      const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+      const cleanImageUrl = image.url.startsWith('/') ? image.url.slice(1) : image.url;
+      return `${cleanBaseUrl}/${cleanImageUrl}`;
+    }
+  }
+  return '';
+}
+
 export default function Carousel() {
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [slides, setSlides] = useState<CarouselImage[]>([])
+  const [slides, setSlides] = useState<CarouselImage[]>(HARDCODED_IMAGES)
   const [isLoading, setIsLoading] = useState(false)
-  const [loadAttempted, setLoadAttempted] = useState(false)
+  const loadAttemptedRef = useRef(false)
 
   useEffect(() => {
     const loadImages = async () => {
-      // Prevent multiple simultaneous loads
-      if (loadAttempted || isLoading) return
-      setLoadAttempted(true)
+      if (loadAttemptedRef.current) return
+      loadAttemptedRef.current = true
       
       try {
         setIsLoading(true)
@@ -125,31 +140,8 @@ export default function Carousel() {
     }
 
     loadImages()
-  }, [loadAttempted, isLoading])
+  }, [])
 
-  // Define getImageUrl before using it in useMemo
-  const getImageUrl = (slide: any): string => {
-    // Handle Strapi image array structure
-    if (slide?.image && Array.isArray(slide.image) && slide.image.length > 0) {
-      const image = slide.image[0];
-      if (image?.url) {
-        // For hardcoded images, return URL directly from frontend public folder
-        if (image.provider === 'hardcoded') {
-          return image.url; // Use direct path from frontend public/carousel/
-        }
-        
-        // Use the Strapi client's getImageUrl method for consistent URL handling
-        const baseUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337';
-        const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-        const cleanImageUrl = image.url.startsWith('/') ? image.url.slice(1) : image.url;
-        const fullUrl = `${cleanBaseUrl}/${cleanImageUrl}`;
-        return fullUrl;
-      }
-    }
-    return '';
-  }
-
-  // Memoize image URL generation to prevent unnecessary recalculations
   const imageUrls = useMemo(() => {
     const urls: Record<string, string> = {}
     slides.forEach((slide) => {

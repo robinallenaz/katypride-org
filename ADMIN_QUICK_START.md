@@ -3,7 +3,7 @@
 ## 🎯 One-Page Summary for Board Members
 
 ### **Step 1: Access Admin Panel**
-🔗 **URL**: https://katypride-7x4qno1sj-robinallenazs-projects.vercel.app/admin
+🔗 **URL**: https://katypride-strapi.onrender.com/admin
 📱 **Bookmark this page!**
 
 ### **Step 2: What You Can Do**

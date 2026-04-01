@@ -100,7 +100,7 @@ const NewsletterForm: React.FC = () => {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
-        interests: formData.interests.join(', '),
+        interests: formData.interests,
         source: 'Newsletter Signup',
         _gotcha: '', // Honeypot field
       };
@@ -266,12 +266,11 @@ const NewsletterForm: React.FC = () => {
           <input
             type="text"
             name="_gotcha"
-            value=""
-            onChange={() => {}}
+            defaultValue=""
+            readOnly
             style={{ display: 'none' }}
             tabIndex={-1}
             autoComplete="off"
-            suppressHydrationWarning={true}
           />
         </form>
       </div>

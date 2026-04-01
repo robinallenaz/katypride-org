@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual, createHash } from 'crypto';
+import { ghlRequest, GHL_LOCATION_ID } from '@/lib/ghl';
 
 const GHL_API_KEY = process.env.GHL_API_KEY || '';
-const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID || '';
-const GHL_BASE_URL = 'https://rest.gohighlevel.com/v1';
 const CRM_ADMIN_SECRET = process.env.CRM_ADMIN_SECRET || '';
 const ALLOWED_CONTACT_TYPES = ['volunteer', 'donor', 'community-member', 'vendor', 'sponsor'] as const;
 const ALLOWED_VENDOR_TYPES = ['nonprofit', 'forprofit', 'food', 'political', 'government'] as const;
+const ALLOWED_SPONSORSHIP_LEVELS = [
+  'water-station', 'community', 'bronze', 'color-run', 'silver',
+  'kids-dash', 'gold', 'presenting', 'custom',
+] as const;
+const ALLOWED_SPONSOR_EVENTS = [
+  'chase-the-rainbow-5k-2026', 'katy-pride-celebration-2026',
+] as const;
+const ALLOWED_EXCLUSIVE_OPPORTUNITIES = [
+  'entertainment', 'hospitality', 't-shirt', 'wifi-charging',
+  'swag-bag', 'kid-zone',
+] as const;
 
 // Enhanced rate limiter with cleanup and better IP detection
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
@@ -227,6 +237,11 @@ const ALLOWED_VOLUNTEER_INTERESTS = [
 const ALLOWED_COMMUNITY_INTERESTS = [
   'LGBTQ+ Advocacy', 'Youth Support', 'Parent Resources', 'Ally Programs',
   'Education', 'Health & Wellness', 'Legal Support', 'Faith Communities',
+  // Newsletter form interests
+  'Events & Celebrations', 'Volunteer Opportunities', 'Advocacy & Education',
+  'Community Support', 'Youth Programs', 'Fundraising & Donations',
+  'Partnership Opportunities', 'Monthly Coffee Meetups',
+  'Pride Nights at Momentum Climbing', 'Small Business Meet-Ups',
 ];
 
 // Enhanced text sanitization to prevent XSS with comprehensive protection
@@ -269,77 +284,6 @@ function safeEqual(a: string, b: string): boolean {
   const hashA = createHash('sha256').update(a).digest();
   const hashB = createHash('sha256').update(b).digest();
   return timingSafeEqual(hashA, hashB);
-}
-
-async function ghlRequest(endpoint: string, options: RequestInit = {}) {
-  const url = `${GHL_BASE_URL}${endpoint}`;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-      headers: {
-        'Authorization': `Bearer ${GHL_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Version': '2021-04-15',
-        ...options.headers,
-      },
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      let errorMessage = 'CRM service request failed';
-      let errorDetails = {};
-
-      try {
-        errorDetails = await response.json();
-        errorMessage = (errorDetails as any).message || (errorDetails as any).error || errorMessage;
-        
-        // Provide more specific error messages based on status code
-        switch (response.status) {
-          case 401:
-            errorMessage = 'Authentication failed';
-            break;
-          case 403:
-            errorMessage = 'Access denied';
-            break;
-          case 404:
-            errorMessage = 'Resource not found';
-            break;
-          case 429:
-            errorMessage = 'Too many requests';
-            break;
-          case 500:
-            errorMessage = 'Service temporarily unavailable';
-            break;
-          default:
-            errorMessage = 'Request failed';
-        }
-      } catch (parseError) {
-        console.error('Failed to parse CRM error response:', parseError);
-        errorMessage = `CRM API error (${response.status}): Unable to connect to CRM service`;
-      }
-
-      console.error('GHL API Error:', response.status, errorDetails);
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
-  } catch (error) {
-    clearTimeout(timeoutId);
-    
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        throw new Error('CRM service timeout - request took too long');
-      }
-      throw error;
-    }
-    
-    throw new Error('CRM service request failed - unknown error');
-  }
 }
 
 export async function GET(request: NextRequest) {
@@ -752,13 +696,20 @@ export async function POST(request: NextRequest) {
       
       contactPayload.contactNote = sponsorNote;
       
-      // Add sponsor-specific tags
+      // Add sponsor-specific tags (validated against allowlists)
       tags.push('sponsor');
-      if (sponsorshipLevel) tags.push(`sponsor-${sponsorshipLevel}`);
-      if (event) tags.push(`event-${event.toLowerCase().replace(/\s+/g, '-')}`);
+      if (sponsorshipLevel && (ALLOWED_SPONSORSHIP_LEVELS as readonly string[]).includes(sponsorshipLevel)) {
+        tags.push(`sponsor-${sponsorshipLevel}`);
+      }
+      if (event) {
+        const normalizedEvent = event.toLowerCase().replace(/\s+/g, '-');
+        if ((ALLOWED_SPONSOR_EVENTS as readonly string[]).includes(normalizedEvent)) {
+          tags.push(`event-${normalizedEvent}`);
+        }
+      }
       if (interestedInExclusives && Array.isArray(interestedInExclusives)) {
-        interestedInExclusives.forEach(exclusive => {
-          if (exclusive && typeof exclusive === 'string') {
+        interestedInExclusives.forEach((exclusive: string) => {
+          if (exclusive && typeof exclusive === 'string' && (ALLOWED_EXCLUSIVE_OPPORTUNITIES as readonly string[]).includes(exclusive)) {
             tags.push(`exclusive-${exclusive}`);
           }
         });

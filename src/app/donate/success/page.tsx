@@ -1,76 +1,23 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 function DonationSuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [isProcessing, setIsProcessing] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const paymentStatus = searchParams.get('redirect_status')
 
-  useEffect(() => {
-    const paymentIntentId = searchParams.get('payment_intent')
-    const paymentStatus = searchParams.get('redirect_status')
-    const transactionId = searchParams.get('payment_intent_client_secret')?.split('_secret')[0]
+  const succeeded = paymentStatus === 'succeeded'
 
-    if (paymentIntentId && paymentStatus === 'succeeded') {
-      // Track successful payment in CRM
-      const trackPayment = async () => {
-        try {
-          const response = await fetch('/api/track-payment', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              paymentIntentId,
-              status: 'completed',
-              transactionId: transactionId || paymentIntentId,
-              paymentMethod: 'stripe',
-            }),
-          })
-
-          if (!response.ok) {
-            throw new Error('Failed to track payment')
-          }
-        } catch (error) {
-          console.error('Error tracking payment:', error)
-          setError('Payment was successful but we had trouble updating our records. Please contact us if you don\'t receive a confirmation email.')
-        } finally {
-          setIsProcessing(false)
-        }
-      }
-
-      trackPayment()
-    } else {
-      setError('Invalid payment status')
-      setIsProcessing(false)
-    }
-  }, [searchParams])
-
-  if (isProcessing) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50 flex items-center justify-center">
-        <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10 max-w-md w-full mx-4">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-            <h2 className="text-2xl font-bold text-purple-700 mb-2">Processing Your Donation...</h2>
-            <p className="text-gray-600">Please wait while we confirm your payment.</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
+  if (!succeeded) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50 flex items-center justify-center">
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10 max-w-md w-full mx-4">
           <div className="text-center">
             <div className="text-4xl mb-4">⚠️</div>
             <h2 className="text-2xl font-bold text-red-600 mb-2">Payment Error</h2>
-            <p className="text-gray-700 mb-6">{error}</p>
+            <p className="text-gray-700 mb-6">There was a problem with your payment. Please try again.</p>
             <button
               onClick={() => router.push('/donate')}
               className="bg-purple-600 text-white font-semibold px-6 py-3 rounded-md hover:bg-purple-700 transition-colors"
