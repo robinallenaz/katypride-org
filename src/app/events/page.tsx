@@ -105,11 +105,17 @@ export default function EventsPage() {
     recurrenceEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year from now
     externalUrl: 'https://www.google.com/maps/dir//3329%20Grand%20Parkway,%20Katy,%20TX%2077449',
     externalCtaLabel: 'Get Directions',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    publishedAt: new Date().toISOString(),
     image: {
       id: 999999,
       name: 'coffee-meetup.png',
       alternativeText: 'Coffee Fellows meetup - LGBTQ+ community gathering',
       url: '/events/coffee-meetup.png',
+      width: 800,
+      height: 600,
+      provider: 'local',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       publishedAt: new Date().toISOString()
