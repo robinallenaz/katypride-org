@@ -16,10 +16,6 @@ if (!stripeKey) {
   throw new Error('STRIPE_SECRET_KEY is required but not configured');
 }
 
-if (!webhookSecret) {
-  throw new Error('STRIPE_WEBHOOK_SECRET is required but not configured');
-}
-
 if (!upstashUrl || !upstashToken) {
   console.warn('UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN not configured. Webhook idempotency will use in-memory fallback (not suitable for production multi-instance deployments).');
 }
@@ -82,6 +78,11 @@ function isEventProcessed(eventId: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  if (!webhookSecret) {
+    console.error('STRIPE_WEBHOOK_SECRET is not configured');
+    return NextResponse.json({ error: 'Webhook service not configured' }, { status: 503 });
+  }
+
   const signature = request.headers.get('stripe-signature');
   if (!signature) {
     return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
