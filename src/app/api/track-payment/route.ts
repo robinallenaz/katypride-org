@@ -1,79 +1,109 @@
-import { NextRequest, NextResponse } from 'next/server'
-import Stripe from 'stripe'
-import { ghlRequest, GHL_LOCATION_ID } from '@/lib/ghl'
+import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { Redis } from '@upstash/redis';
+import { ghlRequest, GHL_LOCATION_ID } from '@/lib/ghl';
 
-// Simple in-memory tracking for webhook events
-// ⚠️ WARNING: In-memory state doesn't persist across serverless instances (Vercel/Render).
-// Webhooks may be processed multiple times if different instances handle retries.
-// For production with multiple instances, use Redis or a database for idempotency tracking.
-// See: https://vercel.com/docs/concepts/functions/serverless-functions
-const processedEventIds = new Set<string>()
-const processingEventIds = new Set<string>() // Events currently being processed
-const PROCESSED_EVENTS_MAX_SIZE = 1000
+// Initialize Redis client for idempotency tracking
+const redis = Redis.fromEnv();
+
+// Environment variable validation at module load
+const stripeKey = process.env.STRIPE_SECRET_KEY;
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
+const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+if (!stripeKey) {
+  throw new Error('STRIPE_SECRET_KEY is required but not configured');
+}
+
+if (!webhookSecret) {
+  throw new Error('STRIPE_WEBHOOK_SECRET is required but not configured');
+}
+
+if (!upstashUrl || !upstashToken) {
+  console.warn('UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN not configured. Webhook idempotency will use in-memory fallback (not suitable for production multi-instance deployments).');
+}
+
+const PROCESSED_EVENTS_MAX_SIZE = 1000;
+
+// In-memory fallback for development
+const processedEventIds = new Set<string>();
+const processingEventIds = new Set<string>();
+
+// Redis-based idempotency check
+async function isEventProcessedRedis(eventId: string): Promise<boolean> {
+  try {
+    const exists = await redis.exists(`webhook:${eventId}`);
+    return exists === 1;
+  } catch (error) {
+    console.error('Redis idempotency check failed, falling back to in-memory:', error);
+    return processedEventIds.has(eventId);
+  }
+}
+
+async function markEventProcessedRedis(eventId: string): Promise<void> {
+  try {
+    // Store with 24-hour expiration to prevent unbounded growth
+    await redis.setex(`webhook:${eventId}`, 24 * 60 * 60, '1');
+  } catch (error) {
+    console.error('Redis mark processed failed, falling back to in-memory:', error);
+    processedEventIds.add(eventId);
+  }
+}
 
 function markEventProcessed(eventId: string): void {
-  // Remove from processing first
-  processingEventIds.delete(eventId)
+  processingEventIds.delete(eventId);
   
-  // Prevent unbounded growth
   if (processedEventIds.size >= PROCESSED_EVENTS_MAX_SIZE) {
-    // Clear oldest 20% of entries (arbitrary but simple eviction strategy)
-    const entries = Array.from(processedEventIds).slice(-Math.floor(PROCESSED_EVENTS_MAX_SIZE * 0.8))
-    processedEventIds.clear()
-    entries.forEach(id => processedEventIds.add(id))
+    const entries = Array.from(processedEventIds).slice(-Math.floor(PROCESSED_EVENTS_MAX_SIZE * 0.8));
+    processedEventIds.clear();
+    entries.forEach(id => processedEventIds.add(id));
   }
-  processedEventIds.add(eventId)
+  processedEventIds.add(eventId);
 }
 
 function markEventProcessing(eventId: string): boolean {
-  // If already being processed by another request, skip
   if (processingEventIds.has(eventId)) {
-    return false
+    return false;
   }
-  // If already completed, skip
   if (processedEventIds.has(eventId)) {
-    return false
+    return false;
   }
-  processingEventIds.add(eventId)
-  return true
+  processingEventIds.add(eventId);
+  return true;
 }
 
 function markEventFailed(eventId: string): void {
-  // Remove from processing so retries can attempt it
-  processingEventIds.delete(eventId)
+  processingEventIds.delete(eventId);
 }
 
 function isEventProcessed(eventId: string): boolean {
-  return processedEventIds.has(eventId)
+  return processedEventIds.has(eventId);
 }
 
 export async function POST(request: NextRequest) {
-  const stripeKey = process.env.STRIPE_SECRET_KEY
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
-
-  if (!stripeKey || !webhookSecret) {
-    console.error('Stripe webhook configuration missing')
-    return NextResponse.json({ error: 'Service not configured' }, { status: 503 })
-  }
-
-  const signature = request.headers.get('stripe-signature')
+  const signature = request.headers.get('stripe-signature');
   if (!signature) {
-    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 })
+    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
   }
 
-  const stripe = new Stripe(stripeKey, { apiVersion: '2026-03-25.dahlia' })
+  const stripe = new Stripe(stripeKey!, { apiVersion: '2025-02-24.acacia' as any });
 
   let event: Stripe.Event
   try {
     const body = await request.text()
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret!)
   } catch (err) {
     console.error('Webhook signature verification failed:', err)
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
   // Idempotency check: Skip if already processed or being processed
-  if (isEventProcessed(event.id)) {
+  const isProcessed = upstashUrl && upstashToken 
+    ? await isEventProcessedRedis(event.id)
+    : isEventProcessed(event.id);
+    
+  if (isProcessed) {
     console.log(`Webhook event ${event.id} already processed, skipping`)
     return NextResponse.json({ received: true, idempotency: true })
   }

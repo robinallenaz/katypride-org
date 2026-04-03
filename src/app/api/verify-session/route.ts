@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
+// Environment variable validation at module load
 const stripeKey = process.env.STRIPE_SECRET_KEY;
 
-export async function GET(request: NextRequest) {
-  if (!stripeKey) {
-    console.error('STRIPE_SECRET_KEY is not configured');
-    return NextResponse.json({ error: 'Payment service not configured' }, { status: 503 });
-  }
+if (!stripeKey) {
+  throw new Error('STRIPE_SECRET_KEY is required but not configured');
+}
 
-  const stripe = new Stripe(stripeKey, {
-    apiVersion: '2026-03-25.dahlia',
-  });
+const stripe = new Stripe(stripeKey, {
+  apiVersion: '2025-02-24.acacia' as any, // Pin to stable version
+});
+
+export async function GET(request: NextRequest) {
 
   const sessionId = request.nextUrl.searchParams.get('session_id');
   

@@ -2,22 +2,36 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { ghlRequest, GHL_LOCATION_ID } from '@/lib/ghl';
 
-const stripeKey = process.env.STRIPE_SECRET_KEY;
+import { Redis } from '@upstash/redis';
 
-// Simple in-memory rate limiting with proper synchronization
-// ⚠️ WARNING: In-memory state doesn't persist across serverless instances (Vercel/Render).
-// For production with multiple instances, use Redis or a database for rate limiting.
-// See: https://vercel.com/docs/concepts/functions/serverless-functions
+// Initialize Redis client for rate limiting (works across serverless instances)
+const redis = Redis.fromEnv();
+
+// Environment variable validation at module load
+const stripeKey = process.env.STRIPE_SECRET_KEY;
+const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
+const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+if (!stripeKey) {
+  throw new Error('STRIPE_SECRET_KEY is required but not configured');
+}
+
+if (!upstashUrl || !upstashToken) {
+  console.warn('UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN not configured. Rate limiting will use in-memory fallback (not suitable for production multi-instance deployments).');
+}
+
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 5; // Max 5 checkout sessions per minute per IP
+const MAX_BODY_SIZE_BYTES = 50 * 1024; // 50KB max request body
+
+// Simple in-memory fallback for development or when Redis is not available
 interface RateLimitEntry {
   count: number;
   resetTime: number;
 }
 
 const rateLimitMap = new Map<string, RateLimitEntry>();
-const processingLocks = new Set<string>(); // Prevent concurrent updates to same key
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 5; // Max 5 checkout sessions per minute per IP
-const MAX_BODY_SIZE_BYTES = 50 * 1024; // 50KB max request body
+const processingLocks = new Set<string>();
 
 // Cleanup expired rate limit entries periodically to prevent memory growth
 function cleanupExpiredRateLimits(): void {
@@ -29,7 +43,7 @@ function cleanupExpiredRateLimits(): void {
   }
 }
 
-// Run cleanup every 5 minutes
+// Run cleanup every 5 minutes (only if using in-memory fallback)
 setInterval(cleanupExpiredRateLimits, 5 * 60 * 1000);
 
 function getRateLimitKey(ip: string): string {
@@ -43,7 +57,7 @@ async function acquireLock(key: string, timeoutMs: number = 100): Promise<boolea
     if (Date.now() - startTime > timeoutMs) {
       return false; // Timeout - couldn't acquire lock
     }
-    await new Promise(resolve => setTimeout(resolve, 10)); // Small delay before retry
+    await new Promise(resolve => setTimeout(resolve, 10));
   }
   processingLocks.add(key);
   return true;
@@ -53,13 +67,11 @@ function releaseLock(key: string): void {
   processingLocks.delete(key);
 }
 
-async function checkRateLimit(ip: string): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
+async function checkRateLimitInMemory(ip: string): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
   const key = getRateLimitKey(ip);
   
-  // Try to acquire lock with timeout
   const lockAcquired = await acquireLock(key);
   if (!lockAcquired) {
-    // If we can't acquire lock, assume rate limited to be safe
     return { allowed: false, remaining: 0, resetTime: Date.now() + RATE_LIMIT_WINDOW_MS };
   }
 
@@ -82,7 +94,6 @@ async function checkRateLimit(ip: string): Promise<{ allowed: boolean; remaining
     const entry = rateLimitMap.get(key);
     
     if (!entry || now > entry.resetTime) {
-      // New window or expired - reset
       const newEntry = {
         count: 1,
         resetTime: now + RATE_LIMIT_WINDOW_MS,
@@ -95,12 +106,44 @@ async function checkRateLimit(ip: string): Promise<{ allowed: boolean; remaining
       return { allowed: false, remaining: 0, resetTime: entry.resetTime };
     }
 
-    // Increment count
     entry.count++;
     return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - entry.count, resetTime: entry.resetTime };
   } finally {
     releaseLock(key);
   }
+}
+
+async function checkRateLimitRedis(ip: string): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
+  const key = `rate_limit:checkout:${ip}`;
+  const now = Date.now();
+  const windowStart = Math.floor(now / RATE_LIMIT_WINDOW_MS) * RATE_LIMIT_WINDOW_MS;
+  const resetTime = windowStart + RATE_LIMIT_WINDOW_MS;
+  
+  try {
+    // Use Redis INCR to atomically increment the counter
+    const currentCount = await redis.incr(key);
+    
+    // If this is the first request in the window, set expiration
+    if (currentCount === 1) {
+      await redis.pexpire(key, RATE_LIMIT_WINDOW_MS);
+    }
+    
+    const remaining = Math.max(0, RATE_LIMIT_MAX_REQUESTS - currentCount);
+    const allowed = currentCount <= RATE_LIMIT_MAX_REQUESTS;
+    
+    return { allowed, remaining, resetTime };
+  } catch (error) {
+    console.error('Redis rate limiting failed, falling back to in-memory:', error);
+    return checkRateLimitInMemory(ip);
+  }
+}
+
+async function checkRateLimit(ip: string): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
+  // Use Redis if available, otherwise fall back to in-memory
+  if (upstashUrl && upstashToken) {
+    return checkRateLimitRedis(ip);
+  }
+  return checkRateLimitInMemory(ip);
 }
 
 function getClientIP(request: NextRequest): string {
@@ -202,7 +245,7 @@ export async function POST(request: NextRequest) {
   }
 
   const stripe = new Stripe(stripeKey, {
-    apiVersion: '2026-03-25.dahlia',
+    apiVersion: '2025-02-24.acacia' as any, // Pin to stable version
   });
 
   try {
