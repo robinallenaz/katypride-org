@@ -240,7 +240,7 @@ export default function EventsPage() {
         parentId: event.parentId,
       }
     })
-  }, [strapiEvents.length, strapiEvents.map(e => e.id + e.updatedAt).join(',')])
+  }, [strapiEvents.length, strapiEvents.map((e) => (e.id + e.updatedAt)).join(',')])
 
   const allEvents = useMemo(() => {
     // Use local date for consistent date-based comparison with event times
