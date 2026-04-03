@@ -21,6 +21,66 @@ type EventItem = {
   parentId?: string
 }
 
+// Helper function to get next Sunday
+function getNextSundayDate(): Date {
+  const today = new Date()
+  const currentDay = today.getDay()
+  // If today is Sunday (0), get next Sunday (7 days away). Otherwise, calculate days until next Sunday.
+  const daysUntilSunday = currentDay === 0 ? 7 : 7 - currentDay
+  const nextSunday = new Date(today)
+  nextSunday.setDate(today.getDate() + daysUntilSunday)
+  nextSunday.setHours(9, 0, 0, 0) // 9:00 AM
+  return nextSunday
+}
+
+// Static coffee meet-up fallback
+const createStaticCoffeeMeetup = (): StrapiEvent => {
+  const nextSunday = getNextSundayDate()
+  const endDate = new Date(nextSunday.getTime() + 2 * 60 * 60 * 1000) // 2 hours later
+  return {
+    id: 999999,
+    documentId: 'coffee-meetup-static',
+    title: 'Espresso Yourself Coffee Meet-Up',
+    start: nextSunday.toISOString(),
+    end: endDate.toISOString(),
+    location: 'Coffee Fellows, 3329 Grand Parkway, Katy, TX 77449',
+    summary: {
+      type: 'doc',
+      children: [{
+        type: 'paragraph',
+        children: [{
+          type: 'text',
+          text: 'Join us for a casual coffee meet up at an LGBTQ-affirming business, Coffee Fellows, to meet other LGBTQ+ community members and allies. Grab a coffee, tea, pastry or whatever suits your fancy, and make new connections or even get some work done. Enjoy a safe space of community and allyship!'
+        }]
+      }]
+    },
+    published: true,
+    eventCategory: 'coffee',
+    isRecurring: true,
+    recurrencePattern: 'monthly',
+    recurrenceInterval: 1,
+    recurrenceDaysOfWeek: [0], // Sunday
+    recurrenceEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year from now
+    externalUrl: 'https://www.google.com/maps/dir//3329%20Grand%20Parkway,%20Katy,%20TX%2077449',
+    externalCtaLabel: 'Get Directions',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    publishedAt: new Date().toISOString(),
+    image: {
+      id: 999999,
+      name: 'coffee-meetup.png',
+      alternativeText: 'Coffee Fellows meetup - LGBTQ+ community gathering',
+      url: '/events/coffee-meetup.png',
+      width: 800,
+      height: 600,
+      provider: 'local',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      publishedAt: new Date().toISOString()
+    }
+  }
+}
+
 export default function EventsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState<string>('')
@@ -74,66 +134,6 @@ export default function EventsPage() {
   const [loadingStrapi, setLoadingStrapi] = useState(true)
   const [strapiError, setStrapiError] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(3)
-
-  // Static coffee meet-up fallback
-  const createStaticCoffeeMeetup = (): StrapiEvent => {
-    const nextSunday = getNextSundayDate()
-    const endDate = new Date(nextSunday.getTime() + 2 * 60 * 60 * 1000) // 2 hours later
-    return {
-      id: 999999,
-      documentId: 'coffee-meetup-static',
-      title: 'Espresso Yourself Coffee Meet-Up',
-      start: nextSunday.toISOString(),
-      end: endDate.toISOString(),
-      location: 'Coffee Fellows, 3329 Grand Parkway, Katy, TX 77449',
-    summary: {
-      type: 'doc',
-      children: [{
-        type: 'paragraph',
-        children: [{
-          type: 'text',
-          text: 'Join us for a casual coffee meet up at an LGBTQ-affirming business, Coffee Fellows, to meet other LGBTQ+ community members and allies. Grab a coffee, tea, pastry or whatever suits your fancy, and make new connections or even get some work done. Enjoy a safe space of community and allyship!'
-        }]
-      }]
-    },
-    published: true,
-    eventCategory: 'coffee',
-    isRecurring: true,
-    recurrencePattern: 'monthly',
-    recurrenceInterval: 1,
-    recurrenceDaysOfWeek: [0], // Sunday
-    recurrenceEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year from now
-    externalUrl: 'https://www.google.com/maps/dir//3329%20Grand%20Parkway,%20Katy,%20TX%2077449',
-    externalCtaLabel: 'Get Directions',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    publishedAt: new Date().toISOString(),
-    image: {
-      id: 999999,
-      name: 'coffee-meetup.png',
-      alternativeText: 'Coffee Fellows meetup - LGBTQ+ community gathering',
-      url: '/events/coffee-meetup.png',
-      width: 800,
-      height: 600,
-      provider: 'local',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      publishedAt: new Date().toISOString()
-    }
-  }
-
-  // Helper function to get next Sunday
-  function getNextSundayDate(): Date {
-    const today = new Date()
-    const currentDay = today.getDay()
-    // If today is Sunday (0), get next Sunday (7 days away). Otherwise, calculate days until next Sunday.
-    const daysUntilSunday = currentDay === 0 ? 7 : 7 - currentDay
-    const nextSunday = new Date(today)
-    nextSunday.setDate(today.getDate() + daysUntilSunday)
-    nextSunday.setHours(9, 0, 0, 0) // 9:00 AM
-    return nextSunday
-  }
-
   useEffect(() => {
     const run = async () => {
       // Cache key defined here so it's available in both try and catch blocks
@@ -513,5 +513,4 @@ export default function EventsPage() {
     </div>
     </>
   )
-}
 }
