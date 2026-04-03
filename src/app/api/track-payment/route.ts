@@ -2,6 +2,51 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { ghlRequest, GHL_LOCATION_ID } from '@/lib/ghl'
 
+// Simple in-memory tracking for webhook events
+// ⚠️ WARNING: In-memory state doesn't persist across serverless instances (Vercel/Render).
+// Webhooks may be processed multiple times if different instances handle retries.
+// For production with multiple instances, use Redis or a database for idempotency tracking.
+// See: https://vercel.com/docs/concepts/functions/serverless-functions
+const processedEventIds = new Set<string>()
+const processingEventIds = new Set<string>() // Events currently being processed
+const PROCESSED_EVENTS_MAX_SIZE = 1000
+
+function markEventProcessed(eventId: string): void {
+  // Remove from processing first
+  processingEventIds.delete(eventId)
+  
+  // Prevent unbounded growth
+  if (processedEventIds.size >= PROCESSED_EVENTS_MAX_SIZE) {
+    // Clear oldest 20% of entries (arbitrary but simple eviction strategy)
+    const entries = Array.from(processedEventIds).slice(-Math.floor(PROCESSED_EVENTS_MAX_SIZE * 0.8))
+    processedEventIds.clear()
+    entries.forEach(id => processedEventIds.add(id))
+  }
+  processedEventIds.add(eventId)
+}
+
+function markEventProcessing(eventId: string): boolean {
+  // If already being processed by another request, skip
+  if (processingEventIds.has(eventId)) {
+    return false
+  }
+  // If already completed, skip
+  if (processedEventIds.has(eventId)) {
+    return false
+  }
+  processingEventIds.add(eventId)
+  return true
+}
+
+function markEventFailed(eventId: string): void {
+  // Remove from processing so retries can attempt it
+  processingEventIds.delete(eventId)
+}
+
+function isEventProcessed(eventId: string): boolean {
+  return processedEventIds.has(eventId)
+}
+
 export async function POST(request: NextRequest) {
   const stripeKey = process.env.STRIPE_SECRET_KEY
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
@@ -16,7 +61,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 })
   }
 
-  const stripe = new Stripe(stripeKey, { apiVersion: '2024-11-20.acacia' })
+  const stripe = new Stripe(stripeKey, { apiVersion: '2026-03-25.dahlia' })
 
   let event: Stripe.Event
   try {
@@ -27,6 +72,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
+  // Idempotency check: Skip if already processed or being processed
+  if (isEventProcessed(event.id)) {
+    console.log(`Webhook event ${event.id} already processed, skipping`)
+    return NextResponse.json({ received: true, idempotency: true })
+  }
+  
+  // Mark as processing to prevent concurrent processing
+  if (!markEventProcessing(event.id)) {
+    console.log(`Webhook event ${event.id} is already being processed, skipping`)
+    return NextResponse.json({ received: true, processing: true })
+  }
+
+  // Handle donation payments (PaymentIntent)
   if (event.type === 'payment_intent.succeeded') {
     const paymentIntent = event.data.object as Stripe.PaymentIntent
     const { donor_email, donor_name, donation_frequency } = paymentIntent.metadata
@@ -69,11 +127,146 @@ export async function POST(request: NextRequest) {
             body: JSON.stringify(contactData),
           })
         }
+        
+        // Mark as processed only after successful GHL update
+        markEventProcessed(event.id)
+        return NextResponse.json({ received: true })
       } catch (ghlError) {
-        // Log but return 200 — Stripe retries on non-2xx, and GHL failures
-        // shouldn't cause repeated webhook delivery attempts
-        console.error('Failed to update GHL contact after payment:', ghlError)
+        // Mark as failed so retries can attempt it again
+        markEventFailed(event.id)
+        console.error('Failed to update GHL contact after donation payment:', ghlError)
+        return NextResponse.json(
+          { error: 'Failed to process donation in CRM', received: false },
+          { status: 500 }
+        )
       }
+    } else {
+      // No donor_email - mark as processed to prevent infinite retries
+      markEventProcessed(event.id)
+    }
+  }
+
+  // Handle vendor and sponsor payments (Checkout Session)
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session
+    const { type, email, name, company, phone, _clientMetadata } = session.metadata || {}
+    
+    // Parse _clientMetadata to extract crmContactId and other nested metadata
+    let crmContactId: string | undefined
+    if (_clientMetadata) {
+      try {
+        const clientMetadata = JSON.parse(_clientMetadata)
+        crmContactId = clientMetadata.crmContactId
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+
+    if (email && type) {
+      try {
+        const isVendor = type === 'vendor'
+        const isSponsor = type === 'sponsor'
+        
+        if (!isVendor && !isSponsor) {
+          // Not a vendor/sponsor payment, skip but mark as processed
+          markEventProcessed(event.id)
+          return NextResponse.json({ received: true })
+        }
+
+        const amount = (session.amount_total || 0) / 100 // Convert from cents
+        
+        const contactData: any = {
+          email,
+          name: name || '',
+          locationId: GHL_LOCATION_ID,
+          tags: isVendor ? ['vendor', 'paid'] : ['sponsor', 'paid'],
+          customFields: {
+            stripe_session_id: session.id,
+            payment_status: 'paid',
+            payment_amount: amount,
+            payment_date: new Date().toISOString(),
+            ...(isVendor && { vendor_type: session.metadata?.vendorType || '' }),
+            ...(isSponsor && { sponsorship_level: session.metadata?.sponsorshipLevel || '' }),
+          },
+        }
+
+        // Add phone if available
+        if (phone) {
+          contactData.phone = phone
+        }
+
+        // Add company name if available
+        if (company) {
+          contactData.companyName = company
+        }
+
+        // If we have a CRM contact ID from the metadata, update that contact
+        if (crmContactId) {
+          try {
+            await ghlRequest(`/contacts/${crmContactId}`, {
+              method: 'PUT',
+              body: JSON.stringify(contactData),
+            })
+            console.log(`Updated ${type} contact ${crmContactId} with payment info`)
+          } catch (updateError) {
+            markEventFailed(event.id)
+            console.error(`Failed to update ${type} contact:`, updateError)
+            // Return 500 to trigger Stripe retry - don't fall back to create duplicate
+            return NextResponse.json(
+              { error: 'Failed to update existing contact', received: false },
+              { status: 500 }
+            )
+          }
+        } else {
+          // Lookup existing contact by email
+          let existingContactId: string | null = null
+          try {
+            const lookup = await ghlRequest(
+              `/contacts/lookup?email=${encodeURIComponent(email)}`
+            )
+            existingContactId = lookup?.contacts?.[0]?.id || null
+          } catch {
+            // Contact not found — will create a new one below
+          }
+
+          try {
+            if (existingContactId) {
+              await ghlRequest(`/contacts/${existingContactId}`, {
+                method: 'PUT',
+                body: JSON.stringify(contactData),
+              })
+            } else {
+              await ghlRequest('/contacts/', {
+                method: 'POST',
+                body: JSON.stringify(contactData),
+              })
+            }
+          } catch (ghlError) {
+            markEventFailed(event.id)
+            console.error(`Failed to create/update ${type} contact:`, ghlError)
+            return NextResponse.json(
+              { error: 'Failed to process payment in CRM', received: false },
+              { status: 500 }
+            )
+          }
+        }
+
+        // Log successful payment processing
+        console.log(`Processed ${type} payment: ${session.id} for ${email}, amount: $${amount}`)
+      } catch (outerError) {
+        markEventFailed(event.id)
+        console.error(`Failed to update GHL contact after ${type} payment:`, outerError)
+        return NextResponse.json(
+          { error: 'Failed to process payment in CRM', received: false },
+          { status: 500 }
+        )
+      }
+      // Mark as processed only after successful GHL update
+      markEventProcessed(event.id)
+    } else {
+      // Missing email or type - log warning and mark processed to prevent infinite retries
+      console.warn(`Checkout session ${session.id} missing email or type in metadata, skipping CRM update`)
+      markEventProcessed(event.id)
     }
   }
 

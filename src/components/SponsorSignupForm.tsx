@@ -156,10 +156,27 @@ export default function SponsorSignupForm() {
       newErrors.zipCode = 'Please enter a valid ZIP code';
     }
 
+    // State validation (2-letter US state code) - case insensitive
+    if (formData.state) {
+      const stateRegex = /^[A-Z]{2}$/;
+      if (!stateRegex.test(formData.state.toUpperCase())) {
+        newErrors.state = 'Please enter a valid 2-letter state code';
+      }
+    }
+
     // Sponsorship Information
     if (!formData.sponsorshipLevel) newErrors.sponsorshipLevel = 'Please select a sponsorship level';
-    if (formData.sponsorshipLevel === 'custom' && !formData.customSponsorshipAmount) {
-      newErrors.customSponsorshipAmount = 'Please enter a custom sponsorship amount';
+    if (formData.sponsorshipLevel === 'custom') {
+      if (!formData.customSponsorshipAmount) {
+        newErrors.customSponsorshipAmount = 'Please enter a custom sponsorship amount';
+      } else {
+        const parsedAmount = parseFloat(formData.customSponsorshipAmount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+          newErrors.customSponsorshipAmount = 'Please enter a valid amount greater than $0';
+        } else if (parsedAmount > 100000) {
+          newErrors.customSponsorshipAmount = 'Amount cannot exceed $100,000';
+        }
+      }
     }
 
     // Website validation (optional but if provided, must be valid)
@@ -187,7 +204,8 @@ export default function SponsorSignupForm() {
     setSubmitMessage('');
 
     try {
-      const requestBody = {
+      // First, submit to CRM to capture the lead
+      const crmRequestBody = {
         type: 'sponsor',
         name: formData.contactName,
         email: formData.contactEmail,
@@ -206,23 +224,26 @@ export default function SponsorSignupForm() {
         additionalComments: formData.additionalComments,
         wantInvoice: formData.wantInvoice,
         event: 'chase-the-rainbow-5k-2026',
-        _gotcha: '' // Honeypot field
+        paymentStatus: formData.wantInvoice ? 'invoice_requested' : 'pending',
+        _gotcha: ''
       };
 
-      const response = await fetch('/api/crm', {
+      const crmResponse = await fetch('/api/crm', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(crmRequestBody),
       });
 
-      const result = await response.json();
+      const crmResult = await crmResponse.json();
 
-      if (result.success) {
+      if (!crmResponse.ok || !crmResult.success) {
+        throw new Error(crmResult.error || 'Failed to submit sponsorship application');
+      }
+
+      // If they want an invoice, skip Stripe and show success
+      if (formData.wantInvoice) {
         setSubmitStatus('success');
         setSubmitMessage('Thank you for your sponsorship interest! We will contact you soon with next steps and payment information.');
-        // Reset form
         setFormData({
           contactName: '',
           contactEmail: '',
@@ -242,14 +263,58 @@ export default function SponsorSignupForm() {
           agreeToPayment: false,
           wantInvoice: false
         });
-      } else {
-        setSubmitStatus('error');
-        setSubmitMessage(result.error || 'There was an error submitting your sponsorship application. Please try again or contact us directly.');
+        setIsSubmitting(false);
+        return;
       }
+
+      // Otherwise, create Stripe Checkout session for immediate payment
+      const checkoutResponse = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'sponsor',
+          sponsorshipLevel: formData.sponsorshipLevel,
+          customAmount: formData.customSponsorshipAmount,
+          email: formData.contactEmail,
+          name: formData.contactName,
+          company: formData.organizationName,
+          phone: formData.contactPhone,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          postalCode: formData.zipCode,
+          website: formData.website,
+          event: 'chase-the-rainbow-5k-2026',
+          metadata: {
+            contactTitle: formData.contactTitle,
+            organizationType: formData.organizationType,
+            additionalComments: formData.additionalComments,
+            crmContactId: crmResult.contactId || '',
+          },
+        }),
+      });
+
+      const checkoutResult = await checkoutResponse.json();
+
+      if (!checkoutResponse.ok || !checkoutResult.url) {
+        throw new Error(checkoutResult.error || 'Failed to create payment session');
+      }
+
+      // Redirect to Stripe Checkout
+      const checkoutUrl = checkoutResult.url;
+      try {
+        const url = new URL(checkoutUrl);
+        const allowedHosts = ['checkout.stripe.com', 'pay.stripe.com'];
+        if (!allowedHosts.includes(url.hostname) || url.protocol !== 'https:') {
+          throw new Error('Invalid checkout domain');
+        }
+      } catch {
+        throw new Error('Invalid checkout URL received');
+      }
+      window.location.href = checkoutUrl;
     } catch (error) {
       setSubmitStatus('error');
-      setSubmitMessage('There was an error submitting your sponsorship application. Please try again or contact us directly at info@katypride.org.');
-    } finally {
+      setSubmitMessage(error instanceof Error ? error.message : 'There was an error submitting your sponsorship application. Please try again or contact us directly at info@katypride.org.');
       setIsSubmitting(false);
     }
   };
@@ -484,7 +549,7 @@ export default function SponsorSignupForm() {
                     type="text"
                     value={formData.state}
                     onChange={(e) => handleInputChange('state', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 uppercase ${
                       errors.state ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="TX"

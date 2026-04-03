@@ -130,12 +130,14 @@ export default function EventsPage() {
 
   useEffect(() => {
     const run = async () => {
+      // Cache key defined here so it's available in both try and catch blocks
+      const cacheKey = 'strapi-events-cache'
+      
       try {
         setLoadingStrapi(true)
         setStrapiError(null)
         
         // Check cache first (5-minute cache)
-        const cacheKey = 'strapi-events-cache'
         const cachedData = sessionStorage.getItem(cacheKey)
         
         if (cachedData) {
@@ -143,9 +145,15 @@ export default function EventsPage() {
             const { events, timestamp, source } = JSON.parse(cachedData)
             const now = Date.now()
             
-            // Use only successful Strapi cache if less than 5 minutes old.
-            // Legacy entries (without source) and fallback cache are ignored.
-            if (source === 'strapi' && now - timestamp < 300000) {
+            // Use only successful API cache if less than 5 minutes old.
+            if (source === 'api' && now - timestamp < 300000) {
+              setStrapiEvents(events)
+              setLoadingStrapi(false)
+              return
+            }
+            
+            // Use fallback cache only if less than 1 minute old
+            if (source === 'fallback' && now - timestamp < 60000) {
               setStrapiEvents(events)
               setLoadingStrapi(false)
               return
@@ -158,10 +166,16 @@ export default function EventsPage() {
           }
         }
         
-        // Fetch fresh data
-        const events = await strapiClient.getEvents()
+        // Fetch fresh data from our API route (server has access to token)
+        const response = await fetch('/api/events')
         
-        // Add static coffee meet-up if no events from Strapi
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`)
+        }
+        
+        const events = await response.json()
+        
+        // Add static coffee meet-up if no events from API
         const eventsWithFallback = events.length === 0 ? [createStaticCoffeeMeetup()] : events
         
         setStrapiEvents(eventsWithFallback)
@@ -171,7 +185,7 @@ export default function EventsPage() {
           sessionStorage.setItem(cacheKey, JSON.stringify({
             events: eventsWithFallback,
             timestamp: Date.now(),
-            source: 'strapi'
+            source: 'api'
           }))
         } catch (cacheError) {
           console.warn('Failed to cache events:', cacheError)
@@ -179,13 +193,13 @@ export default function EventsPage() {
         
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : 'Unknown error'
-        console.warn('Failed to load events from Strapi:', errorMessage)
+        console.warn('Failed to load events:', errorMessage)
         setStrapiError(errorMessage)
-        // Use fallback events when Strapi is down
+        // Use fallback events when API is down
         const fallbackEvents = [createStaticCoffeeMeetup()]
         setStrapiEvents(fallbackEvents)
 
-        // Cache fallback with shorter TTL (1 minute) to retry Strapi soon
+        // Cache fallback with shorter TTL (1 minute) to retry soon
         try {
           sessionStorage.setItem(cacheKey, JSON.stringify({
             events: fallbackEvents,
@@ -379,16 +393,22 @@ export default function EventsPage() {
                   key={event.id}
                   className={`overflow-hidden rounded-xl sm:rounded-2xl border bg-white shadow-sm border-l-4 sm:border-l-8 ${accent.stripe} ${accent.border}`}
                 >
-                  <div className="relative bg-white">
+                  <div className="relative bg-gray-100">
                     {event.imageSrc ? (
                       <img
                         src={event.imageSrc}
                         alt={event.imageAlt}
                         className="block w-full h-auto"
                         loading="lazy"
+                        onError={(e) => {
+                          const target = e.target;
+                          if (target instanceof HTMLImageElement) {
+                            target.style.display = 'none';
+                          }
+                        }}
                       />
                     ) : (
-                      <div className="w-full bg-white" style={{ paddingTop: '56.25%' }} />
+                      <div className="w-full bg-gray-100" style={{ paddingTop: '56.25%' }} />
                     )}
 
                     <div className="absolute left-2 sm:left-3 top-2 sm:top-3 rounded-md bg-[#feef4a] px-2 sm:px-3 py-1 sm:py-1.5 shadow-sm">

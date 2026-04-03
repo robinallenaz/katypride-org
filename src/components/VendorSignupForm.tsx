@@ -49,6 +49,7 @@ export default function VendorSignupForm() {
     agreeToTexts: false,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [submitMessage, setSubmitMessage] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isRequirementsOpen, setIsRequirementsOpen] = useState(true);
@@ -133,11 +134,23 @@ export default function VendorSignupForm() {
       return;
     }
     
+    // Capture current form values to prevent race conditions
+    const currentFormData = { ...formData };
+    const currentVendorTypeValue = currentFormData.vendorType;
+    const currentVendorType = vendorTypes.find(v => v.value === currentVendorTypeValue);
+    
+    // Check if vendor type is selected and has a price
+    if (!currentVendorType || currentVendorType.price <= 0) {
+      setSubmitMessage('Please select a valid vendor type.');
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitMessage('');
 
     try {
-      const response = await fetch('/api/crm', {
+      // First, submit to CRM to capture the lead
+      const crmResponse = await fetch('/api/crm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -153,38 +166,65 @@ export default function VendorSignupForm() {
           postalCode: formData.postalCode,
           website: formData.website,
           socialMedia: formData.socialMedia,
-          vendorType: formData.vendorType,
-          vendor_fee: selectedVendorType?.price,
-          productsservices: formData.productsServices,
+          vendorType: currentVendorTypeValue,
+          vendor_fee: currentVendorType.price,
+          productsServices: formData.productsServices,
+          paymentStatus: 'pending',
         }),
       });
 
-      const result = await response.json();
+      const crmResult = await crmResponse.json();
 
-      if (response.ok && result.success) {
-        setSubmitMessage('Thank you for your vendor application! A contract will be sent to your email after payment is processed. Please check your email for next steps.');
-        setFormData({
-          company: '',
-          address: '',
-          city: '',
-          state: '',
-          postalCode: '',
-          website: '',
-          socialMedia: '',
-          firstName: '',
-          lastName: '',
-          email: '',
-          phone: '',
-          vendorType: '',
-          productsServices: '',
-          agreeToTexts: false,
-        });
-      } else {
-        throw new Error(result.error || 'Submission failed');
+      if (!crmResponse.ok || !crmResult.success) {
+        throw new Error(crmResult.error || 'Failed to submit application');
       }
+
+      // Then, create Stripe Checkout session
+      const checkoutResponse = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'vendor',
+          vendorType: currentVendorTypeValue,
+          email: currentFormData.email,
+          name: `${currentFormData.firstName} ${currentFormData.lastName}`,
+          company: currentFormData.company,
+          phone: currentFormData.phone,
+          address: currentFormData.address,
+          city: currentFormData.city,
+          state: currentFormData.state,
+          postalCode: currentFormData.postalCode,
+          website: currentFormData.website,
+          event: 'katy-pride-celebration-2026',
+          metadata: {
+            productsServices: currentFormData.productsServices,
+            socialMedia: currentFormData.socialMedia,
+            crmContactId: crmResult.contactId || '',
+          },
+        }),
+      });
+
+      const checkoutResult = await checkoutResponse.json();
+
+      if (!checkoutResponse.ok || !checkoutResult.url) {
+        throw new Error(checkoutResult.error || 'Failed to create payment session');
+      }
+
+      // Redirect to Stripe Checkout
+      const checkoutUrl = checkoutResult.url;
+      try {
+        const url = new URL(checkoutUrl);
+        const allowedHosts = ['checkout.stripe.com', 'pay.stripe.com'];
+        if (!allowedHosts.includes(url.hostname) || url.protocol !== 'https:') {
+          throw new Error('Invalid checkout domain');
+        }
+      } catch {
+        throw new Error('Invalid checkout URL received');
+      }
+      window.location.href = checkoutUrl;
     } catch (error) {
-      setSubmitMessage(`Error: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`);
-    } finally {
+      setSubmitStatus('error');
+      setSubmitMessage(error instanceof Error ? error.message : 'An unexpected error occurred');
       setIsSubmitting(false);
     }
   };
@@ -579,7 +619,7 @@ export default function VendorSignupForm() {
 
           {submitMessage && (
             <div className={`mt-4 p-4 rounded-md text-sm w-full ${
-              submitMessage.includes('Error')
+              submitStatus === 'error'
                 ? 'bg-red-100 text-red-700'
                 : 'bg-green-100 text-green-700'
             }`}>

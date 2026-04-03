@@ -18,7 +18,13 @@ const isValidUrl = (url: string): boolean => {
 }
 
 const StrapiRichText: React.FC<StrapiRichTextProps> = ({ content, className = '' }) => {
-  if (!content || !Array.isArray(content)) {
+  // Handle document wrapper format { type: 'doc', children: [...] }
+  let normalizedContent = content
+  if (content && typeof content === 'object' && !Array.isArray(content) && content.type === 'doc' && Array.isArray(content.children)) {
+    normalizedContent = content.children
+  }
+
+  if (!normalizedContent || !Array.isArray(normalizedContent)) {
     return null
   }
 
@@ -27,26 +33,40 @@ const StrapiRichText: React.FC<StrapiRichTextProps> = ({ content, className = ''
 
     // Handle text nodes
     if (node.type === 'text') {
-      let text = node.text || ''
+      let text: React.ReactNode = node.text || ''
       
-      // Apply text formatting
-      if (node.bold) {
-        text = <strong key={index}>{text}</strong>
+      // Build a single wrapper with all formatting applied
+      // This avoids nested fragment issues with multiple formats
+      const formatting: string[] = []
+      if (node.bold) formatting.push('bold')
+      if (node.italic) formatting.push('italic')
+      if (node.underline) formatting.push('underline')
+      if (node.strikethrough) formatting.push('strikethrough')
+      if (node.code) formatting.push('code')
+      
+      if (formatting.length === 0) {
+        return <span key={index}>{text}</span>
       }
-      if (node.italic) {
-        text = <em key={index}>{text}</em>
-      }
-      if (node.underline) {
-        text = <u key={index}>{text}</u>
+      
+      // Apply formatting from outermost to innermost
+      // Order: code (innermost) -> bold/italic/underline/strikethrough
+      if (node.code) {
+        text = <code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{text}</code>
       }
       if (node.strikethrough) {
-        text = <s key={index}>{text}</s>
+        text = <s>{text}</s>
       }
-      if (node.code) {
-        text = <code key={index} className="bg-gray-100 px-1 py-0.5 rounded text-sm">{text}</code>
+      if (node.underline) {
+        text = <u>{text}</u>
       }
-
-      return text
+      if (node.italic) {
+        text = <em>{text}</em>
+      }
+      if (node.bold) {
+        text = <strong>{text}</strong>
+      }
+      
+      return <span key={index}>{text}</span>
     }
 
     // Handle paragraph
@@ -210,7 +230,7 @@ const StrapiRichText: React.FC<StrapiRichTextProps> = ({ content, className = ''
 
   return (
     <div className="prose prose-sm max-w-none">
-      {content.map((node: any, index: number) => renderNode(node, index))}
+      {normalizedContent.map((node: any, index: number) => renderNode(node, index))}
     </div>
   )
 }

@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   }
 
   const stripe = new Stripe(stripeKey, {
-    apiVersion: '2024-11-20.acacia',
+    apiVersion: '2026-03-25.dahlia',
   })
 
   try {
@@ -20,15 +20,15 @@ export async function POST(request: Request) {
     }
 
     // payment_method_types and automatic_payment_methods are mutually exclusive in Stripe
-    const paymentMethodConfig = payment_method_type === 'card'
-      ? { payment_method_types: ['card'] as const }
-      : { automatic_payment_methods: { enabled: true } as const }
+    const paymentMethodTypes = payment_method_type === 'card' ? ['card'] : undefined
+    const automaticPaymentMethods = payment_method_type !== 'card' ? { enabled: true } : undefined
 
     // Create payment intent with metadata for CRM tracking
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100), // Convert to cents
       currency,
-      ...paymentMethodConfig,
+      ...(paymentMethodTypes && { payment_method_types: paymentMethodTypes }),
+      ...(automaticPaymentMethods && { automatic_payment_methods: automaticPaymentMethods }),
       metadata: {
         donor_email: String(donor_email || ''),
         donor_name: String(donor_name || ''),
