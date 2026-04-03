@@ -180,9 +180,13 @@ export default function EventsPage() {
         }
         
         const events = await response.json()
+        console.log('[Events] API returned', events.length, 'events:', events.map((e: any) => e.title))
         
-        // Add static coffee meet-up if no events from API
-        const eventsWithFallback = events.length === 0 ? [createStaticCoffeeMeetup()] : events
+        // Always add static coffee meet-up to ensure recurring events appear
+        const coffeeMeetup = createStaticCoffeeMeetup()
+        console.log('[Events] Created coffee meetup:', coffeeMeetup.title, coffeeMeetup.start)
+        const eventsWithFallback = [...events, coffeeMeetup]
+        console.log('[Events] Combined events:', eventsWithFallback.length, eventsWithFallback.map((e: any) => e.title))
         
         setStrapiEvents(eventsWithFallback)
         
@@ -225,7 +229,9 @@ export default function EventsPage() {
   }, [])
 
   const strapiEventItems: EventItem[] = useMemo(() => {
+    console.log('[Events] Processing', strapiEvents.length, 'events:', strapiEvents.map(e => ({ title: e.title, isRecurring: e.isRecurring, start: e.start })))
     const processedEvents = processEventsWithRecurrences(strapiEvents)
+    console.log('[Events] Processed events:', processedEvents.length, processedEvents.map(e => ({ title: e.title, start: e.start })))
     
     return processedEvents.map((event) => {
       const imageSrc = event.image ? strapiClient.getImageUrlWithSize(event.image, 'large') : undefined

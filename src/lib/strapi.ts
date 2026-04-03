@@ -188,9 +188,13 @@ class StrapiClient {
   async getEvents(): Promise<StrapiEvent[]> {
     // Use UTC time for consistent filtering regardless of server timezone
     const now = encodeURIComponent(new Date().toISOString())
-    const response = await this.request<StrapiResponse<StrapiEvent>>(
-      `/events?filters[published][$eq]=true&filters[$or][0][start][$gte]=${now}&filters[$or][1][isRecurring][$eq]=true&filters[$or][1][$or][0][recurrenceEndDate][$null]=true&filters[$or][1][$or][1][recurrenceEndDate][$gte]=${now}&sort=start:asc&populate=image`
-    )
+    
+    // Debug: Log the query URL
+    const queryUrl = `/events?filters[publishedAt][$notNull]=true&filters[$or][0][start][$gte]=${now}&filters[$or][1][isRecurring][$eq]=true&filters[$or][1][$or][0][recurrenceEndDate][$null]=true&filters[$or][1][$or][1][recurrenceEndDate][$gte]=${now}&sort=start:asc&populate=image`
+    console.log('[Strapi] Events query:', queryUrl)
+    
+    const response = await this.request<StrapiResponse<StrapiEvent>>(queryUrl)
+    console.log(`[Strapi] Raw response: ${response.data.length} events`)
     return response.data
   }
 
