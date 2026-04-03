@@ -7,7 +7,7 @@ export default async function CalendarPage() {
   const settings = await getCalendarSettings()
 
   // Fallback to hardcoded values if no settings found
-  const calendarId = settings?.calendarId || 'c_4489e0e539da4cb7b0a54b0aae11ab9e581f93a23e897f71f1d56abbb5909ea9@group.calendar.google.com'
+  const calendarId = settings?.calendarId || 'c_dfbe56dae657aa4dd69c1bb10dada001e25ea91175cf28d65ce45abfcde10144@group.calendar.google.com'
   const timeZone = settings?.timeZone || 'America/Chicago'
   const calendarTitle = settings?.calendarTitle || 'Calendar'
   const calendarDescription = settings?.calendarDescription || 'View upcoming Katy Pride events and add them to your own calendar.'
