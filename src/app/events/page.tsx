@@ -400,7 +400,14 @@ export default function EventsPage() {
                   className={`overflow-hidden rounded-xl sm:rounded-2xl border bg-white shadow-sm border-l-4 sm:border-l-8 ${accent.stripe} ${accent.border}`}
                 >
                   <div className="relative bg-gray-100">
-                    {event.imageSrc ? (
+                    {event.eventCategory === 'coffee' ? (
+                      <img
+                        src="/espresso-yourself-new-graphic.jpg"
+                        alt="Espresso Yourself Coffee Meetup"
+                        className="block w-full h-auto"
+                        loading="lazy"
+                      />
+                    ) : event.imageSrc ? (
                       <img
                         src={event.imageSrc}
                         alt={event.imageAlt}
@@ -417,30 +424,23 @@ export default function EventsPage() {
                       <div className="w-full bg-gray-100" style={{ paddingTop: '56.25%' }} />
                     )}
 
-                    <div className="absolute left-2 sm:left-3 top-2 sm:top-3 rounded-md bg-[#feef4a] px-2 sm:px-3 py-1 sm:py-1.5 shadow-sm">
-                      <span className="font-heading text-xs sm:text-sm font-bold tracking-wide text-black">
-                        {formatBadgeDate(startDate)}
-                      </span>
-                    </div>
-
                     {label && (
-                      <div className="absolute right-2 sm:right-3 top-2 sm:top-3 rounded-full border border-black/70 bg-white px-2.5 sm:px-3.5 py-1 sm:py-1.5 shadow-md">
+                      <div className="absolute right-2 sm:right-3 top-2 sm:top-3 rounded-full border border-black/70 bg-white px-2.5 sm:px-3.5 py-1 sm:py-1.5 shadow-md z-10">
                         <span className="font-heading text-xs sm:text-sm font-extrabold tracking-wide text-gray-900">
                           {label}
-                        </span>
-                      </div>
-                    )}
-
-                    {event.isRecurring && (
-                      <div className="absolute right-2 sm:right-3 top-10 sm:top-14 rounded-full border border-purple-500/50 bg-purple-100 px-2 sm:px-3 py-0.5 sm:py-1 shadow-md">
-                        <span className="font-heading text-xs sm:text-xs font-semibold tracking-wide text-purple-700">
-                          🔄 Recurring
                         </span>
                       </div>
                     )}
                   </div>
 
                   <div className="p-4 sm:p-5">
+                    {/* Date Badge - moved to content area to prevent overlap */}
+                    <div className="inline-flex items-center rounded-md bg-[#feef4a] px-2 sm:px-3 py-1 sm:py-1.5 shadow-sm mb-3">
+                      <span className="font-heading text-xs sm:text-sm font-bold tracking-wide text-black">
+                        {formatBadgeDate(startDate)}
+                      </span>
+                    </div>
+
                     <h2 className="font-heading text-lg sm:text-xl font-bold text-[#760088]">{event.title}</h2>
 
                     <dl className="mt-3 grid gap-1 text-gray-800">

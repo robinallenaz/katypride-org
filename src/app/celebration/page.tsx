@@ -87,6 +87,36 @@ export default async function CelebrationPage() {
           </div>
         </div>
 
+        {/* Photo Gallery */}
+        <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-purple-100/20 shadow-xl p-8 md:p-10 mt-8">
+          <h2 className="font-heading text-2xl md:text-3xl font-bold text-[#760088] mb-6 text-center">
+            Celebration Photos
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative rounded-xl overflow-hidden shadow-md aspect-[3/4]">
+              <img
+                src="/carousel/3-Attendees-At-Celebration.jpg"
+                alt="Attendees at Katy Pride Celebration"
+                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+            <div className="relative rounded-xl overflow-hidden shadow-md aspect-[3/4]">
+              <img
+                src="/carousel/DJ-Krazy-V.jpg"
+                alt="DJ Krazy V at Katy Pride"
+                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+            <div className="relative rounded-xl overflow-hidden shadow-md aspect-[3/4]">
+              <img
+                src="/carousel/katy-pride-volunteers.jpg"
+                alt="Katy Pride Volunteers"
+                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* 2026 Sponsors */}
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-black/5 shadow-xl p-8 md:p-10 mt-8">
           <h2 className="font-heading text-3xl md:text-4xl font-bold text-[#760088] mb-8 text-center">

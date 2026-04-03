@@ -230,7 +230,7 @@ export default function TwoStepDonationForm({ onSuccess, className = '' }: TwoSt
                   value={formData.name}
                   onChange={handleInputChange}
                   required
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder:text-gray-500 ${
                     errors.name ? 'border-red-500' : ''
                   }`}
                   placeholder="John Doe"
@@ -249,7 +249,7 @@ export default function TwoStepDonationForm({ onSuccess, className = '' }: TwoSt
                   value={formData.email}
                   onChange={handleInputChange}
                   required
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder:text-gray-500 ${
                     errors.email ? 'border-red-500' : ''
                   }`}
                   placeholder="john@example.com"
@@ -268,7 +268,7 @@ export default function TwoStepDonationForm({ onSuccess, className = '' }: TwoSt
                   value={formData.phone}
                   onChange={handleInputChange}
                   required
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder:text-gray-500 ${
                     errors.phone ? 'border-red-500' : ''
                   }`}
                   placeholder="(555) 123-4567"
@@ -306,7 +306,7 @@ export default function TwoStepDonationForm({ onSuccess, className = '' }: TwoSt
                 value={formData.address}
                 onChange={handleInputChange}
                 required
-                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder:text-gray-500 ${
                   errors.address ? 'border-red-500' : ''
                 }`}
                 placeholder="123 Main Street"
@@ -326,7 +326,7 @@ export default function TwoStepDonationForm({ onSuccess, className = '' }: TwoSt
                   value={formData.city}
                   onChange={handleInputChange}
                   required
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder:text-gray-500 ${
                     errors.city ? 'border-red-500' : ''
                   }`}
                   placeholder="Katy"
@@ -346,7 +346,7 @@ export default function TwoStepDonationForm({ onSuccess, className = '' }: TwoSt
                   onChange={handleInputChange}
                   required
                   maxLength={2}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent uppercase ${
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder:text-gray-500 uppercase ${
                     errors.state ? 'border-red-500' : ''
                   }`}
                   placeholder="TX"
@@ -365,7 +365,7 @@ export default function TwoStepDonationForm({ onSuccess, className = '' }: TwoSt
                   value={formData.postalCode}
                   onChange={handleInputChange}
                   required
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder:text-gray-500 ${
                     errors.postalCode ? 'border-red-500' : ''
                   }`}
                   placeholder="77494"
@@ -504,7 +504,7 @@ export default function TwoStepDonationForm({ onSuccess, className = '' }: TwoSt
                       min="1"
                       step="0.01"
                       placeholder="Enter amount"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder:text-gray-500"
                     />
                   </div>
                 )}

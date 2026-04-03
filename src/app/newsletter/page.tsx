@@ -135,7 +135,7 @@ export default function NewsletterPage() {
                 info@katypride.org
               </a>
               <a 
-                href="https://www.instagram.com/katyprielgbtq" 
+                href="https://www.instagram.com/katypridelgbtq" 
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold px-6 py-3 rounded-full hover:from-purple-600 hover:to-pink-600 transition-colors gap-2"

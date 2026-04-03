@@ -33,7 +33,9 @@ export default function Home() {
                 <span className="mt-0.5 text-xs sm:text-sm font-normal text-white/90">Support our mission</span>
               </a>
               <a
-                href="/volunteer"
+                href="https://raceroster.com/events/2026/116853/chase-the-rainbow-stride-with-pride/volunteer/register"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="font-heading inline-flex min-w-[200px] sm:min-w-[240px] flex-col items-center justify-center rounded-full bg-white text-[#760088] border border-purple-100/50 px-6 sm:px-7 py-3 font-semibold transition-all hover:bg-[#EEEDFE] focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-100 focus-visible:ring-offset-2 focus-visible:ring-offset-white text-sm sm:text-base"
               >
                 <span>Volunteer at Katy Pride</span>
@@ -50,6 +52,30 @@ export default function Home() {
             </div>
           </div>
         </header>
+
+        {/* Banner Image Section - Moved to top as requested */}
+        <section className="relative z-10 max-w-6xl mx-auto px-4 mb-6 md:mb-8">
+          <a
+            href="/donate"
+            className="block relative rounded-2xl overflow-hidden shadow-xl bg-gradient-to-r from-[#760088] via-purple-600 to-indigo-600 hover:shadow-2xl transition-shadow group"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-[#760088]/90 via-purple-600/90 to-indigo-600/90"></div>
+            <div className="relative px-6 py-8 md:py-10 text-center">
+              <h2 className="font-heading text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-2">
+                Donate to Katy Pride
+              </h2>
+              <p className="text-white/90 text-sm md:text-base mb-4 max-w-xl mx-auto">
+                Your support helps us create inclusive events and advocate for equality in Katy and West Houston
+              </p>
+              <span className="inline-flex items-center justify-center bg-white text-[#760088] px-6 py-2.5 rounded-full font-semibold text-sm md:text-base group-hover:bg-white/90 transition-colors">
+                Make a Donation
+                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </span>
+            </div>
+          </a>
+        </section>
 
         <main id="main-content" className="relative z-10 max-w-6xl mx-auto px-4 py-8 md:py-12">
           {/* About Katy Pride Section */}
@@ -221,7 +247,7 @@ export default function Home() {
           </section>
 
           {/* Carousel Section */}
-          <section aria-label="Photo Gallery" role="region" className="mb-8 md:mb-12">
+          <section aria-label="Photo Gallery" role="region" className="mb-6 md:mb-8">
             <Carousel />
           </section>
         </main>

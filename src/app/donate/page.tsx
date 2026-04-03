@@ -97,7 +97,7 @@ export default function DonatePage() {
               
               <div className="flex justify-center space-x-4 mt-4">
                 <a 
-                  href="https://www.instagram.com/katyprielgbtq" 
+                  href="https://www.instagram.com/katypridelgbtq" 
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-purple-600 hover:text-purple-700"

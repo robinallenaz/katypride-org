@@ -33,6 +33,24 @@ export default function AboutPage() {
 
           <section className="mt-10">
             <h2 className="font-heading text-2xl md:text-3xl font-bold text-[#760088] mb-4">
+              Our Board
+            </h2>
+            <div className="max-w-2xl mx-auto">
+              <div className="relative rounded-xl overflow-hidden shadow-xl aspect-[16/9]">
+                <img
+                  src="/katy-pride-board.jpg"
+                  alt="Katy Pride Board Members"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <p className="text-center text-gray-600 mt-4 text-sm">
+                The dedicated board members behind Katy Pride
+              </p>
+            </div>
+          </section>
+
+          <section className="mt-10">
+            <h2 className="font-heading text-2xl md:text-3xl font-bold text-[#760088] mb-4">
               Pronouns Matter: Our Commitment to Respect
             </h2>
             <p className="text-lg text-gray-800 leading-relaxed max-w-3xl">
