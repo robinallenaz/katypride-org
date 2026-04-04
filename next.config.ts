@@ -11,16 +11,21 @@ const nextConfig: NextConfig = {
   basePath: isStaticExport ? process.env.NEXT_PUBLIC_BASE_PATH || "" : "",
   assetPrefix: isStaticExport ? process.env.NEXT_PUBLIC_BASE_PATH || "" : "",
   async rewrites() {
+    const strapiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'https://katypride-org.onrender.com'
     return [
       {
         source: '/admin/:path*',
-        destination: `${process.env.NEXT_PUBLIC_STRAPI_URL || 'https://katypride-strapi.onrender.com'}/admin/:path*`,
+        destination: `${strapiUrl}/admin/:path*`,
       },
       {
         source: '/api/strapi/:path*',
-        destination: `${process.env.NEXT_PUBLIC_STRAPI_URL || 'https://katypride-strapi.onrender.com'}/api/:path*`,
+        destination: `${strapiUrl}/api/:path*`,
       },
-    ];
+      {
+        source: '/uploads/:path*',
+        destination: `${strapiUrl}/uploads/:path*`,
+      },
+    ]
   },
 };
 

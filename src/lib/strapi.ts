@@ -1,5 +1,6 @@
 const STRAPI_URL = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337'
 const STRAPI_API_TOKEN = process.env.STRAPI_API_TOKEN || ''
+const IS_STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "true"
 
 // Validate environment variables at startup
 if (process.env.NODE_ENV === 'production' && (!STRAPI_URL || STRAPI_URL === 'http://localhost:1337')) {
@@ -137,8 +138,6 @@ class StrapiClient {
     // Debug logging (remove in production)
     if (process.env.NODE_ENV === 'development') {
       console.log(`Strapi Request: ${url}`)
-      console.log(`Token exists: ${!!STRAPI_API_TOKEN}`)
-      console.log(`Token length: ${STRAPI_API_TOKEN?.length || 0}`)
     }
 
     try {
@@ -220,33 +219,49 @@ class StrapiClient {
   }
 
   getImageUrl(image: StrapiImage): string {
-    if (image.url.startsWith('http')) {
-      return image.url
+    // Handle missing/empty URL
+    if (!image?.url) {
+      return ''
     }
     if (image.provider === 'hardcoded') {
       return image.url
     }
-    // Remove leading slash from image.url to prevent double slashes
-    const cleanImageUrl = image.url.startsWith('/') ? image.url.slice(1) : image.url
-    // Remove trailing slash from baseUrl to prevent double slashes
-    const cleanBaseUrl = this.baseUrl.endsWith('/') ? this.baseUrl.slice(0, -1) : this.baseUrl
-    return `${cleanBaseUrl}/${cleanImageUrl}`
+    if (image.url.startsWith('http')) {
+      if (IS_STATIC_EXPORT) return image.url
+      try {
+        const urlPath = new URL(image.url).pathname
+        return urlPath.startsWith('/uploads/') ? urlPath : image.url
+      } catch {
+        console.warn('[Strapi] Invalid image URL:', image.url)
+        return image.url
+      }
+    }
+    const relativePath = image.url.startsWith('/') ? image.url : `/${image.url}`
+    return IS_STATIC_EXPORT ? `${STRAPI_URL}${relativePath}` : relativePath
   }
 
   getImageUrlWithSize(image: StrapiImage, size: 'thumbnail' | 'small' | 'medium' | 'large' = 'medium'): string {
+    // Handle missing/empty URL
+    if (!image?.url) {
+      return ''
+    }
     if (image.formats && image.formats[size]) {
       const format = image.formats[size]
-      if (format.url.startsWith('http')) {
-        return format.url
-      }
       if (image.provider === 'hardcoded') {
         return format.url
       }
-      // Remove leading slash from format.url to prevent double slashes
-      const cleanFormatUrl = format.url.startsWith('/') ? format.url.slice(1) : format.url
-      // Remove trailing slash from baseUrl to prevent double slashes
-      const cleanBaseUrl = this.baseUrl.endsWith('/') ? this.baseUrl.slice(0, -1) : this.baseUrl
-      return `${cleanBaseUrl}/${cleanFormatUrl}`
+      if (format.url.startsWith('http')) {
+        if (IS_STATIC_EXPORT) return format.url
+        try {
+          const urlPath = new URL(format.url).pathname
+          return urlPath.startsWith('/uploads/') ? urlPath : format.url
+        } catch {
+          console.warn('[Strapi] Invalid format URL:', format.url)
+          return format.url
+        }
+      }
+      const relativePath = format.url.startsWith('/') ? format.url : `/${format.url}`
+      return IS_STATIC_EXPORT ? `${STRAPI_URL}${relativePath}` : relativePath
     }
     return this.getImageUrl(image)
   }
