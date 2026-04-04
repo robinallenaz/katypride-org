@@ -53,6 +53,11 @@ export default function Home() {
           </div>
         </header>
 
+        {/* Carousel Section */}
+        <section aria-label="Photo Gallery" role="region" className="relative z-10 max-w-6xl mx-auto px-4 mb-6 md:mb-8">
+          <Carousel />
+        </section>
+
         {/* Banner Image Section */}
         <section className="relative z-10 max-w-6xl mx-auto px-4 mb-6 md:mb-8">
           <a
@@ -75,11 +80,6 @@ export default function Home() {
               </span>
             </div>
           </a>
-        </section>
-
-        {/* Carousel Section - Moved up for visibility */}
-        <section aria-label="Photo Gallery" role="region" className="relative z-10 max-w-6xl mx-auto px-4 mb-6 md:mb-8">
-          <Carousel />
         </section>
 
         <main id="main-content" className="relative z-10 max-w-6xl mx-auto px-4 py-8 md:py-12">
