@@ -5,15 +5,13 @@ const isDev = process.env.NODE_ENV === 'development'
 
 export async function GET() {
   try {
-    if (isDev) {
-      console.log('[Events API] STRAPI_URL:', process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337 (default)')
-      console.log('[Events API] Token exists:', !!process.env.STRAPI_API_TOKEN)
-    }
+    // Log in both dev and production for debugging
+    console.log('[Events API] STRAPI_URL:', process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337 (default)')
+    console.log('[Events API] Token exists:', !!process.env.STRAPI_API_TOKEN)
+    console.log('[Events API] Token length:', process.env.STRAPI_API_TOKEN?.length || 0)
     
     const events = await strapiClient.getEvents()
-    if (isDev) {
-      console.log(`[Events API] Fetched ${events.length} events`)
-    }
+    console.log(`[Events API] Fetched ${events.length} events`)
     
     // Log image details for debugging (development only)
     if (isDev) {
@@ -33,9 +31,14 @@ export async function GET() {
     return NextResponse.json(events)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    // Log in both dev and production for debugging
+    console.error('[Events API] Failed to fetch events:', errorMessage)
+    if (!isDev) {
+      console.error('[Events API] STRAPI_URL used:', process.env.NEXT_PUBLIC_STRAPI_URL)
+      console.error('[Events API] Token configured:', !!process.env.STRAPI_API_TOKEN)
+    }
     if (isDev) {
       const errorStack = error instanceof Error ? error.stack : ''
-      console.error('[Events API] Failed to fetch events:', errorMessage)
       console.error('[Events API] Stack:', errorStack)
     }
     
