@@ -1,7 +1,8 @@
 {
   "build": {
     "env": {
-      "NEXT_PUBLIC_STRAPI_URL": "https://katypride-strapi.onrender.com"
+      "NEXT_PUBLIC_STRAPI_URL": "https://katypride-org.onrender.com",
+      "STRAPI_API_TOKEN": "f5837613cda230ce2bbcfaeb4da620b554d5a1d28359a30d73f26f19cc99f9238a6e17c329b99516f377ff88e2a42e9eceef7ea3f2545e802edb3cfdad5babae60ffb9157a051b598f9a6cb0709917a42331bdac47968f84d10c88c6eeb73a4d0296298187facd4bd518f8427d33a64b8bfc4edd8fdafd72b00291cb5b072551"
     }
   }
 }
