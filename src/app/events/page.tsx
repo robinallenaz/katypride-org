@@ -1,6 +1,6 @@
  'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { strapiClient, type StrapiEvent } from '@/lib/strapi'
 import { processEventsWithRecurrences, type GeneratedEvent } from '@/lib/recurring-events'
 import StrapiRichText from '@/components/StrapiRichText'
@@ -14,11 +14,19 @@ type EventItem = {
   externalUrl?: string
   externalCtaLabel?: string
   imageSrc?: string
+  imageSrcOriginal?: string // fallback URL without size formatting
   imageAlt: string
   summary?: any // Strapi blocks content
   eventCategory?: 'general' | 'coffee' | 'social' | 'fundraising' | 'advocacy' | 'education' | 'health' | 'youth' | 'pride' | 'volunteer' | 'cultural' | 'community'
   isRecurring?: boolean
   parentId?: string
+}
+
+// Image state tracking for proper React state management
+type ImageState = {
+  src: string
+  error: boolean
+  triedFallback: boolean
 }
 
 // Helper function to get next Sunday
@@ -81,6 +89,61 @@ const createStaticCoffeeMeetup = (): StrapiEvent => {
   }
 }
 
+// Proper React component for event images with state-based error handling
+function EventImage({ src, srcOriginal, alt }: { src: string; srcOriginal?: string; alt: string }) {
+  const [imageState, setImageState] = useState<ImageState>({
+    src,
+    error: false,
+    triedFallback: false
+  })
+
+  // If src prop changes, reset the state
+  useEffect(() => {
+    setImageState({
+      src,
+      error: false,
+      triedFallback: false
+    })
+  }, [src])
+
+  const handleError = () => {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[Events] Failed to load image:', imageState.src)
+    }
+
+    // Try fallback to original URL if sized version fails
+    setImageState(prev => {
+      if (!prev.triedFallback && srcOriginal && srcOriginal !== prev.src) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Events] Trying original image fallback:', srcOriginal)
+        }
+        return {
+          src: srcOriginal,
+          error: false,
+          triedFallback: true
+        }
+      }
+
+      // No fallback available or fallback also failed
+      return { ...prev, error: true }
+    })
+  }
+
+  if (imageState.error) {
+    return <div className="w-full bg-gray-100" style={{ paddingTop: '56.25%' }} />
+  }
+
+  return (
+    <img
+      src={imageState.src}
+      alt={alt}
+      className="block w-full h-auto"
+      loading="lazy"
+      onError={handleError}
+    />
+  )
+}
+
 export default function EventsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState<string>('')
@@ -138,6 +201,8 @@ export default function EventsPage() {
     const run = async () => {
       // Cache key defined here so it's available in both try and catch blocks
       const cacheKey = 'strapi-events-cache'
+      // Create static coffee meetup once to reuse in both paths
+      const staticCoffeeMeetup = createStaticCoffeeMeetup()
       
       try {
         setLoadingStrapi(true)
@@ -179,13 +244,19 @@ export default function EventsPage() {
           throw new Error(`API error: ${response.status}`)
         }
         
-        const events = await response.json()
+        const data = await response.json()
+        
+        // Validate response is an array (API returns { error } on failure)
+        if (!Array.isArray(data)) {
+          throw new Error(data.error || 'Invalid response format from events API')
+        }
+        
+        const events = data
         console.log('[Events] API returned', events.length, 'events:', events.map((e: any) => e.title))
         
         // Always add static coffee meet-up to ensure recurring events appear
-        const coffeeMeetup = createStaticCoffeeMeetup()
-        console.log('[Events] Created coffee meetup:', coffeeMeetup.title, coffeeMeetup.start)
-        const eventsWithFallback = [...events, coffeeMeetup]
+        console.log('[Events] Created coffee meetup:', staticCoffeeMeetup.title, staticCoffeeMeetup.start)
+        const eventsWithFallback = [...events, staticCoffeeMeetup]
         console.log('[Events] Combined events:', eventsWithFallback.length, eventsWithFallback.map((e: any) => e.title))
         
         setStrapiEvents(eventsWithFallback)
@@ -205,8 +276,8 @@ export default function EventsPage() {
         const errorMessage = e instanceof Error ? e.message : 'Unknown error'
         console.warn('Failed to load events:', errorMessage)
         setStrapiError(errorMessage)
-        // Use fallback events when API is down
-        const fallbackEvents = [createStaticCoffeeMeetup()]
+        // Use fallback events when API is down (reuse already-created coffee meetup)
+        const fallbackEvents = [staticCoffeeMeetup]
         setStrapiEvents(fallbackEvents)
 
         // Cache fallback with shorter TTL (1 minute) to retry soon
@@ -229,12 +300,14 @@ export default function EventsPage() {
   }, [])
 
   const strapiEventItems: EventItem[] = useMemo(() => {
-    console.log('[Events] Processing', strapiEvents.length, 'events:', strapiEvents.map(e => ({ title: e.title, isRecurring: e.isRecurring, start: e.start })))
+    console.log('[Events] Processing', strapiEvents.length, 'events:', strapiEvents.map(e => ({ title: e.title, isRecurring: e.isRecurring, start: e.start, hasImage: !!e.image, imageUrl: e.image?.url })))
     const processedEvents = processEventsWithRecurrences(strapiEvents)
-    console.log('[Events] Processed events:', processedEvents.length, processedEvents.map(e => ({ title: e.title, start: e.start })))
+    console.log('[Events] Processed events:', processedEvents.length, processedEvents.map(e => ({ title: e.title, start: e.start, hasImage: !!e.image, imageUrl: e.image?.url })))
     
     return processedEvents.map((event) => {
       const imageSrc = event.image ? strapiClient.getImageUrlWithSize(event.image, 'large') : undefined
+      const imageSrcOriginal = event.image ? strapiClient.getImageUrl(event.image) : undefined
+      console.log('[Events] Image URL for', event.title, ':', imageSrc)
 
       return {
         id: event.id,
@@ -245,6 +318,7 @@ export default function EventsPage() {
         externalUrl: event.externalUrl,
         externalCtaLabel: event.externalCtaLabel,
         imageSrc,
+        imageSrcOriginal,
         imageAlt: event.image?.alternativeText || event.title,
         summary: event.summary,
         eventCategory: event.eventCategory,
@@ -414,17 +488,10 @@ export default function EventsPage() {
                         loading="lazy"
                       />
                     ) : event.imageSrc ? (
-                      <img
+                      <EventImage
                         src={event.imageSrc}
+                        srcOriginal={event.imageSrcOriginal}
                         alt={event.imageAlt}
-                        className="block w-full h-auto"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.target;
-                          if (target instanceof HTMLImageElement) {
-                            target.style.display = 'none';
-                          }
-                        }}
                       />
                     ) : (
                       <div className="w-full bg-gray-100" style={{ paddingTop: '56.25%' }} />
