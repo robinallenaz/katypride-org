@@ -1,5 +1,4 @@
-import { strapiClient } from '@/lib/strapi'
-import { processEventsWithRecurrences } from '@/lib/recurring-events'
+import { readData, type Event } from '@/lib/data-service'
 import EventsList, { type EventItem } from './EventsList'
 
 // Helper function to get next Friday
@@ -14,7 +13,7 @@ function getNextFridayDate(): Date {
 }
 
 // Static coffee meet-up fallback
-function createStaticCoffeeMeetup() {
+function createStaticCoffeeMeetup(): EventItem {
   const nextFriday = getNextFridayDate()
   const endDate = new Date(nextFriday.getTime() + 2 * 60 * 60 * 1000)
   return {
@@ -25,48 +24,54 @@ function createStaticCoffeeMeetup() {
     location: 'Coffee Fellows, 3329 Grand Parkway, Katy, TX 77449',
     imageSrc: '/espresso-yourself-new-graphic.jpg',
     imageAlt: 'Espresso Yourself Coffee Meetup',
-    eventCategory: 'coffee' as const,
+    eventCategory: 'coffee',
     externalUrl: 'https://www.google.com/maps/dir//3329%20Grand%20Parkway,%20Katy,%20TX%2077449',
     externalCtaLabel: 'Get Directions',
-    summary: {
-      type: 'doc',
-      children: [{
-        type: 'paragraph',
-        children: [{
-          type: 'text',
-          text: 'Join us for a casual coffee meet up at an LGBTQ-affirming business, Coffee Fellows, to meet other LGBTQ+ community members and allies. Grab a coffee, tea, pastry or whatever suits your fancy, and make new connections or even get some work done. Enjoy a safe space of community and allyship!'
-        }]
-      }]
-    },
+    summary: 'Join us for a casual coffee meet up at an LGBTQ-affirming business, Coffee Fellows, to meet other LGBTQ+ community members and allies. Grab a coffee, tea, pastry or whatever suits your fancy, and make new connections or even get some work done. Enjoy a safe space of community and allyship!',
+  }
+}
+
+// Convert Event to EventItem
+function convertToEventItem(event: Event): EventItem {
+  return {
+    id: event.id,
+    title: event.title,
+    start: new Date(event.start),
+    end: event.end ? new Date(event.end) : undefined,
+    location: event.location,
+    imageSrc: event.imageSrc,
+    imageAlt: event.imageAlt,
+    eventCategory: event.eventCategory,
+    externalUrl: event.externalUrl,
+    externalCtaLabel: event.externalCtaLabel,
+    summary: event.summary,
+    isRecurring: event.isRecurring,
+    parentId: event.parentId,
   }
 }
 
 // Server-side data fetching with caching
 async function getEvents(): Promise<{ events: EventItem[]; error?: string | null }> {
   try {
-    const strapiEvents = await strapiClient.getEvents()
-    const processedEvents = processEventsWithRecurrences(strapiEvents)
+    const data = await readData<{ events: Event[] }>('events')
+    
+    const eventItems: EventItem[] = data.events
+      .filter(event => new Date(event.start) >= new Date()) // Only future events
+      .map(convertToEventItem)
 
-    const eventItems: EventItem[] = processedEvents.map((event) => ({
-      id: event.id,
-      title: event.title,
-      start: event.start,
-      end: event.end,
-      location: event.location,
-      externalUrl: event.externalUrl,
-      externalCtaLabel: event.externalCtaLabel,
-      imageSrc: event.image ? strapiClient.getImageUrlWithSize(event.image, 'large') : undefined,
-      imageSrcOriginal: event.image ? strapiClient.getImageUrl(event.image) : undefined,
-      imageAlt: event.image?.alternativeText || event.title,
-      summary: event.summary,
-      eventCategory: event.eventCategory,
-      isRecurring: event.isRecurring,
-      parentId: event.parentId,
-    }))
-
-    // Add static coffee meetup
+    // Add static coffee meetup ONLY if no coffee event already exists on that Friday
     const coffeeMeetup = createStaticCoffeeMeetup()
-    eventItems.push(coffeeMeetup)
+    const hasCoffeeOnFriday = eventItems.some(event => {
+      // Check if there's a coffee category event on the same date
+      const eventDate = new Date(event.start)
+      const sameDay = eventDate.toDateString() === coffeeMeetup.start.toDateString()
+      const isCoffeeCategory = event.eventCategory === 'coffee'
+      return sameDay && isCoffeeCategory
+    })
+    
+    if (!hasCoffeeOnFriday) {
+      eventItems.push(coffeeMeetup)
+    }
 
     // Sort by date
     eventItems.sort((a, b) => a.start.getTime() - b.start.getTime())

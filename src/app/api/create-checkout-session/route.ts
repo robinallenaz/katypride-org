@@ -5,7 +5,18 @@ import { ghlRequest, GHL_LOCATION_ID } from '@/lib/ghl';
 import { Redis } from '@upstash/redis';
 
 // Initialize Redis client for rate limiting (works across serverless instances)
-const redis = Redis.fromEnv();
+// Lazy initialization to handle missing env vars gracefully
+let redis: Redis | null = null;
+try {
+  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  
+  if (upstashUrl && upstashToken) {
+    redis = new Redis({ url: upstashUrl, token: upstashToken });
+  }
+} catch (error) {
+  console.warn('Redis initialization failed:', error);
+}
 
 // Environment variable validation at module load
 const stripeKey = process.env.STRIPE_SECRET_KEY;
@@ -13,7 +24,8 @@ const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
 if (!stripeKey) {
-  throw new Error('STRIPE_SECRET_KEY is required but not configured');
+  console.error('[Checkout] STRIPE_SECRET_KEY is not configured');
+  // Don't throw - let the kill switch handle this gracefully
 }
 
 if (!upstashUrl || !upstashToken) {
@@ -114,6 +126,10 @@ async function checkRateLimitInMemory(ip: string): Promise<{ allowed: boolean; r
 }
 
 async function checkRateLimitRedis(ip: string): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
+  if (!redis) {
+    return checkRateLimitInMemory(ip);
+  }
+  
   const key = `rate_limit:checkout:${ip}`;
   const now = Date.now();
   const windowStart = Math.floor(now / RATE_LIMIT_WINDOW_MS) * RATE_LIMIT_WINDOW_MS;
@@ -196,10 +212,70 @@ const SPONSOR_PRICES: Record<string, number> = {
 };
 
 export async function POST(request: NextRequest) {
+  console.log('[Checkout] Received POST request');
+  
+  // Kill switch: Check if Stripe payments are disabled
+  const stripeEnabled = process.env.STRIPE_ENABLED !== 'false';
+  
+  if (!stripeEnabled) {
+    console.log('[Checkout] Stripe payments disabled via STRIPE_ENABLED env var');
+    
+    try {
+      const body = await request.json();
+      const { type, email, name, company, phone, vendorType, sponsorshipLevel, event } = body;
+      
+      // Still record the registration in CRM even without payment
+      const contactData: any = {
+        email: String(email || ''),
+        name: String(name || ''),
+        locationId: GHL_LOCATION_ID,
+        tags: type === 'vendor' ? ['vendor', 'payment-pending'] : ['sponsor', 'payment-pending'],
+        customFields: {
+          payment_status: 'pending-manual',
+          registration_date: new Date().toISOString(),
+          vendor_type: type === 'vendor' ? String(vendorType || '') : undefined,
+          sponsorship_level: type === 'sponsor' ? String(sponsorshipLevel || '') : undefined,
+          event: String(event || ''),
+        },
+      };
+
+      if (company) contactData.companyName = company;
+      if (phone) contactData.customFields.phone = String(phone);
+
+      // Create/update contact in CRM
+      try {
+        await ghlRequest('/contacts/', {
+          method: 'POST',
+          body: JSON.stringify(contactData),
+        });
+      } catch (crmError) {
+        console.warn('[Checkout] CRM recording failed:', crmError);
+        // Continue anyway - at least we tried
+      }
+
+      return NextResponse.json({
+        disabled: true,
+        message: 'Online payment is temporarily unavailable. Your registration has been recorded and an invoice will be sent to your email within 24 hours to complete payment.',
+        url: null,
+        sessionId: null,
+      });
+    } catch (error) {
+      return NextResponse.json({
+        disabled: true,
+        message: 'Payment processing is temporarily unavailable. Please email info@katypride.org to complete your registration.',
+        url: null,
+        sessionId: null,
+      });
+    }
+  }
+  
   // Validate Content-Type (handle charsets like application/json; charset=utf-8)
   const contentType = request.headers.get('content-type');
   const normalizedContentType = contentType?.split(';')[0]?.trim();
+  console.log('[Checkout] Content-Type:', contentType, 'Normalized:', normalizedContentType);
+  
   if (normalizedContentType !== 'application/json') {
+    console.error('[Checkout] Invalid Content-Type:', contentType);
     return NextResponse.json(
       { error: 'Content-Type must be application/json' },
       { status: 415 }
@@ -240,9 +316,11 @@ export async function POST(request: NextRequest) {
   }
 
   if (!stripeKey) {
-    console.error('STRIPE_SECRET_KEY is not configured');
+    console.error('[Checkout] STRIPE_SECRET_KEY is not configured');
     return NextResponse.json({ error: 'Payment service not configured' }, { status: 503 });
   }
+
+  console.log('[Checkout] Initializing Stripe with key:', stripeKey.substring(0, 7) + '...');
 
   const stripe = new Stripe(stripeKey, {
     apiVersion: '2025-02-24.acacia' as any, // Pin to stable version
@@ -269,8 +347,11 @@ export async function POST(request: NextRequest) {
       _gotcha,
     } = body;
 
+    console.log('[Checkout] Parsed body:', { type, vendorType, email, name, company, event, _gotcha: _gotcha ? 'PRESENT' : 'ABSENT' });
+
     // Honeypot validation - reject if honeypot field is filled
     if (_gotcha) {
+      console.error('[Checkout] Honeypot triggered:', _gotcha);
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 
@@ -280,7 +361,9 @@ export async function POST(request: NextRequest) {
 
     // Calculate amount based on type
     if (type === 'vendor') {
+      console.log('[Checkout] Processing vendor type:', vendorType, 'Available prices:', Object.keys(VENDOR_PRICES));
       if (!vendorType || !VENDOR_PRICES[vendorType]) {
+        console.error('[Checkout] Invalid vendor type:', vendorType);
         return NextResponse.json({ error: 'Invalid vendor type' }, { status: 400 });
       }
       amount = VENDOR_PRICES[vendorType];
@@ -437,54 +520,81 @@ export async function POST(request: NextRequest) {
     };
 
     // Create Stripe Checkout Session
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      billing_address_collection: 'required',
-      customer_email: email,
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: productName,
-              description: productDescription,
-              images: ['https://katypride.org/logo.png'], // Optional: Add your logo
+    console.log('[Checkout] Creating Stripe session with amount:', amount, 'product:', productName);
+    
+    try {
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        billing_address_collection: 'required',
+        customer_email: email,
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: productName,
+                description: productDescription,
+                images: ['https://katypride.org/logo.png'], // Optional: Add your logo
+              },
+              unit_amount: amount,
             },
-            unit_amount: amount,
+            quantity: 1,
           },
-          quantity: 1,
+        ],
+        mode: 'payment',
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        metadata: sessionMetadata,
+        // Store customer info for future reference
+        client_reference_id: `${type}-${Date.now()}`,
+        // Custom text on checkout page
+        custom_text: {
+          submit: {
+            message: 'Thank you for supporting Katy Pride! You will receive a confirmation email with next steps.',
+          },
         },
-      ],
-      mode: 'payment',
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      metadata: sessionMetadata,
-      // Store customer info for future reference
-      client_reference_id: `${type}-${Date.now()}`,
-      // Custom text on checkout page
-      custom_text: {
-        submit: {
-          message: 'Thank you for supporting Katy Pride! You will receive a confirmation email with next steps.',
-        },
-      },
-    });
+      });
 
-    return NextResponse.json({
-      sessionId: session.id,
-      url: session.url,
-    });
-  } catch (error) {
-    console.error('Error creating checkout session:', error);
+      console.log('[Checkout] Stripe session created successfully:', session.id);
+      
+      return NextResponse.json({
+        sessionId: session.id,
+        url: session.url,
+      });
+    } catch (stripeError: any) {
+      console.error('[Checkout] Stripe API error:', stripeError);
+      console.error('[Checkout] Error details:', {
+        message: stripeError.message,
+        type: stripeError.type,
+        code: stripeError.code,
+        statusCode: stripeError.statusCode,
+        raw: stripeError.raw,
+        headers: stripeError.headers,
+        requestId: stripeError.requestId,
+      });
+      throw stripeError;
+    }
+  } catch (error: any) {
+    console.error('[Checkout] Error creating checkout session:', error);
+    console.error('[Checkout] Error stack:', error.stack);
     
     if (error instanceof Stripe.errors.StripeError) {
+      console.error('[Checkout] Stripe error details:', {
+        message: error.message,
+        type: error.type,
+        code: error.code,
+        statusCode: error.statusCode,
+        raw: error.raw,
+      });
       return NextResponse.json(
         { error: error.message },
         { status: error.statusCode || 400 }
       );
     }
     
+    console.error('[Checkout] Non-Stripe error:', error);
     return NextResponse.json(
-      { error: 'Failed to create checkout session' },
+      { error: 'Failed to create checkout session: ' + (error.message || 'Unknown error') },
       { status: 500 }
     );
   }

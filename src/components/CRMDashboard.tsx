@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
 interface RecentContact {
+  id: string;
   name: string;
   email: string;
   tags: string[];
@@ -34,6 +35,8 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Re-fetch when token changes (e.g. after sessionStorage hydration)
   const fetchCRMData = useCallback(async () => {
@@ -93,6 +96,30 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
       });
     } catch {
       return dateStr;
+    }
+  };
+
+  const handleDelete = async (contactId: string) => {
+    if (!confirm('Are you sure you want to delete this contact?')) return;
+    
+    setDeletingId(contactId);
+    try {
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      
+      const response = await fetch(`/api/crm?id=${contactId}`, {
+        method: 'DELETE',
+        headers,
+      });
+      
+      if (!response.ok) throw new Error('Failed to delete contact');
+      
+      // Refresh the data
+      await fetchCRMData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete contact');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -159,8 +186,8 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.recentContacts.map((contact, index) => (
-                      <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                    {stats.recentContacts.map((contact) => (
+                      <tr key={contact.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-2">
                           <p className="font-medium text-gray-900">{contact.name || 'Unknown'}</p>
                           {contact.company && (
@@ -179,6 +206,15 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
                         </td>
                         <td className="py-3 px-2 text-gray-500 text-xs hidden md:table-cell">
                           {formatDate(contact.dateAdded)}
+                        </td>
+                        <td className="py-3 px-2">
+                          <button
+                            onClick={() => handleDelete(contact.id)}
+                            disabled={deletingId === contact.id}
+                            className="text-red-500 hover:text-red-700 text-sm disabled:opacity-50"
+                          >
+                            {deletingId === contact.id ? 'Deleting...' : 'Delete'}
+                          </button>
                         </td>
                       </tr>
                     ))}

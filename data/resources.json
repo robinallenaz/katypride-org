@@ -1,0 +1,46 @@
+{
+  "resources": [
+    {
+      "id": "1",
+      "title": "The Trevor Project",
+      "url": "https://www.thetrevorproject.org/",
+      "category": "Crisis Support",
+      "description": "24/7 crisis support for LGBTQ+ youth"
+    },
+    {
+      "id": "2",
+      "title": "PFLAG Houston",
+      "url": "https://pflaghouston.org/",
+      "category": "Family Support",
+      "description": "Support for families and allies of LGBTQ+ individuals"
+    },
+    {
+      "id": "3",
+      "title": "Montrose Center",
+      "url": "https://www.montrosecenter.org/",
+      "category": "Community Services",
+      "description": "Houston's LGBTQ+ community center offering health, wellness, and support services"
+    },
+    {
+      "id": "4",
+      "title": "GLAAD",
+      "url": "https://www.glaad.org/",
+      "category": "Advocacy",
+      "description": "Media advocacy and LGBTQ+ representation"
+    },
+    {
+      "id": "5",
+      "title": "HRC (Human Rights Campaign)",
+      "url": "https://www.hrc.org/",
+      "category": "Advocacy",
+      "description": "National advocacy for LGBTQ+ equality"
+    },
+    {
+      "id": "6",
+      "title": "Lambda Legal",
+      "url": "https://www.lambdalegal.org/",
+      "category": "Legal Support",
+      "description": "Legal advocacy for LGBTQ+ rights"
+    }
+  ]
+}

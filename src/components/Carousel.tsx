@@ -1,100 +1,35 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { cloudinaryUrl } from '@/lib/cloudinary'
-import { getCarouselImages, type CarouselImage } from '@/lib/carousel'
+import { useState, useEffect, useRef } from 'react'
+
+interface CarouselImage {
+  id: string;
+  url: string;
+  alt: string;
+  caption?: string;
+}
 
 // Hardcoded fallback images for development/demo
 const HARDCODED_IMAGES: CarouselImage[] = [
   {
-    id: 1,
-    documentId: 'hardcoded-1',
-    title: 'Katy Pride 2026 Celebration',
-    image: [{
-      id: 1,
-      name: 'Katy Pride 2026 Celebration',
-      alternativeText: 'Katy Pride Celebration with rainbow flags and community',
-      caption: 'Katy Pride 2026 Celebration',
-      width: 1200,
-      height: 600,
-      url: '/carousel/3-Attendees-At-Celebration.jpg',
-      provider: 'hardcoded',
-      provider_metadata: null,
-      createdAt: '2026-03-14T00:00:00.000Z',
-      updatedAt: '2026-03-14T00:00:00.000Z',
-      publishedAt: '2026-03-14T00:00:00.000Z'
-    }],
-    alt: 'Katy Pride 2026 Celebration',
-    isActive: true,
-    createdAt: '2026-03-14T00:00:00.000Z',
-    updatedAt: '2026-03-14T00:00:00.000Z',
-    publishedAt: '2026-03-14T00:00:00.000Z'
+    id: '1',
+    url: '/carousel/3-Attendees-At-Celebration.jpg',
+    alt: 'Katy Pride Celebration with rainbow flags and community',
+    caption: 'Katy Pride 2026 Celebration'
   },
   {
-    id: 2,
-    documentId: 'hardcoded-2',
-    title: 'Community Unity',
-    image: [{
-      id: 2,
-      name: 'Community Unity',
-      alternativeText: 'Diverse community members celebrating together',
-      caption: 'Community Unity at Katy Pride',
-      width: 1200,
-      height: 600,
-      url: '/carousel/DJ-Krazy-V.jpg',
-      provider: 'hardcoded',
-      provider_metadata: null,
-      createdAt: '2026-03-14T00:00:00.000Z',
-      updatedAt: '2026-03-14T00:00:00.000Z',
-      publishedAt: '2026-03-14T00:00:00.000Z'
-    }],
-    alt: 'Community Unity at Katy Pride',
-    isActive: true,
-    createdAt: '2026-03-14T00:00:00.000Z',
-    updatedAt: '2026-03-14T00:00:00.000Z',
-    publishedAt: '2026-03-14T00:00:00.000Z'
+    id: '2',
+    url: '/carousel/DJ-Krazy-V.jpg',
+    alt: 'DJ Krazy V performing at Katy Pride',
+    caption: 'DJ Krazy V keeping the energy high'
   },
   {
-    id: 3,
-    documentId: 'hardcoded-3',
-    title: 'Pride Parade',
-    image: [{
-      id: 3,
-      name: 'Pride Parade',
-      alternativeText: 'Colorful pride parade with participants celebrating',
-      caption: 'Katy Pride Parade Celebration',
-      width: 1200,
-      height: 600,
-      url: '/carousel/katy-pride-volunteers.jpg',
-      provider: 'hardcoded',
-      provider_metadata: null,
-      createdAt: '2026-03-14T00:00:00.000Z',
-      updatedAt: '2026-03-14T00:00:00.000Z',
-      publishedAt: '2026-03-14T00:00:00.000Z'
-    }],
-    alt: 'Katy Pride Parade Celebration',
-    isActive: true,
-    createdAt: '2026-03-14T00:00:00.000Z',
-    updatedAt: '2026-03-14T00:00:00.000Z',
-    publishedAt: '2026-03-14T00:00:00.000Z'
+    id: '3',
+    url: '/carousel/katy-pride-volunteers.jpg',
+    alt: 'Katy Pride volunteers',
+    caption: 'Our amazing volunteers make it all possible'
   }
 ]
-
-function getImageUrl(slide: any): string {
-  if (slide?.image && Array.isArray(slide.image) && slide.image.length > 0) {
-    const image = slide.image[0];
-    if (image?.url) {
-      if (image.provider === 'hardcoded') {
-        return image.url;
-      }
-      const baseUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337';
-      const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-      const cleanImageUrl = image.url.startsWith('/') ? image.url.slice(1) : image.url;
-      return `${cleanBaseUrl}/${cleanImageUrl}`;
-    }
-  }
-  return '';
-}
 
 export default function Carousel() {
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -110,18 +45,20 @@ export default function Carousel() {
       try {
         setIsLoading(true)
         
-        // Try to load from Strapi API first, fallback to hardcoded if it fails
+        // Try to load from JSON file first, fallback to hardcoded if it fails
         let finalSlides: CarouselImage[] = []
         
         try {
-          const images = await getCarouselImages()
-          if (images.length > 0) {
-            finalSlides = images
+          const response = await fetch('/api/carousel')
+          if (!response.ok) throw new Error('Failed to fetch')
+          const data = await response.json()
+          if (data.images && data.images.length > 0) {
+            finalSlides = data.images
           } else {
             finalSlides = HARDCODED_IMAGES
           }
         } catch (apiError) {
-          console.warn('Strapi API failed, using hardcoded images:', apiError)
+          console.warn('JSON load failed, using hardcoded images:', apiError)
           finalSlides = HARDCODED_IMAGES
         }
         
@@ -142,16 +79,7 @@ export default function Carousel() {
     loadImages()
   }, [])
 
-  const imageUrls = useMemo(() => {
-    const urls: Record<string, string> = {}
-    slides.forEach((slide) => {
-      urls[slide.id] = getImageUrl(slide)
-    })
-    return urls
-  }, [slides])
-
   const currentSlide = slides[currentIndex] || null
-  const currentImageUrl = currentSlide ? imageUrls[currentSlide.id] : ''
 
   const goToPrevious = () => {
     if (slides.length === 0) return;
@@ -171,10 +99,6 @@ export default function Carousel() {
     }
   };
 
-  const getAltText = (slide: any) => {
-    return slide?.alt || slide?.title || 'Katy Pride image'
-  }
-
   return (
     <div className="relative z-10 max-w-6xl mx-auto px-4 py-8">
       <div className="relative w-full h-96 md:h-[500px] bg-gradient-to-br from-purple-50 to-indigo-50 backdrop-blur-md rounded-2xl border border-purple-100/20 shadow-xl overflow-hidden carousel-container">
@@ -186,17 +110,24 @@ export default function Carousel() {
                 <picture>
                   <source
                     media="(min-width: 768px)"
-                    srcSet={currentImageUrl}
+                    srcSet={currentSlide.url}
                   />
                   <img
-                    src={currentImageUrl}
-                    alt={getAltText(currentSlide)}
+                    src={currentSlide.url}
+                    alt={currentSlide.alt || 'Katy Pride image'}
                     className="absolute inset-0 h-full w-full object-contain carousel-image"
                     loading="lazy"
                     decoding="async"
                   />
                 </picture>
               </div>
+
+              {/* Caption */}
+              {currentSlide.caption && (
+                <div className="absolute bottom-16 left-0 right-0 bg-black/50 text-white text-center py-2 px-4">
+                  <p className="text-sm font-medium">{currentSlide.caption}</p>
+                </div>
+              )}
 
               {/* Loading indicator */}
               {isLoading && (
@@ -252,7 +183,7 @@ export default function Carousel() {
               <div className="text-purple-200 text-6xl mb-4">🖼️</div>
               <h3 className="text-xl font-semibold text-purple-700 mb-2">No Carousel Images Yet</h3>
               <p className="text-purple-600 max-w-md">
-                Admins can add carousel images through the Strapi admin panel to showcase events and celebrations.
+                Admins can add carousel images through the admin panel at /admin/carousel to showcase events and celebrations.
               </p>
             </div>
           )}

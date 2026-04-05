@@ -4,11 +4,12 @@ import React, { useState } from 'react';
 
 interface CRMContactFormProps {
   type: 'volunteer' | 'donor' | 'community-member';
+  source?: string;
   onSuccess?: (data: any) => void;
   onError?: (error: string) => void;
 }
 
-const CRMContactForm: React.FC<CRMContactFormProps> = ({ type, onSuccess, onError }) => {
+const CRMContactForm: React.FC<CRMContactFormProps> = ({ type, source, onSuccess, onError }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -50,6 +51,7 @@ const CRMContactForm: React.FC<CRMContactFormProps> = ({ type, onSuccess, onErro
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
+        source: source || 'Website Form',
         _gotcha: (document.querySelector('input[name="_gotcha"]') as HTMLInputElement)?.value || '',
       };
 

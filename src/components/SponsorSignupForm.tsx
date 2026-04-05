@@ -296,6 +296,33 @@ export default function SponsorSignupForm() {
 
       const checkoutResult = await checkoutResponse.json();
 
+      // Handle Stripe disabled gracefully
+      if (checkoutResult.disabled) {
+        setSubmitStatus('success');
+        setSubmitMessage(checkoutResult.message || 'Your registration has been recorded. We will contact you shortly to complete payment.');
+        setFormData({
+          contactName: '',
+          contactEmail: '',
+          contactPhone: '',
+          contactTitle: '',
+          organizationName: '',
+          organizationType: '',
+          website: '',
+          address: '',
+          city: '',
+          state: '',
+          zipCode: '',
+          sponsorshipLevel: '',
+          customSponsorshipAmount: '',
+          additionalComments: '',
+          agreeToTerms: false,
+          agreeToPayment: false,
+          wantInvoice: false
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       if (!checkoutResponse.ok || !checkoutResult.url) {
         throw new Error(checkoutResult.error || 'Failed to create payment session');
       }

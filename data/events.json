@@ -1,0 +1,52 @@
+{
+  "events": [
+    {
+      "id": "1",
+      "title": "Espresso Yourself - Coffee Meetup",
+      "start": "2026-04-10T09:00:00.000Z",
+      "end": "2026-04-10T11:00:00.000Z",
+      "location": "The Dapper Dog Coffee Bar, 919 Mason Rd, Katy, TX 77450",
+      "imageSrc": "/espresso-yourself-new-graphic.jpg",
+      "imageAlt": "Espresso Yourself Coffee Meetup",
+      "eventCategory": "coffee",
+      "summary": "Join us for our monthly coffee meetup! Connect with the LGBTQ+ community in a casual, welcoming environment. All are welcome!"
+    },
+    {
+      "id": "2",
+      "title": "Chase the Rainbow 5K Fun Run",
+      "start": "2026-06-20T08:00:00.000Z",
+      "end": "2026-06-20T11:00:00.000Z",
+      "location": "Katy Mills Mall, 5000 Katy Mills Cir, Katy, TX 77494",
+      "imageSrc": "/chase-the-rainbow.jpg",
+      "imageAlt": "Chase the Rainbow 5K Fun Run",
+      "eventCategory": "fundraising",
+      "externalUrl": "https://raceroster.com/events/2026/116853/chase-the-rainbow-stride-with-pride",
+      "externalCtaLabel": "Register to Run",
+      "summary": "Join us for the Chase the Rainbow 5K fun run! All proceeds support Katy Pride. Walkers welcome, strollers encouraged!"
+    },
+    {
+      "id": "3",
+      "title": "Karaoke & Coffee Night",
+      "start": "2026-04-24T19:00:00.000Z",
+      "end": "2026-04-24T22:00:00.000Z",
+      "location": "The Dapper Dog Coffee Bar, 919 Mason Rd, Katy, TX 77450",
+      "imageSrc": "/karaoke-and-coffee.png",
+      "imageAlt": "Karaoke & Coffee Night",
+      "eventCategory": "social",
+      "summary": "Show off your singing skills or just cheer on others! Open mic karaoke with great coffee and community."
+    },
+    {
+      "id": "4",
+      "title": "Katy Pride Celebration 2026",
+      "start": "2026-10-03T16:00:00.000Z",
+      "end": "2026-10-03T21:00:00.000Z",
+      "location": "Bear Creek Rodeo Arena, 3230 Hwy 6, Houston, TX 77084",
+      "imageSrc": "/katy-pride-celebration-2026.jpg",
+      "imageAlt": "Katy Pride Celebration 2026",
+      "eventCategory": "pride",
+      "externalUrl": "/celebration",
+      "externalCtaLabel": "Learn More",
+      "summary": "Our biggest event of the year! Join 2000+ attendees for vendors, entertainment, food trucks, and community celebration. Theme: 'Stand Tall, Y'all!'"
+    }
+  ]
+}

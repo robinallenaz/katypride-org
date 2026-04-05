@@ -1,4 +1,4 @@
-import { strapiClient, type StrapiResourceLink } from '@/lib/strapi'
+import { readData, type Resource } from '@/lib/data-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -83,28 +83,25 @@ const defaultResources: ResourceLink[] = [
 
 async function getResourceLinks(): Promise<ResourceLink[]> {
   try {
-    const strapiResources = await strapiClient.getResourceLinks()
+    // Try to load from JSON file
+    const data = await readData<{ resources: Resource[] }>('resources')
     
-    // Convert Strapi resources to expected format
-    const convertedResources = strapiResources.map((resource) => ({
-      id: resource.documentId,
-      title: resource.name,
+    // Convert JSON resources to expected format
+    const jsonResources = data.resources.map((resource) => ({
+      id: resource.id,
+      title: resource.title,
       url: resource.url,
-      category: resource.category
+      category: resource.category.toLowerCase()
     }))
     
-    // Merge with default resources - Strapi resources appear first, then defaults
+    // Merge with default resources - JSON resources appear first, then defaults
     // Use a Set to track URLs and avoid duplicates
-    const seenUrls = new Set(convertedResources.map((r) => r.url))
+    const seenUrls = new Set(jsonResources.map((r) => r.url))
     const uniqueDefaults = defaultResources.filter((r) => !seenUrls.has(r.url))
-    return [...convertedResources, ...uniqueDefaults]
+    return [...jsonResources, ...uniqueDefaults]
   } catch (error) {
-    console.error('Failed to fetch resource links from Strapi:', error)
-    // In development, show a more detailed error message
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('Strapi API error details - check if API is running and permissions are set correctly')
-    }
-    // Return default resources if Strapi fails
+    console.warn('Failed to load resources from JSON:', error)
+    // Return default resources if JSON fails
     return defaultResources
   }
 }

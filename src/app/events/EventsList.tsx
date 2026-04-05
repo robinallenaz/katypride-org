@@ -354,7 +354,9 @@ export default function EventsList({ initialEvents, error }: EventsListProps) {
                                 More info
                               </summary>
                               <div className="mt-2 sm:mt-3 text-xs sm:text-sm leading-relaxed text-gray-700">
-                                <StrapiRichText content={event.summary} />
+                                {typeof event.summary === 'string' 
+                                  ? event.summary 
+                                  : JSON.stringify(event.summary)}
                               </div>
                             </details>
                           )}

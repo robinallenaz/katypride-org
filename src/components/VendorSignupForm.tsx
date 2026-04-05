@@ -206,6 +206,14 @@ export default function VendorSignupForm() {
 
       const checkoutResult = await checkoutResponse.json();
 
+      // Handle Stripe disabled gracefully
+      if (checkoutResult.disabled) {
+        setSubmitStatus('success');
+        setSubmitMessage(checkoutResult.message || 'Your registration has been recorded. We will contact you shortly to complete payment.');
+        setIsSubmitting(false);
+        return;
+      }
+
       if (!checkoutResponse.ok || !checkoutResult.url) {
         throw new Error(checkoutResult.error || 'Failed to create payment session');
       }

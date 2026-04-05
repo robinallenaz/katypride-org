@@ -21,59 +21,22 @@ const ALLOWED_EXCLUSIVE_OPPORTUNITIES = [
   'swag-bag', 'kid-zone',
 ] as const;
 
+// Cleanup stale rate limit locks periodically
+const RATE_LOCK_CLEANUP_INTERVAL = 300_000; // 5 minutes
+const RATE_LOCK_MAX_AGE = 60_000; // 1 minute
+
 // Enhanced rate limiter with cleanup and better IP detection
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 const RATE_LIMIT_MAX = 5;
 const MAX_RATE_LIMIT_ENTRIES = 1000; // Prevent memory exhaustion
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
-// Cleanup interval reference
+// Cleanup interval reference - initialized once at module load
 let cleanupInterval: NodeJS.Timeout | null = null;
-let cleanupInitialized = false;
-
-// Initialize cleanup interval only when needed
-const initializeCleanupInterval = () => {
-  if (cleanupInterval) return; // Prevent multiple intervals
-  
-  cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    const entriesToDelete: string[] = [];
-    
-    // Collect entries to delete
-    rateLimitMap.forEach((entry, ip) => {
-      if (now > entry.resetAt) {
-        entriesToDelete.push(ip);
-      }
-    });
-    
-    // Delete expired entries
-    entriesToDelete.forEach(ip => rateLimitMap.delete(ip));
-    
-    // Prevent memory exhaustion - remove oldest entries if too many
-    if (rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
-      const entries = Array.from(rateLimitMap.entries());
-      entries.sort((a, b) => a[1].resetAt - b[1].resetAt);
-      const toDelete = entries.slice(0, rateLimitMap.size - MAX_RATE_LIMIT_ENTRIES);
-      toDelete.forEach(([ip]) => rateLimitMap.delete(ip));
-    }
-  }, 300_000); // 5 minutes
-};
-
-// Ensure cleanup interval is initialized only when needed
-const ensureCleanupInitialized = () => {
-  if (!cleanupInitialized) {
-    initializeCleanupInterval();
-    initializeRateLockCleanup(); // Also initialize rate lock cleanup
-    cleanupInitialized = true;
-  }
-};
+let rateLockCleanupInterval: NodeJS.Timeout | null = null;
 
 // Enhanced rate limiting with atomic operations using Map-based locking
 const rateLimitLock = new Map<string, { locked: boolean; timestamp: number }>();
-
-// Cleanup stale rate limit locks periodically
-const RATE_LOCK_CLEANUP_INTERVAL = 300_000; // 5 minutes
-const RATE_LOCK_MAX_AGE = 60_000; // 1 minute
 
 async function cleanupStaleRateLocks(): Promise<void> {
   const now = Date.now();
@@ -87,39 +50,6 @@ async function cleanupStaleRateLocks(): Promise<void> {
   
   staleLocks.forEach(ip => rateLimitLock.delete(ip));
 }
-
-// Initialize rate lock cleanup
-let rateLockCleanupInterval: NodeJS.Timeout | null = null;
-
-const initializeRateLockCleanup = () => {
-  if (rateLockCleanupInterval) return;
-  
-  rateLockCleanupInterval = setInterval(() => {
-    cleanupStaleRateLocks();
-  }, RATE_LOCK_CLEANUP_INTERVAL);
-};
-
-// Cleanup on process exit
-process.on('beforeExit', () => {
-  if (rateLockCleanupInterval) {
-    clearInterval(rateLockCleanupInterval);
-    rateLockCleanupInterval = null;
-  }
-});
-
-process.on('SIGINT', () => {
-  if (rateLockCleanupInterval) {
-    clearInterval(rateLockCleanupInterval);
-    rateLockCleanupInterval = null;
-  }
-});
-
-process.on('SIGTERM', () => {
-  if (rateLockCleanupInterval) {
-    clearInterval(rateLockCleanupInterval);
-    rateLockCleanupInterval = null;
-  }
-});
 
 function acquireLock(ip: string): boolean {
   const now = Date.now();
@@ -159,6 +89,42 @@ function isRateLimited(ip: string): boolean {
   entry.count = newCount;
   return newCount > RATE_LIMIT_MAX;
 }
+
+// Initialize cleanup intervals once at module load (not per-request)
+function initializeCleanupIntervals(): void {
+  if (cleanupInterval) return;
+  
+  cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    const entriesToDelete: string[] = [];
+    
+    // Collect entries to delete
+    rateLimitMap.forEach((entry, ip) => {
+      if (now > entry.resetAt) {
+        entriesToDelete.push(ip);
+      }
+    });
+    
+    // Delete expired entries
+    entriesToDelete.forEach(ip => rateLimitMap.delete(ip));
+    
+    // Prevent memory exhaustion - remove oldest entries if too many
+    if (rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
+      const entries = Array.from(rateLimitMap.entries());
+      entries.sort((a, b) => a[1].resetAt - b[1].resetAt);
+      const toDelete = entries.slice(0, rateLimitMap.size - MAX_RATE_LIMIT_ENTRIES);
+      toDelete.forEach(([ip]) => rateLimitMap.delete(ip));
+    }
+  }, 300_000); // 5 minutes
+
+  // Rate lock cleanup interval
+  rateLockCleanupInterval = setInterval(() => {
+    cleanupStaleRateLocks();
+  }, RATE_LOCK_CLEANUP_INTERVAL);
+}
+
+// Initialize immediately at module load
+initializeCleanupIntervals();
 
 // Cleanup interval on process exit
 process.on('beforeExit', () => {
@@ -290,8 +256,7 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
-  // Ensure cleanup interval is initialized
-  ensureCleanupInitialized();
+  // Cleanup intervals are initialized at module load
   
   // Require a non-empty admin secret and valid bearer token
   const authHeader = request.headers.get('authorization');
@@ -538,6 +503,7 @@ export async function POST(request: NextRequest) {
       contactName, contactTitle, organizationName, organizationType,
       sponsorshipLevel, customSponsorshipAmount, interestedInExclusives, wantInvoice,
       event,
+      source, // Track form source (e.g., 'Newsletter Signup')
       _gotcha, // honeypot field — bots fill this, real users don't see it
     } = body;
 
@@ -703,26 +669,36 @@ export async function POST(request: NextRequest) {
 
     // Create contact in GrowthSphere360
     const contactPayload: Record<string, any> = {
+      locationId: GHL_LOCATION_ID,
       name,
       email,
       phone,
       tags,
       customFields,
-      locationId: GHL_LOCATION_ID,
-    };
+    }
     if (company) contactPayload.companyName = company;
     if (Object.keys(contactAddress).length > 0) contactPayload.address = contactAddress;
-    
-    // Add vendor details to contact note for visibility (enhanced sanitization)
-    if (type === 'vendor' && productsServices) {
-      const sanitizedVendorType = sanitizeText(vendorType || 'Not specified');
-      const sanitizedProductsServices = sanitizeText(productsServices);
-      const sanitizedAdditionalInfo = additionalInfo ? sanitizeText(additionalInfo) : '';
+
+    // Add contact notes based on type
+    if (type === 'community-member') {
+      const sanitizedSource = source ? sanitizeText(source) : 'Website Form';
+      const interestList = interests && Array.isArray(interests) && interests.length > 0 
+        ? interests.join(', ')
+        : 'None specified';
       
-      contactPayload.contactNote = `Vendor Type: ${sanitizedVendorType}\nProducts/Services: ${sanitizedProductsServices}${sanitizedAdditionalInfo ? `\nAdditional Info: ${sanitizedAdditionalInfo}` : ''}`;
+      contactPayload.contactNote = `Source: ${sanitizedSource}\nInterests: ${interestList}`;
     }
 
-    // Add sponsor details to contact note for visibility
+    if (type === 'volunteer') {
+      const sanitizedSource = source ? sanitizeText(source) : 'Website Form';
+      const interestList = interests && Array.isArray(interests) && interests.length > 0 
+        ? interests.join(', ')
+        : 'None specified';
+      const availabilityInfo = availability ? sanitizeText(availability) : 'Not specified';
+      
+      contactPayload.contactNote = `Source: ${sanitizedSource}\nInterests: ${interestList}\nAvailability: ${availabilityInfo}`;
+    }
+
     if (type === 'sponsor') {
       const sanitizedSponsorshipLevel = sanitizeText(sponsorshipLevel || 'Not specified');
       const sanitizedOrganizationType = sanitizeText(organizationType || 'Not specified');
@@ -741,10 +717,72 @@ export async function POST(request: NextRequest) {
       contactPayload.contactNote = sponsorNote;
     }
 
-    const contact = await ghlRequest('/contacts/', {
-      method: 'POST',
-      body: JSON.stringify(contactPayload),
-    });
+    if (type === 'vendor') {
+      const sanitizedVendorType = sanitizeText(vendorType || 'Not specified');
+      const sanitizedProductsServices = sanitizeText(productsServices || '');
+      const sanitizedAdditionalInfo = additionalInfo ? sanitizeText(additionalInfo) : '';
+      const sanitizedWebsite = website ? sanitizeText(website) : '';
+      const sanitizedSocialMedia = socialMedia ? sanitizeText(socialMedia) : '';
+      const sponsorshipInterestInfo = sponsorshipInterest ? 'Yes' : 'No';
+      
+      let vendorNote = `Vendor Type: ${sanitizedVendorType}\nProducts/Services: ${sanitizedProductsServices}`;
+      
+      if (sanitizedWebsite) vendorNote += `\nWebsite: ${sanitizedWebsite}`;
+      if (sanitizedSocialMedia) vendorNote += `\nSocial Media: ${sanitizedSocialMedia}`;
+      if (sanitizedAdditionalInfo) vendorNote += `\nAdditional Info: ${sanitizedAdditionalInfo}`;
+      vendorNote += `\nInterested in Sponsorship: ${sponsorshipInterestInfo}`;
+      
+      contactPayload.contactNote = vendorNote;
+    }
+
+    // Check if contact already exists to prevent tag merging issues
+    let existingContactId: string | null = null;
+    let existingTags: string[] = [];
+    
+    try {
+      const searchUrl = `/contacts/?locationId=${GHL_LOCATION_ID}&query=${encodeURIComponent(email)}&limit=1`;
+      const searchResult = await ghlRequest(searchUrl);
+      
+      if (searchResult?.contacts && searchResult.contacts.length > 0) {
+        const existingContact = searchResult.contacts.find((c: any) => 
+          c.email?.toLowerCase() === email.toLowerCase()
+        );
+        
+        if (existingContact) {
+          existingContactId = existingContact.id;
+          existingTags = existingContact.tags || [];
+          
+          // Remove old vendor-type tags to prevent double-tagging
+          const vendorTypeTags = ALLOWED_VENDOR_TYPES.map(t => `vendor-${t}`);
+          const cleanedTags = existingTags.filter((tag: string) => 
+            !vendorTypeTags.includes(tag)
+          );
+          
+          // Merge cleaned existing tags with new tags (avoiding duplicates)
+          const mergedTags = [...new Set([...cleanedTags, ...tags])];
+          contactPayload.tags = mergedTags;
+        }
+      }
+    } catch (searchError) {
+      console.warn('Could not search for existing contact:', searchError);
+      // Continue with create flow
+    }
+    
+    let contact;
+    
+    if (existingContactId) {
+      // Update existing contact
+      contact = await ghlRequest(`/contacts/${existingContactId}`, {
+        method: 'PUT',
+        body: JSON.stringify(contactPayload),
+      });
+    } else {
+      // Create new contact
+      contact = await ghlRequest('/contacts/', {
+        method: 'POST',
+        body: JSON.stringify(contactPayload),
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -759,6 +797,54 @@ export async function POST(request: NextRequest) {
     console.error('CRM API Error:', error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'An unexpected error occurred' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    // Require admin authentication
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!CRM_ADMIN_SECRET || !token || !safeEqual(token, CRM_ADMIN_SECRET)) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // Get contact ID from query params
+    const { searchParams } = new URL(request.url);
+    const contactId = searchParams.get('id');
+
+    if (!contactId) {
+      return NextResponse.json(
+        { success: false, error: 'Contact ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Delete contact from GrowthSphere360
+    await ghlRequest(`/contacts/${contactId}`, {
+      method: 'DELETE',
+    });
+
+    // Clear the dashboard cache to reflect the deletion
+    const CACHE_KEY = `crm_dashboard_data_${GHL_LOCATION_ID}`;
+    if ((global as any).crmCache) {
+      (global as any).crmCache.delete(CACHE_KEY);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Contact deleted successfully',
+    });
+  } catch (error) {
+    console.error('CRM Delete Error:', error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Failed to delete contact' },
       { status: 500 }
     );
   }

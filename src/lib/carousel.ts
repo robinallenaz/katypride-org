@@ -1,36 +1,29 @@
-import { strapiClient, type StrapiImage } from '@/lib/strapi'
-
 export interface CarouselImage {
-  id: number
-  documentId: string
-  title: string
-  image: StrapiImage[]
-  alt: string
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
-  publishedAt: string
+  id: string;
+  url: string;
+  alt: string;
+  caption?: string;
 }
 
+// Client-safe version that fetches from API
 export async function getCarouselImages(): Promise<CarouselImage[]> {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337'}/api/carousel-images?filters[isActive][$eq]=true&sort=createdAt:asc&populate=image`, {
-      headers: {
-        'Authorization': `Bearer ${process.env.STRAPI_API_TOKEN || ''}`,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-    })
-
+    const response = await fetch('/api/carousel');
     if (!response.ok) {
-      console.error('Failed to fetch carousel images:', response.status)
-      return []
+      throw new Error('Failed to fetch carousel data');
     }
-
-    const data = await response.json()
-    return data.data || []
+    const data = await response.json();
+    return data.images || [];
   } catch (error) {
-    console.error('Error fetching carousel images:', error)
-    return []
+    console.error('Error fetching carousel images:', error);
+    return [];
   }
+}
+
+// Server-safe version for server components
+export async function getCarouselImagesServer(): Promise<CarouselImage[]> {
+  // Dynamic import to avoid bundling fs in client
+  const { readData } = await import('./data-service');
+  const data = await readData<{ images: CarouselImage[] }>('carousel');
+  return data.images || [];
 }

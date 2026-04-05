@@ -184,23 +184,94 @@ class StrapiClient {
   }
 
   async getEvents(): Promise<StrapiEvent[]> {
-    // Use UTC time for consistent filtering regardless of server timezone
-    const now = encodeURIComponent(new Date().toISOString())
-    
-    // Debug: Log the query URL
-    const queryUrl = `/events?filters[publishedAt][$notNull]=true&filters[$or][0][start][$gte]=${now}&filters[$or][1][isRecurring][$eq]=true&filters[$or][1][$or][0][recurrenceEndDate][$null]=true&filters[$or][1][$or][1][recurrenceEndDate][$gte]=${now}&sort=start:asc&populate=image`
-    console.log('[Strapi] Events query:', queryUrl)
-    
-    const response = await this.request<StrapiResponse<StrapiEvent>>(queryUrl)
-    console.log(`[Strapi] Raw response: ${response.data.length} events`)
-    return response.data
+    try {
+      // Use UTC time for consistent filtering regardless of server timezone
+      const now = encodeURIComponent(new Date().toISOString())
+      
+      // Debug: Log the query URL
+      const queryUrl = `/events?filters[publishedAt][$notNull]=true&filters[$or][0][start][$gte]=${now}&filters[$or][1][isRecurring][$eq]=true&filters[$or][1][$or][0][recurrenceEndDate][$null]=true&filters[$or][1][$or][1][recurrenceEndDate][$gte]=${now}&sort=start:asc&populate=image`
+      console.log('[Strapi] Events query:', queryUrl)
+      
+      const response = await this.request<StrapiResponse<StrapiEvent>>(queryUrl)
+      console.log(`[Strapi] Raw response: ${response.data.length} events`)
+      return response.data
+    } catch (error) {
+      console.warn('[Strapi] Falling back to JSON data:', error)
+      // Fallback to JSON file
+      const { readData } = await import('./data-service')
+      const data = await readData<{ events: any[] }>('events')
+      return data.events.map((e: any) => ({
+        id: parseInt(e.id),
+        documentId: e.id,
+        title: e.title,
+        start: e.start,
+        end: e.end,
+        location: e.location,
+        summary: e.summary,
+        externalUrl: e.externalUrl,
+        externalCtaLabel: e.externalCtaLabel,
+        eventCategory: e.eventCategory as StrapiEvent['eventCategory'],
+        isRecurring: e.isRecurring,
+        published: true,
+        image: e.imageSrc ? {
+          id: 1,
+          name: e.imageAlt,
+          url: e.imageSrc,
+          provider: 'hardcoded',
+          width: 800,
+          height: 600,
+          createdAt: e.start,
+          updatedAt: e.start,
+          publishedAt: e.start,
+        } : undefined,
+        createdAt: e.start,
+        updatedAt: e.start,
+        publishedAt: e.start,
+      })) as StrapiEvent[]
+    }
+  }
+
+  async getEventsFromJSON(): Promise<any[]> {
+    const { readData } = await import('./data-service')
+    const data = await readData<{ events: any[] }>('events')
+    return data.events
   }
 
   async getResourceLinks(): Promise<StrapiResourceLink[]> {
-    const response = await this.request<StrapiResponse<StrapiResourceLink>>(
-      `/resource-links?filters[active][$eq]=true&sort=orderRank:asc`
-    )
-    return response.data
+    try {
+      const response = await this.request<StrapiResponse<StrapiResourceLink>>(
+        `/resource-links?filters[active][$eq]=true&sort=orderRank:asc`
+      )
+      return response.data
+    } catch (error) {
+      console.warn('[Strapi] Falling back to JSON data for resources:', error)
+      const { readData } = await import('./data-service')
+      const data = await readData<{ resources: any[] }>('resources')
+      return data.resources.map((r: any) => ({
+        id: parseInt(r.id),
+        documentId: r.id,
+        name: r.title,
+        url: r.url,
+        category: r.category.toLowerCase() as StrapiResourceLink['category'],
+        description: r.description,
+        active: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        publishedAt: new Date().toISOString(),
+      })) as StrapiResourceLink[]
+    }
+  }
+
+  async getResourcesFromJSON(): Promise<any[]> {
+    const { readData } = await import('./data-service')
+    const data = await readData<{ resources: any[] }>('resources')
+    return data.resources
+  }
+
+  async getCarouselImages(): Promise<any[]> {
+    const { readData } = await import('./data-service')
+    const data = await readData<{ images: any[] }>('carousel')
+    return data.images
   }
 
   async getFormLinks(page: string): Promise<StrapiFormLink[]> {
