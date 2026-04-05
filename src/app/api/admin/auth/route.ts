@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHash, timingSafeEqual } from 'crypto';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-
-if (!ADMIN_PASSWORD) {
-  throw new Error('ADMIN_PASSWORD environment variable is required');
-}
-
 const SESSION_SECRET = process.env.SESSION_SECRET;
 
-if (!SESSION_SECRET) {
-  throw new Error('SESSION_SECRET environment variable is required');
+// Runtime check function instead of module-level throw
+function checkEnvVars(): { ok: boolean; error?: string } {
+  if (!ADMIN_PASSWORD) {
+    return { ok: false, error: 'ADMIN_PASSWORD environment variable is required' };
+  }
+  if (!SESSION_SECRET) {
+    return { ok: false, error: 'SESSION_SECRET environment variable is required' };
+  }
+  return { ok: true };
 }
 
 // JWT-based session for serverless compatibility
@@ -42,6 +44,10 @@ function createToken(): string {
 
 // Verify JWT token
 function verifyToken(token: string): boolean {
+  // Runtime env check
+  const envCheck = checkEnvVars();
+  if (!envCheck.ok) return false;
+
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return false;
@@ -63,6 +69,15 @@ function verifyToken(token: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  // Runtime env check
+  const envCheck = checkEnvVars();
+  if (!envCheck.ok) {
+    return NextResponse.json(
+      { success: false, error: envCheck.error },
+      { status: 500 }
+    );
+  }
+
   try {
     const { password } = await request.json();
 
