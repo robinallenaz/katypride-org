@@ -3,7 +3,7 @@ services:
     name: katypride-strapi
     env: node
     plan: free
-    buildCommand: cd backend && npm install && npm run build && npx strapi migrate
+    buildCommand: cd backend && rm -rf .cache build dist node_modules && npm ci && npm run build && npx strapi migrate
     startCommand: cd backend && npm start
     healthCheckPath: /api/health
     envVars:

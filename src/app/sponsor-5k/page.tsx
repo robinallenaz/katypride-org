@@ -25,6 +25,22 @@ export default function SponsorSignupPage() {
           <p className="text-lg sm:text-xl text-gray-700 mb-6 sm:mb-8">
             Partner with us to create an inclusive community while showcasing your organization's commitment to diversity and inclusion.
           </p>
+          
+          {/* Sponsor Packet Download */}
+          <div className="mb-6">
+            <a
+              href="/sponsorship-packet.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center bg-white border-2 border-[#760088] text-[#760088] px-6 py-3 rounded-full font-semibold hover:bg-[#EEEDFE] transition-colors gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Download Sponsor Packet (PDF)
+            </a>
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-8">
             <a
               href="/5k"

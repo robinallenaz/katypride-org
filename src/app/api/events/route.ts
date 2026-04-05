@@ -3,6 +3,9 @@ import { strapiClient } from '@/lib/strapi'
 
 const isDev = process.env.NODE_ENV === 'development'
 
+// Cache for 60 seconds on CDN, allow stale content for 5 minutes
+const CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300'
+
 export async function GET() {
   try {
     // Log in both dev and production for debugging
@@ -28,7 +31,12 @@ export async function GET() {
     if (isDev && events.length > 0) {
       console.log('[Events API] Event titles:', events.map(e => e.title))
     }
-    return NextResponse.json(events)
+    
+    return NextResponse.json(events, {
+      headers: {
+        'Cache-Control': CACHE_CONTROL,
+      },
+    })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     // Log in both dev and production for debugging
@@ -49,7 +57,13 @@ export async function GET() {
     
     return NextResponse.json(
       { error: responseMessage },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          // Don't cache error responses
+          'Cache-Control': 'no-store',
+        },
+      }
     )
   }
 }

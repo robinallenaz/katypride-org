@@ -1,6 +1,5 @@
 const STRAPI_URL = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337'
 const STRAPI_API_TOKEN = process.env.STRAPI_API_TOKEN || ''
-const IS_STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "true"
 
 // Validate environment variables at startup
 if (process.env.NODE_ENV === 'production' && (!STRAPI_URL || STRAPI_URL === 'http://localhost:1337')) {
@@ -227,17 +226,11 @@ class StrapiClient {
       return image.url
     }
     if (image.url.startsWith('http')) {
-      if (IS_STATIC_EXPORT) return image.url
-      try {
-        const urlPath = new URL(image.url).pathname
-        return urlPath.startsWith('/uploads/') ? urlPath : image.url
-      } catch {
-        console.warn('[Strapi] Invalid image URL:', image.url)
-        return image.url
-      }
+      return image.url
     }
-    const relativePath = image.url.startsWith('/') ? image.url : `/${image.url}`
-    return IS_STATIC_EXPORT ? `${STRAPI_URL}${relativePath}` : relativePath
+    // For relative paths, prepend the Strapi base URL
+    const relativePath = image.url.startsWith('/') ? image.url.slice(1) : image.url
+    return `${STRAPI_URL}${relativePath}`
   }
 
   getImageUrlWithSize(image: StrapiImage, size: 'thumbnail' | 'small' | 'medium' | 'large' = 'medium'): string {
@@ -251,17 +244,11 @@ class StrapiClient {
         return format.url
       }
       if (format.url.startsWith('http')) {
-        if (IS_STATIC_EXPORT) return format.url
-        try {
-          const urlPath = new URL(format.url).pathname
-          return urlPath.startsWith('/uploads/') ? urlPath : format.url
-        } catch {
-          console.warn('[Strapi] Invalid format URL:', format.url)
-          return format.url
-        }
+        return format.url
       }
-      const relativePath = format.url.startsWith('/') ? format.url : `/${format.url}`
-      return IS_STATIC_EXPORT ? `${STRAPI_URL}${relativePath}` : relativePath
+      // For relative paths, prepend the Strapi base URL
+      const relativePath = format.url.startsWith('/') ? format.url.slice(1) : format.url
+      return `${STRAPI_URL}${relativePath}`
     }
     return this.getImageUrl(image)
   }

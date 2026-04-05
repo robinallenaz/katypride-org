@@ -22,7 +22,7 @@ export default function Home() {
               Welcome to Katy Pride
             </h1>
             <p className="text-xl md:text-2xl text-gray-800 mb-8 max-w-3xl mx-auto leading-relaxed">
-              Building community, advocating for equality,<br />and celebrating diversity in Katy and beyond.
+              Empowering the LGBTQ+ community in Katy and West Houston by creating inclusive events, advocating for equality, and fostering a supportive community of acceptance and diversity.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
               <a
@@ -36,10 +36,10 @@ export default function Home() {
                 href="https://raceroster.com/events/2026/116853/chase-the-rainbow-stride-with-pride/volunteer/register"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-heading inline-flex min-w-[200px] sm:min-w-[240px] flex-col items-center justify-center rounded-full bg-white text-[#760088] border border-purple-100/50 px-6 sm:px-7 py-3 font-semibold transition-all hover:bg-[#EEEDFE] focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-100 focus-visible:ring-offset-2 focus-visible:ring-offset-white text-sm sm:text-base"
+                className="font-heading inline-flex min-w-[200px] sm:min-w-[240px] flex-col items-center justify-center rounded-full bg-[#06bd01] text-white border border-[#06bd01] px-6 sm:px-7 py-3 font-semibold transition-all hover:bg-[#05a801] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#06bd01] focus-visible:ring-offset-2 focus-visible:ring-offset-white text-sm sm:text-base shadow-md"
               >
-                <span>Volunteer at Katy Pride</span>
-                <span className="mt-0.5 text-xs sm:text-sm font-normal text-[#760088]/90">Join the team</span>
+                <span>Katy Pride 5K</span>
+                <span className="mt-0.5 text-xs sm:text-sm font-normal text-white/90">Register or Volunteer</span>
               </a>
               <a
                 href="/newsletter"
@@ -121,7 +121,7 @@ export default function Home() {
                     <div className="inline-flex items-center justify-center w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full mb-3 md:mb-4">
                       <Heart className="w-6 h-6 md:w-8 md:h-8 text-white" />
                     </div>
-                    <p className="text-gray-700 font-medium text-base md:text-lg">"Building community. Creating change. Celebrating pride. Empowering LGBTQ+ voices in Katy and West Houston through inclusive events, transformative advocacy, and unwavering support."</p>
+                    <p className="text-gray-700 font-medium text-base md:text-lg">"Empowering the LGBTQ+ community in Katy and West Houston by creating inclusive events, advocating for equality, and fostering a supportive community of acceptance and diversity."</p>
                   </div>
                 </div>
               </div>

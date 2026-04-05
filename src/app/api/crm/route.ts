@@ -7,8 +7,11 @@ const CRM_ADMIN_SECRET = process.env.CRM_ADMIN_SECRET || '';
 const ALLOWED_CONTACT_TYPES = ['volunteer', 'donor', 'community-member', 'vendor', 'sponsor'] as const;
 const ALLOWED_VENDOR_TYPES = ['nonprofit', 'forprofit', 'food', 'political', 'government'] as const;
 const ALLOWED_SPONSORSHIP_LEVELS = [
+  // 5K levels
   'water-station', 'community', 'bronze', 'color-run', 'silver',
   'kids-dash', 'gold', 'presenting', 'custom',
+  // Celebration levels
+  'friends', 'rainbow', 'platinum', 'title',
 ] as const;
 const ALLOWED_SPONSOR_EVENTS = [
   'chase-the-rainbow-5k-2026', 'katy-pride-celebration-2026',
@@ -578,6 +581,38 @@ export async function POST(request: NextRequest) {
 
     // Build tags — only allow known interest values to prevent tag injection
     const tags: string[] = [type];
+    
+    // Add sponsor-specific tags immediately if type is sponsor
+    if (type === 'sponsor') {
+      tags.push('sponsor');
+      if (sponsorshipLevel && (ALLOWED_SPONSORSHIP_LEVELS as readonly string[]).includes(sponsorshipLevel)) {
+        tags.push(`sponsor-${sponsorshipLevel}`);
+      }
+      // Validate custom sponsorship amount is numeric when level is 'custom'
+      if (sponsorshipLevel === 'custom' && customSponsorshipAmount) {
+        const parsedCustomAmount = parseFloat(customSponsorshipAmount);
+        if (isNaN(parsedCustomAmount) || parsedCustomAmount <= 0) {
+          return NextResponse.json(
+            { success: false, error: 'Invalid custom sponsorship amount. Please enter a valid positive number.' },
+            { status: 400 }
+          );
+        }
+      }
+      if (event) {
+        const normalizedEvent = event.toLowerCase().replace(/\s+/g, '-');
+        if ((ALLOWED_SPONSOR_EVENTS as readonly string[]).includes(normalizedEvent)) {
+          tags.push(`event-${normalizedEvent}`);
+        }
+      }
+      if (interestedInExclusives && Array.isArray(interestedInExclusives)) {
+        interestedInExclusives.forEach((exclusive: string) => {
+          if (exclusive && typeof exclusive === 'string' && (ALLOWED_EXCLUSIVE_OPPORTUNITIES as readonly string[]).includes(exclusive)) {
+            tags.push(`exclusive-${exclusive}`);
+          }
+        });
+      }
+    }
+    
     if (interests && Array.isArray(interests)) {
       const allowed = type === 'volunteer' ? ALLOWED_VOLUNTEER_INTERESTS
         : type === 'community-member' ? ALLOWED_COMMUNITY_INTERESTS
@@ -602,14 +637,23 @@ export async function POST(request: NextRequest) {
     if (pronouns) customFields.pronouns = pronouns;
     if (type === 'donor') {
       if (donationFrequency) customFields.donation_frequency = donationFrequency;
-      if (donationAmount) customFields.last_donation_amount = parseFloat(donationAmount);
+      if (type === 'donor' && donationAmount) {
+        const parsedAmount = parseFloat(donationAmount);
+        if (!isNaN(parsedAmount)) {
+          customFields.last_donation_amount = parsedAmount;
+        }
+      }
       if (anonymous) customFields.anonymous = anonymous;
       if (comments) customFields.comments = comments;
+      // Legacy support for old field names with NaN validation
+      if (type === 'donor' && frequency) customFields.donation_frequency = frequency;
+      if (type === 'donor' && amount) {
+        const parsedAmount = parseFloat(amount);
+        if (!isNaN(parsedAmount)) {
+          customFields.last_donation_amount = parsedAmount;
+        }
+      }
     }
-    // Legacy support for old field names
-    if (type === 'donor' && frequency) customFields.donation_frequency = frequency;
-    if (type === 'donor' && amount) customFields.last_donation_amount = amount;
-
     // Build address object with validation
     const contactAddress: Record<string, string> = {};
     if (address && typeof address === 'string' && address.trim().length > 0) {
@@ -695,25 +739,6 @@ export async function POST(request: NextRequest) {
       if (wantInvoice) sponsorNote += '\nInvoice Requested: Yes';
       
       contactPayload.contactNote = sponsorNote;
-      
-      // Add sponsor-specific tags (validated against allowlists)
-      tags.push('sponsor');
-      if (sponsorshipLevel && (ALLOWED_SPONSORSHIP_LEVELS as readonly string[]).includes(sponsorshipLevel)) {
-        tags.push(`sponsor-${sponsorshipLevel}`);
-      }
-      if (event) {
-        const normalizedEvent = event.toLowerCase().replace(/\s+/g, '-');
-        if ((ALLOWED_SPONSOR_EVENTS as readonly string[]).includes(normalizedEvent)) {
-          tags.push(`event-${normalizedEvent}`);
-        }
-      }
-      if (interestedInExclusives && Array.isArray(interestedInExclusives)) {
-        interestedInExclusives.forEach((exclusive: string) => {
-          if (exclusive && typeof exclusive === 'string' && (ALLOWED_EXCLUSIVE_OPPORTUNITIES as readonly string[]).includes(exclusive)) {
-            tags.push(`exclusive-${exclusive}`);
-          }
-        });
-      }
     }
 
     const contact = await ghlRequest('/contacts/', {
