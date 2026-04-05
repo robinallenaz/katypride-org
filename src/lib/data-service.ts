@@ -3,12 +3,43 @@ import path from 'path';
 
 const dataDir = path.join(process.cwd(), 'data');
 
+// Ensure data directory exists on module load
+(async () => {
+  try {
+    await fs.access(dataDir);
+  } catch {
+    try {
+      await fs.mkdir(dataDir, { recursive: true });
+    } catch (error) {
+      console.error(`[DataService] Failed to create data directory: ${dataDir}`, error);
+    }
+  }
+})();
+
 // File locking to prevent race conditions
 const fileLocks = new Map<string, Promise<void>>();
+const LOCK_TIMEOUT_MS = 5000; // 5 second timeout
 
 async function acquireLock(filePath: string): Promise<() => void> {
+  const startTime = Date.now();
+  
   while (fileLocks.has(filePath)) {
-    await fileLocks.get(filePath);
+    // Wait for existing lock with timeout
+    await Promise.race([
+      fileLocks.get(filePath)!,
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('File lock timeout')), LOCK_TIMEOUT_MS)
+      )
+    ]).catch(() => {
+      // If timeout, force release the stuck lock
+      fileLocks.delete(filePath);
+    });
+    
+    // Safety check: if we've been waiting too long, break
+    if (Date.now() - startTime > LOCK_TIMEOUT_MS * 2) {
+      fileLocks.delete(filePath);
+      break;
+    }
   }
   
   let release: () => void = () => {};
@@ -37,6 +68,7 @@ export async function readData<T>(filename: string): Promise<T> {
       if (filename === 'carousel') return { images: [] } as unknown as T;
       if (filename === 'events') return { events: [] } as unknown as T;
       if (filename === 'resources') return { resources: [] } as unknown as T;
+      if (filename === 'form-backup') return { submissions: [] } as unknown as T;
     }
     console.error(`Error reading ${filename}:`, error);
     throw new Error(`Failed to read ${filename}`);

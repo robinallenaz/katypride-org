@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual, createHash } from 'crypto';
 import { ghlRequest, GHL_LOCATION_ID } from '@/lib/ghl';
+import { readData, writeData } from '@/lib/data-service';
 
 const GHL_API_KEY = process.env.GHL_API_KEY || '';
 const CRM_ADMIN_SECRET = process.env.CRM_ADMIN_SECRET || '';
@@ -30,6 +31,33 @@ const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 const RATE_LIMIT_MAX = 5;
 const MAX_RATE_LIMIT_ENTRIES = 1000; // Prevent memory exhaustion
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+// Fallback backup function to save form data locally if CRM fails
+async function saveFormBackup(formData: any): Promise<void> {
+  try {
+    const timestamp = new Date().toISOString();
+    const backupEntry = {
+      timestamp,
+      ...formData,
+      source: 'crm_fallback',
+    };
+    
+    // Use the data service to append to a backup file
+    const existing = await readData<{ submissions: any[] }>('form-backup');
+    const submissions = existing?.submissions || [];
+    submissions.push(backupEntry);
+    
+    // Keep only last 1000 submissions to prevent file bloat
+    if (submissions.length > 1000) {
+      submissions.splice(0, submissions.length - 1000);
+    }
+    
+    await writeData('form-backup', { submissions });
+    console.log('[CRM Fallback] Form data saved to backup:', timestamp);
+  } catch (backupError) {
+    console.error('[CRM Fallback] Failed to save backup:', backupError);
+  }
+}
 
 // Cleanup interval reference - initialized once at module load
 let cleanupInterval: NodeJS.Timeout | null = null;
@@ -132,6 +160,10 @@ process.on('beforeExit', () => {
     clearInterval(cleanupInterval);
     cleanupInterval = null;
   }
+  if (rateLockCleanupInterval) {
+    clearInterval(rateLockCleanupInterval);
+    rateLockCleanupInterval = null;
+  }
 });
 
 process.on('SIGINT', () => {
@@ -139,12 +171,20 @@ process.on('SIGINT', () => {
     clearInterval(cleanupInterval);
     cleanupInterval = null;
   }
+  if (rateLockCleanupInterval) {
+    clearInterval(rateLockCleanupInterval);
+    rateLockCleanupInterval = null;
+  }
 });
 
 process.on('SIGTERM', () => {
   if (cleanupInterval) {
     clearInterval(cleanupInterval);
     cleanupInterval = null;
+  }
+  if (rateLockCleanupInterval) {
+    clearInterval(rateLockCleanupInterval);
+    rateLockCleanupInterval = null;
   }
 });
 
@@ -491,8 +531,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Capture body early so it's available in catch block for backup
+  let requestBody: any;
   try {
-    const body = await request.json();
+    requestBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      { success: false, error: 'Invalid JSON body' },
+      { status: 400 }
+    );
+  }
+
+  try {
     const {
       type, name, email, phone, interests, availability, amount, frequency, pronouns,
       company, address, city, state, postalCode, website, socialMedia,
@@ -505,7 +555,7 @@ export async function POST(request: NextRequest) {
       event,
       source, // Track form source (e.g., 'Newsletter Signup')
       _gotcha, // honeypot field — bots fill this, real users don't see it
-    } = body;
+    } = requestBody;
 
     // Reject bot submissions that filled the hidden honeypot field
     if (_gotcha) {
@@ -795,6 +845,17 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('CRM API Error:', error);
+    
+    // Save form data to backup if CRM fails (requestBody is already available)
+    try {
+      await saveFormBackup({
+        ...requestBody,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } catch (backupSaveError) {
+      console.error('Failed to save form backup:', backupSaveError);
+    }
+    
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'An unexpected error occurred' },
       { status: 500 }

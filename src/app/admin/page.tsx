@@ -60,6 +60,15 @@ export default function AdminLogin() {
           <h2 className="font-heading text-xl font-bold text-[#760088] mb-2">Carousel</h2>
           <p className="text-gray-600 text-sm">Manage homepage carousel images</p>
         </a>
+
+        <a
+          href="/admin/submissions"
+          className="block bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow"
+        >
+          <div className="text-4xl mb-3">📋</div>
+          <h2 className="font-heading text-xl font-bold text-[#760088] mb-2">Form Submissions</h2>
+          <p className="text-gray-600 text-sm">View vendor, sponsor, and volunteer form submissions</p>
+        </a>
       </div>
     );
   }
