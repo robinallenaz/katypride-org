@@ -101,10 +101,6 @@ export default function AdminLogin() {
             {isSubmitting ? 'Logging in...' : 'Login'}
           </button>
         </form>
-
-        <p className="text-center text-xs text-gray-500 mt-4">
-          Default password: <code className="bg-gray-100 px-1 py-0.5 rounded">katypride2026</code>
-        </p>
       </div>
     </div>
   );
