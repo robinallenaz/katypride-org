@@ -1,35 +1,4 @@
-import { strapiClient, type StrapiPageContent } from '@/lib/strapi'
-import StrapiRichText from '@/components/StrapiRichText'
-
-export const dynamic = 'force-dynamic'
-
-interface PageContent {
-  heading?: string
-  intro?: any[]
-}
-
-async function getPageContent(page: string): Promise<PageContent | null> {
-  try {
-    const strapiContent = await strapiClient.getPageContent(page)
-    
-    if (!strapiContent) return null
-    
-    return {
-      heading: strapiContent.heading,
-      intro: strapiContent.intro
-    }
-  } catch (error) {
-    console.error('Failed to fetch page content:', error)
-    return null
-  }
-}
-
-export default async function CelebrationPage() {
-  const pageContent = await getPageContent('celebration')
-
-  const heading = pageContent?.heading || 'Katy Pride Celebration'
-  const intro = pageContent?.intro
-
+export default function CelebrationPage() {
   return (
     <>
       <a 
@@ -42,24 +11,20 @@ export default async function CelebrationPage() {
         <section id="main-content" className="max-w-6xl mx-auto px-4 py-16">
         <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-purple-100/20 shadow-xl p-8 md:p-10">
           <h1 className="font-heading text-4xl md:text-5xl font-bold text-[#760088] mb-4">
-            {heading}
+            Katy Pride Celebration
           </h1>
           <div className="text-lg text-gray-800 leading-relaxed max-w-3xl">
-            {intro ? (
-              <StrapiRichText content={intro} />
-            ) : (
-              <div className="space-y-6">
-                <p>
-                  Join us for the Katy Pride 2026 Celebration on Saturday, October 3, 2026 from 11AM to 4PM at the Bear Creek Rodeo Arena in Houston, Texas. This year's theme "STAND TALL, Y'ALL!" celebrates the strength, resilience, and vibrant diversity of our LGBTQ+ community in Katy and West Houston.
-                </p>
-                <p>
-                  Expected to draw 2,000+ attendees, our annual celebration is the cornerstone of Katy Pride's mission to empower LGBTQ+ individuals and allies through inclusive events, advocacy, and community building. Serving Katy, Harris, Fort Bend, and Waller counties, we're creating safe spaces where everyone can live authentically and proudly.
-                </p>
-                <p>
-                  The celebration features 70+ vendor booths, live entertainment, community resources, family-friendly activities, and opportunities to connect with local LGBTQ+ organizations and allies. Whether you're looking to celebrate, volunteer, or simply show your support, the Katy Pride Celebration is where our community comes together to stand tall, speak out, and build a more inclusive future for all.
-                </p>
-              </div>
-            )}
+            <div className="space-y-6">
+              <p>
+                Join us for the Katy Pride 2026 Celebration on Saturday, October 3, 2026 from 11AM to 4PM at the Bear Creek Rodeo Arena in Houston, Texas. This year&apos;s theme &quot;STAND TALL, Y&apos;ALL!&quot; celebrates the strength, resilience, and vibrant diversity of our LGBTQ+ community in Katy and West Houston.
+              </p>
+              <p>
+                Expected to draw 2,000+ attendees, our annual celebration is the cornerstone of Katy Pride&apos;s mission to empower LGBTQ+ individuals and allies through inclusive events, advocacy, and community building. Serving Katy, Harris, Fort Bend, and Waller counties, we&apos;re creating safe spaces where everyone can live authentically and proudly.
+              </p>
+              <p>
+                The celebration features 70+ vendor booths, live entertainment, community resources, family-friendly activities, and opportunities to connect with local LGBTQ+ organizations and allies. Whether you&apos;re looking to celebrate, volunteer, or simply show your support, the Katy Pride Celebration is where our community comes together to stand tall, speak out, and build a more inclusive future for all.
+              </p>
+            </div>
           </div>
 
           {/* Vendor & Sponsor Links */}
@@ -91,6 +56,17 @@ export default async function CelebrationPage() {
                   strokeWidth={2}
                   d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
                 />
+              </svg>
+            </a>
+            <a
+              href="/sponsorship-packet.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-white border-2 border-[#760088] text-[#760088] font-semibold px-6 py-3 rounded-full hover:bg-purple-50 transition-colors"
+            >
+              View Sponsorship Packet (PDF)
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </a>
           </div>

@@ -150,7 +150,7 @@ interface EventsListProps {
 export default function EventsList({ initialEvents, error }: EventsListProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState<string>('')
-  const [visibleCount, setVisibleCount] = useState(3)
+  const [visibleCount, setVisibleCount] = useState(6)
 
   const allEvents = useMemo(() => {
     const now = new Date()
@@ -203,7 +203,7 @@ export default function EventsList({ initialEvents, error }: EventsListProps) {
                   placeholder="Search events by title or location..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+                  className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
                 />
                 <svg
                   className="absolute left-3 top-3.5 w-4 h-4 text-gray-400"

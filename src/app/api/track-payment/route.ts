@@ -3,17 +3,34 @@ import Stripe from 'stripe';
 import { Redis } from '@upstash/redis';
 import { ghlRequest, GHL_LOCATION_ID } from '@/lib/ghl';
 
+// Kill switch: Check if Stripe payments are disabled
+const stripeEnabled = process.env.STRIPE_ENABLED !== 'false';
+
 // Initialize Redis client for idempotency tracking
 const redis = Redis.fromEnv();
 
-// Environment variable validation at module load
-const stripeKey = process.env.STRIPE_SECRET_KEY;
+// Environment variable validation - lazy, not at module load
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-if (!stripeKey) {
-  throw new Error('STRIPE_SECRET_KEY is required but not configured');
+// Lazy Stripe initialization
+let stripeInstance: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (!stripeEnabled) {
+    throw new Error('Stripe is disabled via STRIPE_ENABLED env var');
+  }
+  
+  if (!stripeInstance) {
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeKey) {
+      throw new Error('STRIPE_SECRET_KEY is not configured');
+    }
+    stripeInstance = new Stripe(stripeKey, { apiVersion: '2025-02-24.acacia' as any });
+  }
+  
+  return stripeInstance;
 }
 
 if (!upstashUrl || !upstashToken) {
@@ -78,6 +95,14 @@ function isEventProcessed(eventId: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  // Check kill switch first
+  if (!stripeEnabled) {
+    return NextResponse.json(
+      { error: 'Payment tracking is currently disabled' },
+      { status: 503 }
+    );
+  }
+
   if (!webhookSecret) {
     console.error('STRIPE_WEBHOOK_SECRET is not configured');
     return NextResponse.json({ error: 'Webhook service not configured' }, { status: 503 });
@@ -88,7 +113,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
   }
 
-  const stripe = new Stripe(stripeKey!, { apiVersion: '2025-02-24.acacia' as any });
+  const stripe = getStripe();
 
   let event: Stripe.Event
   try {

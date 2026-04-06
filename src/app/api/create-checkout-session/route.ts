@@ -255,14 +255,14 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         disabled: true,
-        message: 'Online payment is temporarily unavailable. Your registration has been recorded and an invoice will be sent to your email within 24 hours to complete payment.',
+        message: 'Thank you for your registration! An invoice will be sent to your email with instructions to complete payment.',
         url: null,
         sessionId: null,
       });
     } catch (error) {
       return NextResponse.json({
         disabled: true,
-        message: 'Payment processing is temporarily unavailable. Please email info@katypride.org to complete your registration.',
+        message: 'Thank you for your registration! An invoice will be sent to your email with instructions to complete payment.',
         url: null,
         sessionId: null,
       });

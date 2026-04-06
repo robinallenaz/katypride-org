@@ -69,12 +69,12 @@ export function useAdminAuth() {
     return () => clearInterval(interval);
   }, [token, isAuthenticated, verifyToken, logout]);
 
-  const login = async (password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<boolean> => {
     try {
       const response = await fetch('/api/admin/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();

@@ -860,6 +860,18 @@ export async function POST(request: NextRequest) {
       { success: false, error: error instanceof Error ? error.message : 'An unexpected error occurred' },
       { status: 500 }
     );
+  } finally {
+    // Save successful submission to backup for admin review
+    if (requestBody) {
+      try {
+        await saveFormBackup({
+          ...requestBody,
+          crmSuccess: true,
+        });
+      } catch (backupSaveError) {
+        console.error('Failed to save form backup:', backupSaveError);
+      }
+    }
   }
 }
 

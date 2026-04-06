@@ -1,16 +1,40 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 
+// Kill switch: Check if Stripe payments are disabled
+const stripeEnabled = process.env.STRIPE_ENABLED !== 'false';
+
+// Lazy Stripe initialization
+let stripeInstance: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (!stripeEnabled) {
+    throw new Error('Stripe is disabled via STRIPE_ENABLED env var');
+  }
+  
+  if (!stripeInstance) {
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeKey) {
+      throw new Error('STRIPE_SECRET_KEY is not configured');
+    }
+    stripeInstance = new Stripe(stripeKey, {
+      apiVersion: '2026-03-25.dahlia',
+    });
+  }
+  
+  return stripeInstance;
+}
+
 export async function POST(request: Request) {
-  const stripeKey = process.env.STRIPE_SECRET_KEY
-  if (!stripeKey) {
-    console.error('STRIPE_SECRET_KEY is not configured')
-    return NextResponse.json({ error: 'Payment service not configured' }, { status: 503 })
+  // Check kill switch first
+  if (!stripeEnabled) {
+    return NextResponse.json(
+      { error: 'Payment processing is currently disabled' },
+      { status: 503 }
+    );
   }
 
-  const stripe = new Stripe(stripeKey, {
-    apiVersion: '2026-03-25.dahlia',
-  })
+  const stripe = getStripe();
 
   try {
     const { amount, currency = 'usd', payment_method_type, donor_email, donor_name, donation_frequency } = await request.json()

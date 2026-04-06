@@ -1,18 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-// Environment variable validation at module load
-const stripeKey = process.env.STRIPE_SECRET_KEY;
+// Kill switch: Check if Stripe payments are disabled
+const stripeEnabled = process.env.STRIPE_ENABLED !== 'false';
 
-if (!stripeKey) {
-  throw new Error('STRIPE_SECRET_KEY is required but not configured');
+// Lazy initialization - don't throw at module load
+let stripeInstance: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (!stripeEnabled) {
+    throw new Error('Stripe is disabled via STRIPE_ENABLED env var');
+  }
+  
+  if (!stripeInstance) {
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeKey) {
+      throw new Error('STRIPE_SECRET_KEY is not configured');
+    }
+    stripeInstance = new Stripe(stripeKey, {
+      apiVersion: '2025-02-24.acacia' as any,
+    });
+  }
+  
+  return stripeInstance;
 }
 
-const stripe = new Stripe(stripeKey, {
-  apiVersion: '2025-02-24.acacia' as any, // Pin to stable version
-});
-
 export async function GET(request: NextRequest) {
+  // Check kill switch first
+  if (!stripeEnabled) {
+    return NextResponse.json(
+      { error: 'Payment verification is currently disabled' },
+      { status: 503 }
+    );
+  }
 
   const sessionId = request.nextUrl.searchParams.get('session_id');
   
@@ -26,6 +46,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const stripe = getStripe();
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 
     if (session.payment_status === 'paid') {

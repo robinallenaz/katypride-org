@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readData } from '@/lib/data-service';
+import { readData, writeData } from '@/lib/data-service';
 import { verifySession } from '../auth/route';
 
 interface FormSubmission {
@@ -72,6 +72,59 @@ export async function GET(request: NextRequest) {
     console.error('Error reading form backup:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to read form submissions' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const auth = authenticate(request);
+  if (!auth.success) return auth.response;
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const timestamp = searchParams.get('timestamp');
+    const email = searchParams.get('email');
+
+    if (!timestamp || !email) {
+      return NextResponse.json(
+        { success: false, error: 'Timestamp and email are required' },
+        { status: 400 }
+      );
+    }
+
+    // Read current data
+    const data = await readData<FormBackupData>('form-backup');
+    let submissions = data?.submissions || [];
+
+    // Find and remove the matching submission
+    const initialCount = submissions.length;
+    submissions = submissions.filter((sub: FormSubmission) => {
+      // Match by timestamp and email to ensure we delete the right one
+      return !(sub.timestamp === timestamp && sub.email === email);
+    });
+
+    const deletedCount = initialCount - submissions.length;
+
+    if (deletedCount === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Submission not found' },
+        { status: 404 }
+      );
+    }
+
+    // Write updated data back
+    await writeData('form-backup', { submissions });
+
+    return NextResponse.json({
+      success: true,
+      message: `Deleted ${deletedCount} submission(s)`,
+      remaining: submissions.length
+    });
+  } catch (error) {
+    console.error('Error deleting submission:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete submission' },
       { status: 500 }
     );
   }

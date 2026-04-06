@@ -28,12 +28,13 @@ function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(hashA, hashB);
 }
 
-// Create JWT token
-function createToken(): string {
+// Create JWT token with email
+function createToken(email: string): string {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const now = Math.floor(Date.now() / 1000);
   const payload = Buffer.from(JSON.stringify({
-    sub: 'admin',
+    sub: email,
+    email: email,
     iat: now,
     exp: now + SESSION_MAX_AGE,
   })).toString('base64url');
@@ -79,7 +80,23 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { password } = await request.json();
+    const { email, password } = await request.json();
+
+    // Validate email
+    if (!email || typeof email !== 'string') {
+      return NextResponse.json(
+        { success: false, error: 'Email is required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate email domain
+    if (!email.endsWith('@katypride.org')) {
+      return NextResponse.json(
+        { success: false, error: 'Only @katypride.org email addresses are allowed' },
+        { status: 401 }
+      );
+    }
 
     if (!password || typeof password !== 'string') {
       return NextResponse.json(
@@ -90,13 +107,13 @@ export async function POST(request: NextRequest) {
 
     if (!safeEqual(password, ADMIN_PASSWORD!)) {
       return NextResponse.json(
-        { success: false, error: 'Invalid password' },
+        { success: false, error: 'Invalid email or password' },
         { status: 401 }
       );
     }
 
-    // Generate JWT token
-    const token = createToken();
+    // Generate JWT token with email
+    const token = createToken(email);
 
     return NextResponse.json({
       success: true,

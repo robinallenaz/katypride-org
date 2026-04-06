@@ -11,6 +11,9 @@ interface FormSubmission {
   company?: string;
   vendorType?: string;
   sponsorshipLevel?: string;
+  organizationType?: string;
+  wantInvoice?: boolean;
+  event?: string;
   error?: string;
   source?: string;
   phone?: string;
@@ -23,6 +26,7 @@ const typeFilters = [
   { value: 'sponsor', label: 'Sponsor Applications' },
   { value: 'volunteer', label: 'Volunteer Signups' },
   { value: 'donor', label: 'Donor Signups' },
+  { value: 'newsletter', label: 'Newsletter Signups' },
   { value: 'community-member', label: 'Community Members' },
 ];
 
@@ -32,6 +36,8 @@ export default function SubmissionsAdmin() {
   const [error, setError] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [selectedSubmission, setSelectedSubmission] = useState<FormSubmission | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { isAuthenticated, isLoading: authLoading, getAuthHeaders } = useAdminAuth();
 
   useEffect(() => {
@@ -80,6 +86,41 @@ export default function SubmissionsAdmin() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!selectedSubmission) return;
+    
+    setDeleting(true);
+    try {
+      const response = await fetch(
+        `/api/admin/submissions?timestamp=${encodeURIComponent(selectedSubmission.timestamp)}&email=${encodeURIComponent(selectedSubmission.email || '')}`,
+        {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+        }
+      );
+
+      if (response.status === 401) {
+        window.location.href = '/admin';
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSelectedSubmission(null);
+        setDeleteConfirm(false);
+        loadSubmissions();
+      } else {
+        setError(data.error || 'Failed to delete submission');
+      }
+    } catch (error) {
+      console.error('Failed to delete submission:', error);
+      setError('Failed to delete submission. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const getTypeLabel = (type?: string) => {
     const found = typeFilters.find(f => f.value === type);
     return found?.label || type || 'Unknown';
@@ -125,7 +166,7 @@ export default function SubmissionsAdmin() {
         <select
           value={selectedType}
           onChange={(e) => setSelectedType(e.target.value)}
-          className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#760088]"
+          className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#760088] text-gray-900 bg-white"
         >
           {typeFilters.map(filter => (
             <option key={filter.value} value={filter.value}>{filter.label}</option>
@@ -201,54 +242,35 @@ export default function SubmissionsAdmin() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-gray-500 uppercase">Type</label>
-                  <p className="font-medium">{getTypeLabel(selectedSubmission.type)}</p>
+                  <p className="font-medium text-gray-900">{getTypeLabel(selectedSubmission.type)}</p>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 uppercase">Submitted</label>
-                  <p className="font-medium">{formatDate(selectedSubmission.timestamp)}</p>
+                  <p className="font-medium text-gray-900">{formatDate(selectedSubmission.timestamp)}</p>
                 </div>
               </div>
 
               <div className="border-t pt-3">
-                <label className="text-xs text-gray-500 uppercase">Name</label>
-                <p className="font-medium">{selectedSubmission.name || 'N/A'}</p>
+                {Object.entries(selectedSubmission)
+                  .filter(([key]) => !['timestamp', 'type', 'error', 'source', 'crmSuccess'].includes(key))
+                  .map(([key, value]) => (
+                    <div key={key} className="mb-3">
+                      <label className="text-xs text-gray-500 uppercase">
+                        {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                      </label>
+                      <p className="font-medium text-gray-900">
+                        {typeof value === 'boolean' 
+                          ? (value ? 'Yes' : 'No')
+                          : (value === null || value === undefined || value === '' 
+                            ? 'N/A' 
+                            : String(value))}
+                      </p>
+                    </div>
+                  ))}
               </div>
-
-              <div>
-                <label className="text-xs text-gray-500 uppercase">Email</label>
-                <p className="font-medium">{selectedSubmission.email || 'N/A'}</p>
-              </div>
-
-              {selectedSubmission.phone && (
-                <div>
-                  <label className="text-xs text-gray-500 uppercase">Phone</label>
-                  <p className="font-medium">{selectedSubmission.phone}</p>
-                </div>
-              )}
-
-              {selectedSubmission.company && (
-                <div>
-                  <label className="text-xs text-gray-500 uppercase">Company</label>
-                  <p className="font-medium">{selectedSubmission.company}</p>
-                </div>
-              )}
-
-              {selectedSubmission.vendorType && (
-                <div>
-                  <label className="text-xs text-gray-500 uppercase">Vendor Type</label>
-                  <p className="font-medium">{selectedSubmission.vendorType}</p>
-                </div>
-              )}
-
-              {selectedSubmission.sponsorshipLevel && (
-                <div>
-                  <label className="text-xs text-gray-500 uppercase">Sponsorship Level</label>
-                  <p className="font-medium">{selectedSubmission.sponsorshipLevel}</p>
-                </div>
-              )}
 
               {selectedSubmission.error && (
-                <div className="bg-red-50 border border-red-200 rounded p-3">
+                <div className="bg-red-50 border border-red-200 rounded p-3 mt-3">
                   <label className="text-xs text-red-600 uppercase">CRM Error</label>
                   <p className="text-sm text-red-700 mt-1">{selectedSubmission.error}</p>
                 </div>
@@ -257,18 +279,56 @@ export default function SubmissionsAdmin() {
               {/* Raw Data */}
               <div className="border-t pt-3">
                 <label className="text-xs text-gray-500 uppercase">All Data</label>
-                <pre className="mt-2 bg-gray-100 p-3 rounded text-xs overflow-auto max-h-60">
+                <pre className="mt-2 bg-gray-100 p-3 rounded text-xs overflow-auto max-h-60 text-gray-900">
                   {JSON.stringify(selectedSubmission, null, 2)}
                 </pre>
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex justify-between">
+              <button
+                onClick={() => setDeleteConfirm(true)}
+                className="px-4 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200"
+              >
+                Delete
+              </button>
               <button
                 onClick={() => setSelectedSubmission(null)}
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && selectedSubmission && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-red-600 mb-4">Confirm Delete</h3>
+            <p className="text-gray-700 mb-4">
+              Are you sure you want to delete this submission from{' '}
+              <strong>{selectedSubmission.name || selectedSubmission.email || 'Unknown'}</strong>?
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              This action cannot be undone. The submission will be permanently removed from the local backup.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>

@@ -20,6 +20,7 @@ interface FormData {
   agreeToTerms: boolean;
   wantInvoice: boolean;
   gotcha: string; // honeypot field
+  event: string;
 }
 
 const STANDARD_TIERS = [
@@ -140,6 +141,7 @@ export default function CelebrationSponsorForm() {
     agreeToTerms: false,
     wantInvoice: false,
     gotcha: '',
+    event: 'katy-pride-celebration-2026',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -211,6 +213,7 @@ export default function CelebrationSponsorForm() {
           interestedInExclusives: formData.interestedInExclusives,
           additionalComments: formData.additionalComments,
           wantInvoice: formData.wantInvoice,
+          event: formData.event,
           _gotcha: formData.gotcha,
         }),
       });
