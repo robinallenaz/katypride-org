@@ -1,7 +1,27 @@
 'use client';
 
 import React, { useState } from 'react';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Check, Users, Trophy, Star, Heart } from 'lucide-react';
+
+let stripePromise: Promise<Stripe | null> | null = null;
+let lastPublishableKey: string | null = null;
+
+function getStripe(): Promise<Stripe | null> | null {
+  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  
+  // Reset promise if key changes or was previously null
+  if (stripePromise === null || publishableKey !== lastPublishableKey) {
+    lastPublishableKey = publishableKey || null;
+    if (!publishableKey) {
+      console.warn('Stripe publishable key not configured');
+      return null;
+    }
+    stripePromise = loadStripe(publishableKey);
+  }
+  return stripePromise;
+}
 
 interface SponsorFormData {
   // Contact Information
@@ -86,6 +106,13 @@ const SPONSORSHIP_LEVELS = [
     price: '$2,500',
     description: 'Maximum visibility and recognition',
     features: ['Presented by on event materials', 'Largest logo on race shirts', 'Recognition in press releases', '10 complimentary race entries', 'Premium booth space in festival area', 'Option for promotional items in race bags']
+  },
+  {
+    id: 'custom',
+    name: 'Custom Sponsorship',
+    price: 'Custom',
+    description: 'Enter your own sponsorship amount',
+    features: ['Custom sponsorship benefits', 'Contact us to discuss options', 'Flexible contribution level']
   }
 ];
 
@@ -102,7 +129,39 @@ const ORGANIZATION_TYPES = [
   'Other'
 ];
 
-export default function SponsorSignupForm() {
+export default function SponsorSignupFormWrapper() {
+  const stripe = getStripe();
+  
+  if (!stripe) {
+    return (
+      <div className="max-w-2xl mx-auto p-8 bg-red-50 rounded-lg text-red-700">
+        Payment system is not configured. Please contact support.
+      </div>
+    );
+  }
+
+  return (
+    <Elements stripe={stripe}>
+      <SponsorSignupForm />
+    </Elements>
+  );
+}
+
+function SponsorSignupForm() {
+  const stripe = useStripe();
+  const elements = useElements();
+
+  // Helper function to get sponsorship price
+  const getSponsorshipPrice = (levelId: string, customAmt?: string): number => {
+    if (levelId === 'custom' && customAmt) {
+      return parseFloat(customAmt) || 0;
+    }
+    const level = SPONSORSHIP_LEVELS.find(l => l.id === levelId);
+    if (!level) return 0;
+    if (level.price === 'FREE' || level.price === 'Custom') return 0;
+    return parseInt(level.price.replace('$', '').replace(',', ''), 10) || 0;
+  };
+
   const [formData, setFormData] = useState<SponsorFormData>({
     contactName: '',
     contactEmail: '',
@@ -166,15 +225,21 @@ export default function SponsorSignupForm() {
 
     // Sponsorship Information
     if (!formData.sponsorshipLevel) newErrors.sponsorshipLevel = 'Please select a sponsorship level';
+    // Validate custom amount format (prevent floating point issues)
     if (formData.sponsorshipLevel === 'custom') {
       if (!formData.customSponsorshipAmount) {
         newErrors.customSponsorshipAmount = 'Please enter a custom sponsorship amount';
       } else {
-        const parsedAmount = parseFloat(formData.customSponsorshipAmount);
-        if (isNaN(parsedAmount) || parsedAmount <= 0) {
-          newErrors.customSponsorshipAmount = 'Please enter a valid amount greater than $0';
-        } else if (parsedAmount > 100000) {
-          newErrors.customSponsorshipAmount = 'Amount cannot exceed $100,000';
+        const validAmountRegex = /^\d+(?:\.\d{1,2})?$/;
+        if (!validAmountRegex.test(formData.customSponsorshipAmount.trim())) {
+          newErrors.customSponsorshipAmount = 'Please enter a valid amount (e.g., 100 or 100.50)';
+        } else {
+          const parsedAmount = parseFloat(formData.customSponsorshipAmount);
+          if (isNaN(parsedAmount) || parsedAmount <= 0) {
+            newErrors.customSponsorshipAmount = 'Please enter a valid amount greater than $0';
+          } else if (parsedAmount > 100000) {
+            newErrors.customSponsorshipAmount = 'Amount cannot exceed $100,000';
+          }
         }
       }
     }
@@ -194,9 +259,29 @@ export default function SponsorSignupForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    if (!stripe || !elements) {
+      setSubmitMessage('Payment system is not ready. Please try again.');
+      return;
+    }
+
+    // Validate form first before checking card element
     if (!validateForm()) {
       return;
+    }
+
+    // Capture current form data to prevent race conditions during async operations
+    const currentFormData = { ...formData };
+
+    // Validate card element is present when payment is required
+    const requiresPayment = !currentFormData.wantInvoice && currentFormData.sponsorshipLevel && currentFormData.sponsorshipLevel !== 'water-station';
+    if (requiresPayment) {
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        setSubmitStatus('error');
+        setSubmitMessage('Please enter your card details to complete the payment.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -205,27 +290,30 @@ export default function SponsorSignupForm() {
 
     try {
       // First, submit to CRM to capture the lead
+      // Read honeypot value from form
+      const honeypotValue = (document.querySelector('input[name="_gotcha"]') as HTMLInputElement)?.value || '';
+      
       const crmRequestBody = {
         type: 'sponsor',
-        name: formData.contactName,
-        email: formData.contactEmail,
-        phone: formData.contactPhone,
-        contactTitle: formData.contactTitle,
-        company: formData.organizationName,
-        organizationName: formData.organizationName,
-        organizationType: formData.organizationType,
-        website: formData.website,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        postalCode: formData.zipCode,
-        sponsorshipLevel: formData.sponsorshipLevel,
-        customSponsorshipAmount: formData.customSponsorshipAmount,
-        additionalComments: formData.additionalComments,
-        wantInvoice: formData.wantInvoice,
+        name: currentFormData.contactName,
+        email: currentFormData.contactEmail,
+        phone: currentFormData.contactPhone,
+        contactTitle: currentFormData.contactTitle,
+        company: currentFormData.organizationName,
+        organizationName: currentFormData.organizationName,
+        organizationType: currentFormData.organizationType,
+        website: currentFormData.website,
+        address: currentFormData.address,
+        city: currentFormData.city,
+        state: currentFormData.state,
+        postalCode: currentFormData.zipCode,
+        sponsorshipLevel: currentFormData.sponsorshipLevel,
+        customSponsorshipAmount: currentFormData.customSponsorshipAmount,
+        additionalComments: currentFormData.additionalComments,
+        wantInvoice: currentFormData.wantInvoice,
         event: 'chase-the-rainbow-5k-2026',
-        paymentStatus: formData.wantInvoice ? 'invoice_requested' : 'pending',
-        _gotcha: ''
+        paymentStatus: currentFormData.wantInvoice ? 'invoice_requested' : 'pending',
+        _gotcha: honeypotValue,
       };
 
       const crmResponse = await fetch('/api/crm', {
@@ -241,107 +329,166 @@ export default function SponsorSignupForm() {
       }
 
       // If they want an invoice, skip Stripe and show success
-      if (formData.wantInvoice) {
+      if (currentFormData.wantInvoice) {
         setSubmitStatus('success');
         setSubmitMessage('Thank you for your sponsorship interest! We will contact you soon with next steps and payment information.');
-        setFormData({
-          contactName: '',
-          contactEmail: '',
-          contactPhone: '',
-          contactTitle: '',
-          organizationName: '',
-          organizationType: '',
-          website: '',
-          address: '',
-          city: '',
-          state: '',
-          zipCode: '',
-          sponsorshipLevel: '',
-          customSponsorshipAmount: '',
-          additionalComments: '',
-          agreeToTerms: false,
-          agreeToPayment: false,
-          wantInvoice: false
-        });
+        resetForm();
         setIsSubmitting(false);
         return;
       }
 
-      // Otherwise, create Stripe Checkout session for immediate payment
-      const checkoutResponse = await fetch('/api/create-checkout-session', {
+      // Get sponsorship amount in cents - use string parsing to avoid floating point issues
+      let sponsorshipAmountCents: number;
+      if (currentFormData.sponsorshipLevel === 'custom') {
+        // Parse dollars and cents separately to avoid floating point errors
+        const customAmount = currentFormData.customSponsorshipAmount.trim();
+        const match = customAmount.match(/^(\d+)(?:\.(\d{1,2}))?$/);
+        if (!match) {
+          throw new Error('Invalid sponsorship amount format');
+        }
+        const dollars = parseInt(match[1], 10);
+        const cents = match[2] ? parseInt(match[2].padEnd(2, '0').slice(0, 2), 10) : 0;
+        sponsorshipAmountCents = dollars * 100 + cents;
+      } else {
+        sponsorshipAmountCents = getSponsorshipPrice(currentFormData.sponsorshipLevel) * 100;
+      }
+
+      if (sponsorshipAmountCents <= 0) {
+        throw new Error('Invalid sponsorship amount');
+      }
+
+      // Create payment intent
+      const paymentResponse = await fetch('/api/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'sponsor',
-          sponsorshipLevel: formData.sponsorshipLevel,
-          customAmount: formData.customSponsorshipAmount,
-          email: formData.contactEmail,
-          name: formData.contactName,
-          company: formData.organizationName,
-          phone: formData.contactPhone,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          postalCode: formData.zipCode,
-          website: formData.website,
-          event: 'chase-the-rainbow-5k-2026',
+          amount: sponsorshipAmountCents,
+          currency: 'usd',
+          payment_method_type: 'card',
+          donor_email: currentFormData.contactEmail,
+          donor_name: currentFormData.contactName,
+          donation_frequency: 'one-time',
           metadata: {
-            contactTitle: formData.contactTitle,
-            organizationType: formData.organizationType,
-            additionalComments: formData.additionalComments,
+            type: 'sponsor',
+            sponsorshipLevel: currentFormData.sponsorshipLevel,
+            company: currentFormData.organizationName,
             crmContactId: crmResult.contactId || '',
           },
         }),
       });
 
-      const checkoutResult = await checkoutResponse.json();
-
-      // Handle Stripe disabled gracefully
-      if (checkoutResult.disabled) {
-        setSubmitStatus('success');
-        setSubmitMessage(checkoutResult.message || 'Your registration has been recorded. We will contact you shortly to complete payment.');
-        setFormData({
-          contactName: '',
-          contactEmail: '',
-          contactPhone: '',
-          contactTitle: '',
-          organizationName: '',
-          organizationType: '',
-          website: '',
-          address: '',
-          city: '',
-          state: '',
-          zipCode: '',
-          sponsorshipLevel: '',
-          customSponsorshipAmount: '',
-          additionalComments: '',
-          agreeToTerms: false,
-          agreeToPayment: false,
-          wantInvoice: false
-        });
-        setIsSubmitting(false);
-        return;
+      if (!paymentResponse.ok) {
+        const errorData = await paymentResponse.json();
+        throw new Error(errorData.error || 'Failed to create payment');
       }
 
-      if (!checkoutResponse.ok || !checkoutResult.url) {
-        throw new Error(checkoutResult.error || 'Failed to create payment session');
+      const { paymentIntent } = await paymentResponse.json();
+
+      // Confirm payment with card element
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error('Card information is required');
       }
 
-      // Redirect to Stripe Checkout
-      const checkoutUrl = checkoutResult.url;
+      let confirmedPayment;
       try {
-        const url = new URL(checkoutUrl);
-        const allowedHosts = ['checkout.stripe.com', 'pay.stripe.com'];
-        if (!allowedHosts.includes(url.hostname) || url.protocol !== 'https:') {
-          throw new Error('Invalid checkout domain');
+        const { error, paymentIntent: confirmed } = await stripe.confirmCardPayment(
+          paymentIntent.client_secret,
+          {
+            payment_method: {
+              card: cardElement,
+              billing_details: {
+                name: currentFormData.contactName,
+                email: currentFormData.contactEmail,
+                address: {
+                  line1: currentFormData.address,
+                  city: currentFormData.city,
+                  state: currentFormData.state,
+                  postal_code: currentFormData.zipCode,
+                },
+              },
+            },
+          }
+        );
+
+        if (error) {
+          throw new Error(error.message || 'Payment failed');
         }
-      } catch {
-        throw new Error('Invalid checkout URL received');
+        confirmedPayment = confirmed;
+      } catch (paymentError) {
+        // Update CRM with failed status before propagating error
+        try {
+          await fetch('/api/crm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'sponsor',
+              email: currentFormData.contactEmail,
+              paymentStatus: 'failed',
+              paymentIntentId: paymentIntent.id,
+              paymentError: paymentError instanceof Error ? paymentError.message : 'Payment failed',
+            }),
+          });
+        } catch (crmError) {
+          console.warn('Failed to update CRM with payment failure:', crmError);
+        }
+        throw paymentError;
       }
-      window.location.href = checkoutUrl;
+
+      // Handle 3D Secure or other actions required
+      // Stripe.js automatically handles the modal and resolves after authentication
+      // If status is still requires_action, authentication was not completed
+      if (confirmedPayment.status === 'requires_action') {
+        // Update CRM with failed status
+        try {
+          await fetch('/api/crm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'sponsor',
+              email: currentFormData.contactEmail,
+              paymentStatus: 'failed',
+              paymentIntentId: confirmedPayment.id,
+              paymentError: '3D Secure authentication incomplete',
+            }),
+          });
+        } catch (crmError) {
+          console.warn('Failed to update CRM with payment failure:', crmError);
+        }
+        throw new Error('Payment authentication incomplete. Please complete the verification or use a different card.');
+      }
+
+      if (confirmedPayment.status === 'succeeded') {
+        // Update CRM with payment status (non-blocking - don't fail if CRM update fails)
+        try {
+          const crmUpdateResponse = await fetch('/api/crm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'sponsor',
+              email: currentFormData.contactEmail,
+              paymentStatus: 'paid',
+              paymentIntentId: confirmedPayment.id,
+            }),
+          });
+
+          if (!crmUpdateResponse.ok) {
+            console.warn('Failed to update CRM with payment status:', await crmUpdateResponse.text());
+          }
+        } catch (crmError) {
+          console.warn('CRM update failed after payment:', crmError);
+        }
+
+        setSubmitStatus('success');
+        setSubmitMessage('Thank you for your sponsorship! Your payment has been processed successfully.');
+        resetForm();
+      } else {
+        throw new Error('Payment was not completed');
+      }
     } catch (error) {
       setSubmitStatus('error');
       setSubmitMessage(error instanceof Error ? error.message : 'There was an error submitting your sponsorship application. Please try again or contact us directly at info@katypride.org.');
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -352,6 +499,30 @@ export default function SponsorSignupForm() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      contactName: '',
+      contactEmail: '',
+      contactPhone: '',
+      contactTitle: '',
+      organizationName: '',
+      organizationType: '',
+      website: '',
+      address: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      sponsorshipLevel: '',
+      customSponsorshipAmount: '',
+      additionalComments: '',
+      agreeToTerms: false,
+      agreeToPayment: false,
+      wantInvoice: false,
+    });
+    setErrors({});
+    setSubmitMessage('');
   };
 
   if (submitStatus === 'success') {
@@ -387,6 +558,9 @@ export default function SponsorSignupForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Honeypot — hidden from real users, bots auto-fill it */}
+          <input type="text" name="_gotcha" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" suppressHydrationWarning={true} />
+
           {/* Contact Information */}
           <div>
             <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
@@ -402,7 +576,7 @@ export default function SponsorSignupForm() {
                   type="text"
                   value={formData.contactName}
                   onChange={(e) => handleInputChange('contactName', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700 ${
                     errors.contactName ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="John Doe"
@@ -418,7 +592,7 @@ export default function SponsorSignupForm() {
                   type="text"
                   value={formData.contactTitle}
                   onChange={(e) => handleInputChange('contactTitle', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700"
                   placeholder="Marketing Director"
                 />
               </div>
@@ -431,7 +605,7 @@ export default function SponsorSignupForm() {
                   type="email"
                   value={formData.contactEmail}
                   onChange={(e) => handleInputChange('contactEmail', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700 ${
                     errors.contactEmail ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="john@example.com"
@@ -447,7 +621,7 @@ export default function SponsorSignupForm() {
                   type="tel"
                   value={formData.contactPhone}
                   onChange={(e) => handleInputChange('contactPhone', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700 ${
                     errors.contactPhone ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="(555) 123-4567"
@@ -472,7 +646,7 @@ export default function SponsorSignupForm() {
                   type="text"
                   value={formData.organizationName}
                   onChange={(e) => handleInputChange('organizationName', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700 ${
                     errors.organizationName ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="Acme Corporation"
@@ -507,7 +681,7 @@ export default function SponsorSignupForm() {
                   type="url"
                   value={formData.website}
                   onChange={(e) => handleInputChange('website', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700 ${
                     errors.website ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="https://example.com"
@@ -543,7 +717,7 @@ export default function SponsorSignupForm() {
                   type="text"
                   value={formData.address}
                   onChange={(e) => handleInputChange('address', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700 ${
                     errors.address ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="123 Main St"
@@ -559,7 +733,7 @@ export default function SponsorSignupForm() {
                   type="text"
                   value={formData.city}
                   onChange={(e) => handleInputChange('city', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700 ${
                     errors.city ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="Katy"
@@ -576,7 +750,7 @@ export default function SponsorSignupForm() {
                     type="text"
                     value={formData.state}
                     onChange={(e) => handleInputChange('state', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 uppercase ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700 uppercase ${
                       errors.state ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="TX"
@@ -593,7 +767,7 @@ export default function SponsorSignupForm() {
                     type="text"
                     value={formData.zipCode}
                     onChange={(e) => handleInputChange('zipCode', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700 ${
                       errors.zipCode ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="77494"
@@ -651,7 +825,47 @@ export default function SponsorSignupForm() {
             {errors.sponsorshipLevel && <p className="text-red-500 text-sm mt-1">{errors.sponsorshipLevel}</p>}
           </div>
 
-          
+          {/* Payment Information - only show if not requesting invoice */}
+          {!formData.wantInvoice && formData.sponsorshipLevel && formData.sponsorshipLevel !== 'water-station' && (
+            <div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-[#760088]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                Payment Information
+              </h3>
+              <div className="p-4 border border-gray-300 rounded-lg bg-white">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Card Details *
+                </label>
+                <div className="p-3 border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-transparent">
+                  <CardElement 
+                    options={{
+                      style: {
+                        base: {
+                          fontSize: '16px',
+                          color: '#1a1a1a',
+                          '::placeholder': {
+                            color: '#374151',
+                          },
+                        },
+                        invalid: {
+                          color: '#dc2626',
+                        },
+                      },
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Your card will be charged ${getSponsorshipPrice(formData.sponsorshipLevel, formData.customSponsorshipAmount) > 0 ? getSponsorshipPrice(formData.sponsorshipLevel, formData.customSponsorshipAmount) : '0'}.00 for the sponsorship.
+                </p>
+                <p className="text-xs text-gray-500">
+                  Your card information is securely processed by Stripe.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Additional Comments */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -661,7 +875,7 @@ export default function SponsorSignupForm() {
               value={formData.additionalComments}
               onChange={(e) => handleInputChange('additionalComments', e.target.value)}
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700"
               placeholder="Any special requirements, questions about sponsorship benefits, or custom requests..."
             />
           </div>

@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   try {
     const { amount, currency = 'usd', payment_method_type, donor_email, donor_name, donation_frequency } = await request.json()
 
-    if (!amount || typeof amount !== 'number' || amount <= 0 || amount > 50000) {
+    if (!amount || typeof amount !== 'number' || amount <= 0 || amount > 5000000) {
       return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
     }
 
@@ -48,8 +48,9 @@ export async function POST(request: Request) {
     const automaticPaymentMethods = payment_method_type !== 'card' ? { enabled: true } : undefined
 
     // Create payment intent with metadata for CRM tracking
+    // Amount is already in cents from frontend
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // Convert to cents
+      amount: Math.round(amount),
       currency,
       ...(paymentMethodTypes && { payment_method_types: paymentMethodTypes }),
       ...(automaticPaymentMethods && { automatic_payment_methods: automaticPaymentMethods }),

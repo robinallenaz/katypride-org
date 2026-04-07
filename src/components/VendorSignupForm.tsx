@@ -1,6 +1,26 @@
 'use client';
 
 import React, { useState } from 'react';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+let stripePromise: Promise<Stripe | null> | null = null;
+let lastPublishableKey: string | null = null;
+
+function getStripe(): Promise<Stripe | null> | null {
+  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  
+  // Reset promise if key changes or was previously null
+  if (stripePromise === null || publishableKey !== lastPublishableKey) {
+    lastPublishableKey = publishableKey || null;
+    if (!publishableKey) {
+      console.warn('Stripe publishable key not configured');
+      return null;
+    }
+    stripePromise = loadStripe(publishableKey);
+  }
+  return stripePromise;
+}
 
 // Validation helpers
 const isValidEmail = (email: string): boolean => {
@@ -31,7 +51,27 @@ const vendorTypes = [
   { value: 'government', label: 'Government Entity', price: 275 },
 ];
 
-export default function VendorSignupForm() {
+export default function VendorSignupFormWrapper() {
+  const stripe = getStripe();
+  
+  if (!stripe) {
+    return (
+      <div className="max-w-2xl mx-auto p-8 bg-red-50 rounded-lg text-red-700">
+        Payment system is not configured. Please contact support.
+      </div>
+    );
+  }
+
+  return (
+    <Elements stripe={stripe}>
+      <VendorSignupForm />
+    </Elements>
+  );
+}
+
+function VendorSignupForm() {
+  const stripe = useStripe();
+  const elements = useElements();
   const [formData, setFormData] = useState({
     company: '',
     address: '',
@@ -127,6 +167,11 @@ export default function VendorSignupForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!stripe || !elements) {
+      setSubmitMessage('Payment system is not ready. Please try again.');
+      return;
+    }
     
     // Validate form before submission
     if (!validateForm()) {
@@ -150,13 +195,16 @@ export default function VendorSignupForm() {
 
     try {
       // First, submit to CRM to capture the lead
+      // Read honeypot value from form
+      const honeypotValue = (document.querySelector('input[name="_gotcha"]') as HTMLInputElement)?.value || '';
+      
       const crmResponse = await fetch('/api/crm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'vendor',
           name: `${formData.firstName} ${formData.lastName}`,
-          _gotcha: (document.querySelector('input[name="_gotcha"]') as HTMLInputElement)?.value || '',
+          _gotcha: honeypotValue,
           email: formData.email,
           phone: formData.phone,
           company: formData.company,
@@ -169,6 +217,7 @@ export default function VendorSignupForm() {
           vendorType: currentVendorTypeValue,
           vendor_fee: currentVendorType.price,
           productsServices: formData.productsServices,
+          agreeToTexts: formData.agreeToTexts,
           paymentStatus: 'pending',
         }),
       });
@@ -179,60 +228,137 @@ export default function VendorSignupForm() {
         throw new Error(crmResult.error || 'Failed to submit application');
       }
 
-      // Then, create Stripe Checkout session
-      const checkoutResponse = await fetch('/api/create-checkout-session', {
+      // Create payment intent - amount already in cents from vendorType.price * 100
+      const paymentResponse = await fetch('/api/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'vendor',
-          vendorType: currentVendorTypeValue,
-          email: currentFormData.email,
-          name: `${currentFormData.firstName} ${currentFormData.lastName}`,
-          company: currentFormData.company,
-          phone: currentFormData.phone,
-          address: currentFormData.address,
-          city: currentFormData.city,
-          state: currentFormData.state,
-          postalCode: currentFormData.postalCode,
-          website: currentFormData.website,
-          event: 'katy-pride-celebration-2026',
+          amount: Math.round(currentVendorType.price * 100),
+          currency: 'usd',
+          payment_method_type: 'card',
+          donor_email: currentFormData.email,
+          donor_name: `${currentFormData.firstName} ${currentFormData.lastName}`,
+          donation_frequency: 'one-time',
           metadata: {
-            productsServices: currentFormData.productsServices,
-            socialMedia: currentFormData.socialMedia,
+            type: 'vendor',
+            vendorType: currentVendorTypeValue,
+            company: currentFormData.company,
             crmContactId: crmResult.contactId || '',
           },
         }),
       });
 
-      const checkoutResult = await checkoutResponse.json();
-
-      // Handle Stripe disabled gracefully
-      if (checkoutResult.disabled) {
-        setSubmitStatus('success');
-        setSubmitMessage(checkoutResult.message || 'Your registration has been recorded. We will contact you shortly to complete payment.');
-        setIsSubmitting(false);
-        return;
+      if (!paymentResponse.ok) {
+        const errorData = await paymentResponse.json();
+        throw new Error(errorData.error || 'Failed to create payment');
       }
 
-      if (!checkoutResponse.ok || !checkoutResult.url) {
-        throw new Error(checkoutResult.error || 'Failed to create payment session');
+      const { paymentIntent } = await paymentResponse.json();
+
+      // Confirm payment with card element
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error('Card information is required');
       }
 
-      // Redirect to Stripe Checkout
-      const checkoutUrl = checkoutResult.url;
+      let confirmedPayment;
       try {
-        const url = new URL(checkoutUrl);
-        const allowedHosts = ['checkout.stripe.com', 'pay.stripe.com'];
-        if (!allowedHosts.includes(url.hostname) || url.protocol !== 'https:') {
-          throw new Error('Invalid checkout domain');
+        const { error, paymentIntent: confirmed } = await stripe.confirmCardPayment(
+          paymentIntent.client_secret,
+          {
+            payment_method: {
+              card: cardElement,
+              billing_details: {
+                name: `${currentFormData.firstName} ${currentFormData.lastName}`,
+                email: currentFormData.email,
+                address: {
+                  line1: currentFormData.address,
+                  city: currentFormData.city,
+                  state: currentFormData.state,
+                  postal_code: currentFormData.postalCode,
+                },
+              },
+            },
+          }
+        );
+
+        if (error) {
+          throw new Error(error.message || 'Payment failed');
         }
-      } catch {
-        throw new Error('Invalid checkout URL received');
+        confirmedPayment = confirmed;
+      } catch (paymentError) {
+        // Update CRM with failed status before propagating error
+        try {
+          await fetch('/api/crm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'vendor',
+              email: currentFormData.email,
+              paymentStatus: 'failed',
+              paymentIntentId: paymentIntent.id,
+              paymentError: paymentError instanceof Error ? paymentError.message : 'Payment failed',
+            }),
+          });
+        } catch (crmError) {
+          console.warn('Failed to update CRM with payment failure:', crmError);
+        }
+        throw paymentError;
       }
-      window.location.href = checkoutUrl;
+
+      // Handle 3D Secure or other actions required
+      // Stripe.js automatically handles the modal and resolves after authentication
+      // If status is still requires_action, authentication was not completed
+      if (confirmedPayment.status === 'requires_action') {
+        // Update CRM with failed status
+        try {
+          await fetch('/api/crm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'vendor',
+              email: currentFormData.email,
+              paymentStatus: 'failed',
+              paymentIntentId: confirmedPayment.id,
+              paymentError: '3D Secure authentication incomplete',
+            }),
+          });
+        } catch (crmError) {
+          console.warn('Failed to update CRM with payment failure:', crmError);
+        }
+        throw new Error('Payment authentication incomplete. Please complete the verification or use a different card.');
+      }
+
+      if (confirmedPayment.status === 'succeeded') {
+        // Update CRM with payment status (non-blocking - don't fail if CRM update fails)
+        try {
+          const crmUpdateResponse = await fetch('/api/crm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'vendor',
+              email: currentFormData.email,
+              paymentStatus: 'paid',
+              paymentIntentId: confirmedPayment.id,
+            }),
+          });
+          
+          if (!crmUpdateResponse.ok) {
+            console.warn('Failed to update CRM with payment status:', await crmUpdateResponse.text());
+          }
+        } catch (crmError) {
+          console.warn('CRM update failed after payment:', crmError);
+        }
+
+        // Redirect to success page
+        window.location.href = `/vendor-success?payment_intent=${confirmedPayment.id}`;
+      } else {
+        throw new Error('Payment was not completed');
+      }
     } catch (error) {
       setSubmitStatus('error');
       setSubmitMessage(error instanceof Error ? error.message : 'An unexpected error occurred');
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -324,7 +450,7 @@ export default function VendorSignupForm() {
             onChange={handleChange}
             required
             placeholder="Organization"
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white ${
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white placeholder:text-gray-700 ${
               errors.company ? 'border-red-500' : 'border-gray-300'
             }`}
           />
@@ -346,7 +472,7 @@ export default function VendorSignupForm() {
             onChange={handleChange}
             required
             placeholder="Address"
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white ${
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white placeholder:text-gray-700 ${
               errors.address ? 'border-red-500' : 'border-gray-300'
             }`}
           />
@@ -369,7 +495,7 @@ export default function VendorSignupForm() {
               onChange={handleChange}
               required
               placeholder="City"
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white text-sm ${
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white text-sm placeholder:text-gray-700 ${
                 errors.city ? 'border-red-500' : 'border-gray-300'
               }`}
             />
@@ -390,7 +516,7 @@ export default function VendorSignupForm() {
               required
               placeholder="State"
               maxLength={2}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white text-sm uppercase ${
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white text-sm uppercase placeholder:text-gray-700 ${
                 errors.state ? 'border-red-500' : 'border-gray-300'
               }`}
             />
@@ -410,7 +536,7 @@ export default function VendorSignupForm() {
               onChange={handleChange}
               required
               placeholder="Postal Code"
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white text-sm ${
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white text-sm placeholder:text-gray-700 ${
                 errors.postalCode ? 'border-red-500' : 'border-gray-300'
               }`}
             />
@@ -432,7 +558,7 @@ export default function VendorSignupForm() {
             value={formData.website}
             onChange={handleChange}
             placeholder="https://example.com"
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white ${
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white placeholder:text-gray-700 ${
               errors.website ? 'border-red-500' : 'border-gray-300'
             }`}
           />
@@ -453,7 +579,7 @@ export default function VendorSignupForm() {
             value={formData.socialMedia}
             onChange={handleChange}
             placeholder="@yourhandle"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white placeholder:text-gray-700"
           />
         </div>
 
@@ -471,7 +597,7 @@ export default function VendorSignupForm() {
               onChange={handleChange}
               required
               placeholder="First Name"
-              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white text-sm ${
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white text-sm placeholder:text-gray-700 ${
                 errors.firstName ? 'border-red-500' : ''
               }`}
             />
@@ -491,7 +617,7 @@ export default function VendorSignupForm() {
               onChange={handleChange}
               required
               placeholder="Last Name"
-              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white text-sm ${
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white text-sm placeholder:text-gray-700 ${
                 errors.lastName ? 'border-red-500' : ''
               }`}
             />
@@ -514,7 +640,7 @@ export default function VendorSignupForm() {
             onChange={handleChange}
             required
             placeholder="Email"
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white ${
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white placeholder:text-gray-700 ${
               errors.email ? 'border-red-500' : 'border-gray-300'
             }`}
           />
@@ -536,7 +662,7 @@ export default function VendorSignupForm() {
             onChange={handleChange}
             required
             placeholder="(555) 123-4567"
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white ${
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white placeholder:text-gray-700 ${
               errors.phone ? 'border-red-500' : 'border-gray-300'
             }`}
           />
@@ -577,6 +703,42 @@ export default function VendorSignupForm() {
           )}
         </div>
 
+        {/* Payment Information */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Payment Information <span className="text-red-500">*</span>
+          </label>
+          <div className="p-4 border border-gray-300 rounded-lg bg-white">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Card Details
+            </label>
+            <div className="p-3 border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-transparent">
+              <CardElement 
+                options={{
+                  style: {
+                    base: {
+                      fontSize: '16px',
+                      color: '#1a1a1a',
+                      '::placeholder': {
+                        color: '#374151',
+                      },
+                    },
+                    invalid: {
+                      color: '#dc2626',
+                    },
+                  },
+                }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Your card will be charged ${selectedVendorType?.price || 0}.00 for the vendor fee.
+            </p>
+            <p className="text-xs text-gray-500">
+              Your card information is securely processed by Stripe.
+            </p>
+          </div>
+        </div>
+
         {/* Products/Services */}
         <div>
           <label htmlFor="productsServices" className="block text-sm font-medium text-gray-700 mb-1">
@@ -590,7 +752,7 @@ export default function VendorSignupForm() {
             required
             rows={4}
             placeholder="Describe your products, services, or menu items"
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white ${
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white placeholder:text-gray-700 ${
               errors.productsServices ? 'border-red-500' : 'border-gray-300'
             }`}
           />
