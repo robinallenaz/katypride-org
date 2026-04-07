@@ -1,21 +1,24 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
-// Use /tmp for serverless environments where process.cwd() is read-only
-const isServerless = process.env.VERCEL || process.env.RENDER || process.env.AWS_LAMBDA_FUNCTION_NAME;
-const dataDir = isServerless 
-  ? path.join('/tmp', 'data')
-  : path.join(process.cwd(), 'data');
+// Primary data directory (committed files)
+const primaryDataDir = path.join(process.cwd(), 'data');
 
-// Ensure data directory exists on module load
+// Writable directory for serverless environments
+const isServerless = process.env.VERCEL || process.env.RENDER || process.env.AWS_LAMBDA_FUNCTION_NAME;
+const writableDataDir = isServerless 
+  ? path.join('/tmp', 'data')
+  : primaryDataDir;
+
+// Ensure writable directory exists on module load
 (async () => {
   try {
-    await fs.access(dataDir);
+    await fs.access(writableDataDir);
   } catch {
     try {
-      await fs.mkdir(dataDir, { recursive: true });
+      await fs.mkdir(writableDataDir, { recursive: true });
     } catch (error) {
-      console.error(`[DataService] Failed to create data directory: ${dataDir}`, error);
+      console.error(`[DataService] Failed to create data directory: ${writableDataDir}`, error);
     }
   }
 })();
@@ -58,17 +61,29 @@ async function acquireLock(filePath: string): Promise<() => void> {
   return release;
 }
 
-// Read data from JSON file
+// Read data from JSON file (tries writable dir first, then committed files)
 export async function readData<T>(filename: string): Promise<T> {
-  const filePath = path.join(dataDir, `${filename}.json`);
-  const release = await acquireLock(filePath);
+  // Try writable directory first (for admin changes on serverless)
+  const writablePath = path.join(writableDataDir, `${filename}.json`);
+  const release = await acquireLock(writablePath);
   
   try {
-    const data = await fs.readFile(filePath, 'utf8');
+    try {
+      const data = await fs.readFile(writablePath, 'utf8');
+      return JSON.parse(data) as T;
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') {
+        console.error(`Error reading ${filename} from writable:`, error);
+      }
+      // File doesn't exist in writable dir, try primary (committed) dir
+    }
+    
+    const primaryPath = path.join(primaryDataDir, `${filename}.json`);
+    const data = await fs.readFile(primaryPath, 'utf8');
     return JSON.parse(data) as T;
   } catch (error: any) {
     if (error.code === 'ENOENT') {
-      // File doesn't exist - return default empty structure
+      // File doesn't exist anywhere - return default empty structure
       if (filename === 'carousel') return { images: [] } as unknown as T;
       if (filename === 'events') return { events: [] } as unknown as T;
       if (filename === 'resources') return { resources: [] } as unknown as T;
@@ -81,9 +96,9 @@ export async function readData<T>(filename: string): Promise<T> {
   }
 }
 
-// Write data to JSON file atomically
+// Write data to JSON file atomically (always writes to writable dir)
 export async function writeData<T>(filename: string, data: T): Promise<void> {
-  const filePath = path.join(dataDir, `${filename}.json`);
+  const filePath = path.join(writableDataDir, `${filename}.json`);
   const tempPath = `${filePath}.tmp`;
   const release = await acquireLock(filePath);
   
