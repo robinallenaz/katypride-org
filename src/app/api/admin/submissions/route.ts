@@ -99,6 +99,22 @@ export async function DELETE(request: NextRequest) {
 
     // Find and remove the matching submission
     const initialCount = submissions.length;
+    
+    // If no email provided, require exact timestamp match AND verify only one match
+    // to prevent accidental mass deletion
+    if (!email) {
+      const matchingSubmissions = submissions.filter((sub: FormSubmission) => 
+        sub.timestamp === timestamp
+      );
+      
+      if (matchingSubmissions.length > 1) {
+        return NextResponse.json(
+          { success: false, error: 'Multiple submissions with same timestamp. Email required for deletion.' },
+          { status: 400 }
+        );
+      }
+    }
+    
     submissions = submissions.filter((sub: FormSubmission) => {
       // Match by timestamp and optionally email
       // If email provided, match both; if no email, match by timestamp only

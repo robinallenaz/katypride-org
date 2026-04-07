@@ -125,6 +125,8 @@ export default function SubmissionsAdmin() {
       );
 
       if (response.status === 401) {
+        setDeleting(false);
+        setDeleteConfirm(false);
         window.location.href = '/admin';
         return;
       }
