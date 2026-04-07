@@ -8,7 +8,7 @@ function getNextFridayDate(): Date {
   const daysUntilFriday = currentDay <= 5 ? (5 - currentDay) % 7 : 5 + (7 - currentDay)
   const nextFriday = new Date(today)
   nextFriday.setDate(today.getDate() + daysUntilFriday)
-  nextFriday.setHours(9, 0, 0, 0)
+  nextFriday.setHours(13, 0, 0, 0)
   return nextFriday
 }
 

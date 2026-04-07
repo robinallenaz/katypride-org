@@ -1,7 +1,11 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
-const dataDir = path.join(process.cwd(), 'data');
+// Use /tmp for serverless environments where process.cwd() is read-only
+const isServerless = process.env.VERCEL || process.env.RENDER || process.env.AWS_LAMBDA_FUNCTION_NAME;
+const dataDir = isServerless 
+  ? path.join('/tmp', 'data')
+  : path.join(process.cwd(), 'data');
 
 // Ensure data directory exists on module load
 (async () => {

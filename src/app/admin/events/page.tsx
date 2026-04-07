@@ -68,12 +68,14 @@ export default function EventsAdmin() {
   };
 
   const handleSave = async (event: Event) => {
+    console.log('[Admin Events] Saving event:', event);
     try {
       const response = await fetch('/api/admin/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(event),
       });
+      console.log('[Admin Events] Response status:', response.status);
 
       if (response.status === 401) {
         window.location.href = '/admin';
@@ -87,10 +89,13 @@ export default function EventsAdmin() {
         loadEvents();
         setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Error saving event');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('[Admin Events] Error response:', errorData);
+        setMessage(`Error saving event: ${errorData.error || response.statusText}`);
       }
     } catch (error) {
-      setMessage('Error saving event');
+      console.error('[Admin Events] Network error:', error);
+      setMessage('Error saving event: Network error');
     }
   };
 
