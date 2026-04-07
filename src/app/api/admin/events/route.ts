@@ -97,10 +97,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const rawEvent: Partial<Event> = await request.json();
+    console.log('[Events API] Received event:', JSON.stringify(rawEvent, null, 2));
     
     // Validate input
     const validation = validateEvent(rawEvent);
     if (!validation.valid) {
+      console.error('[Events API] Validation failed:', validation.error);
       return NextResponse.json(
         { success: false, error: validation.error },
         { status: 400 }
@@ -109,19 +111,27 @@ export async function POST(request: NextRequest) {
     
     // Sanitize input
     const event = sanitizeEvent(rawEvent);
+    console.log('[Events API] Sanitized event:', JSON.stringify(event, null, 2));
+    
     const data = await readData<{ events: Event[] }>('events');
+    console.log('[Events API] Read existing events count:', data.events.length);
     
     const existingIndex = data.events.findIndex(e => e.id === event.id);
     if (existingIndex >= 0) {
       data.events[existingIndex] = event;
+      console.log('[Events API] Updated existing event at index:', existingIndex);
     } else {
       data.events.push(event);
+      console.log('[Events API] Added new event');
     }
     
     await writeData('events', data);
+    console.log('[Events API] Successfully wrote events');
     return NextResponse.json({ success: true, event });
   } catch (error) {
-    console.error('Error saving event:', error);
+    console.error('[Events API] Error saving event:', error);
+    console.error('[Events API] Error details:', error instanceof Error ? error.message : String(error));
+    console.error('[Events API] Error stack:', error instanceof Error ? error.stack : 'No stack');
     return NextResponse.json({ success: false, error: 'Failed to save event' }, { status: 500 });
   }
 }
