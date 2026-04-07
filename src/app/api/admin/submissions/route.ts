@@ -86,9 +86,9 @@ export async function DELETE(request: NextRequest) {
     const timestamp = searchParams.get('timestamp');
     const email = searchParams.get('email');
 
-    if (!timestamp || !email) {
+    if (!timestamp) {
       return NextResponse.json(
-        { success: false, error: 'Timestamp and email are required' },
+        { success: false, error: 'Timestamp is required' },
         { status: 400 }
       );
     }
@@ -100,8 +100,11 @@ export async function DELETE(request: NextRequest) {
     // Find and remove the matching submission
     const initialCount = submissions.length;
     submissions = submissions.filter((sub: FormSubmission) => {
-      // Match by timestamp and email to ensure we delete the right one
-      return !(sub.timestamp === timestamp && sub.email === email);
+      // Match by timestamp and optionally email
+      // If email provided, match both; if no email, match by timestamp only
+      if (sub.timestamp !== timestamp) return true;
+      if (email && sub.email !== email) return true;
+      return false;
     });
 
     const deletedCount = initialCount - submissions.length;

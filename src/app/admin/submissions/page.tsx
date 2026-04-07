@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 
 interface FormSubmission {
@@ -38,15 +38,25 @@ export default function SubmissionsAdmin() {
   const [selectedSubmission, setSelectedSubmission] = useState<FormSubmission | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { isAuthenticated, isLoading: authLoading, getAuthHeaders } = useAdminAuth();
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      loadSubmissions();
+      const controller = new AbortController();
+      loadSubmissions(controller.signal);
+      return () => controller.abort();
     }
   }, [authLoading, isAuthenticated, selectedType]);
 
-  const loadSubmissions = async () => {
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    };
+  }, []);
+
+  const loadSubmissions = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       const url = selectedType 
@@ -55,6 +65,7 @@ export default function SubmissionsAdmin() {
       
       const response = await fetch(url, {
         headers: getAuthHeaders(),
+        signal,
       });
       
       if (response.status === 401) {
@@ -71,6 +82,9 @@ export default function SubmissionsAdmin() {
         setError(data.error || 'Failed to load submissions');
       }
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
       console.error('Failed to load submissions:', error);
       setError('Failed to load submissions. Please try again.');
     } finally {
@@ -89,10 +103,21 @@ export default function SubmissionsAdmin() {
   const handleDelete = async () => {
     if (!selectedSubmission) return;
     
+    // Validate timestamp is present (required for lookup)
+    if (!selectedSubmission.timestamp) {
+      setError('Timestamp is required for deletion');
+      return;
+    }
+    
     setDeleting(true);
+    setError('');
+    
     try {
+      const emailParam = selectedSubmission.email 
+        ? `&email=${encodeURIComponent(selectedSubmission.email)}` 
+        : '';
       const response = await fetch(
-        `/api/admin/submissions?timestamp=${encodeURIComponent(selectedSubmission.timestamp)}&email=${encodeURIComponent(selectedSubmission.email || '')}`,
+        `/api/admin/submissions?timestamp=${encodeURIComponent(selectedSubmission.timestamp)}${emailParam}`,
         {
           method: 'DELETE',
           headers: getAuthHeaders(),
@@ -109,7 +134,12 @@ export default function SubmissionsAdmin() {
       if (data.success) {
         setSelectedSubmission(null);
         setDeleteConfirm(false);
-        loadSubmissions();
+        
+        if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+        setSuccessMessage('Submission deleted successfully');
+        successTimeoutRef.current = setTimeout(() => setSuccessMessage(''), 3000);
+        
+        await loadSubmissions();
       } else {
         setError(data.error || 'Failed to delete submission');
       }
@@ -154,6 +184,13 @@ export default function SubmissionsAdmin() {
         </button>
       </div>
 
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+          {successMessage}
+        </div>
+      )}
+
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
@@ -191,7 +228,7 @@ export default function SubmissionsAdmin() {
         <div className="space-y-4">
           {submissions.map((submission, index) => (
             <div
-              key={index}
+              key={`${submission.timestamp}-${submission.email || 'no-email'}-${index}`}
               className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => setSelectedSubmission(submission)}
             >
