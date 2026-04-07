@@ -1,11 +1,11 @@
 import { readData, type Event } from '@/lib/data-service'
 import EventsList, { type EventItem } from './EventsList'
 
-// Helper function to get next Friday
+// Helper function to get next Friday (or today if Friday)
 function getNextFridayDate(): Date {
   const today = new Date()
   const currentDay = today.getDay() // 0 = Sunday, 5 = Friday
-  const daysUntilFriday = currentDay < 5 ? 5 - currentDay : 5 + (7 - currentDay)
+  const daysUntilFriday = currentDay <= 5 ? (5 - currentDay) % 7 : 5 + (7 - currentDay)
   const nextFriday = new Date(today)
   nextFriday.setDate(today.getDate() + daysUntilFriday)
   nextFriday.setHours(9, 0, 0, 0)
@@ -21,11 +21,11 @@ function createStaticCoffeeMeetup(): EventItem {
     title: 'Espresso Yourself Coffee Meet-Up',
     start: nextFriday,
     end: endDate,
-    location: 'Coffee Fellows, 3329 Grand Parkway, Katy, TX 77449',
+    location: 'Coffee Fellows, 3329 W Grand Pkwy N #700, Katy, TX 77449',
     imageSrc: '/espresso-yourself-new-graphic.jpg',
     imageAlt: 'Espresso Yourself Coffee Meetup',
     eventCategory: 'coffee',
-    externalUrl: 'https://www.google.com/maps/dir//3329%20Grand%20Parkway,%20Katy,%20TX%2077449',
+    externalUrl: 'https://www.google.com/maps/dir//3329%20W%20Grand%20Pkwy%20N%20%23700,%20Katy,%20TX%2077449',
     externalCtaLabel: 'Get Directions',
     summary: 'Join us for a casual coffee meet up at an LGBTQ-affirming business, Coffee Fellows, to meet other LGBTQ+ community members and allies. Grab a coffee, tea, pastry or whatever suits your fancy, and make new connections or even get some work done. Enjoy a safe space of community and allyship!',
   }

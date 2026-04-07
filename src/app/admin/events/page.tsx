@@ -150,6 +150,12 @@ export default function EventsAdmin() {
         </div>
       )}
 
+      {message && (
+        <div className="bg-green-50 text-green-700 p-3 rounded-lg">
+          {message}
+        </div>
+      )}
+
       {(isCreating || editingEvent) && (
         <EventForm
           event={editingEvent}
@@ -157,6 +163,7 @@ export default function EventsAdmin() {
           onCancel={() => {
             setEditingEvent(null);
             setIsCreating(false);
+            setMessage('');
           }}
         />
       )}
@@ -267,7 +274,7 @@ function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (
             required
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
             placeholder="Event title"
           />
         </div>
@@ -277,7 +284,7 @@ function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (
           <select
             value={formData.eventCategory}
             onChange={(e) => setFormData({ ...formData, eventCategory: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
           >
             {eventCategories.map((cat) => (
               <option key={cat.value} value={cat.value}>{cat.label}</option>
@@ -292,7 +299,7 @@ function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (
             required
             value={formData.start.slice(0, 16)}
             onChange={(e) => setFormData({ ...formData, start: localDateTimeToISO(e.target.value) })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
           />
         </div>
 
@@ -302,7 +309,7 @@ function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (
             type="datetime-local"
             value={formData.end?.slice(0, 16) || ''}
             onChange={(e) => setFormData({ ...formData, end: e.target.value ? localDateTimeToISO(e.target.value) : undefined })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
           />
         </div>
 
@@ -312,7 +319,7 @@ function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (
             type="text"
             value={formData.location || ''}
             onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
             placeholder="Event location"
           />
         </div>
@@ -323,7 +330,7 @@ function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (
             type="text"
             value={formData.imageSrc || ''}
             onChange={(e) => setFormData({ ...formData, imageSrc: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
             placeholder="/path/to/image.jpg or https://..."
           />
         </div>
@@ -334,7 +341,7 @@ function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (
             type="text"
             value={formData.imageAlt || ''}
             onChange={(e) => setFormData({ ...formData, imageAlt: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
             placeholder="Description of image for accessibility"
           />
         </div>
@@ -345,7 +352,7 @@ function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (
             type="text"
             value={formData.externalUrl || ''}
             onChange={(e) => setFormData({ ...formData, externalUrl: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
             placeholder="https://example.com/event"
           />
         </div>
@@ -356,7 +363,7 @@ function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (
             type="text"
             value={formData.externalCtaLabel || ''}
             onChange={(e) => setFormData({ ...formData, externalCtaLabel: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
             placeholder="Register, Learn More, etc."
           />
         </div>
@@ -367,7 +374,7 @@ function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (
             value={formData.summary || ''}
             onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
             placeholder="Brief description of the event"
           />
         </div>
