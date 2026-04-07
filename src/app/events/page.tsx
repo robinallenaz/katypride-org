@@ -84,8 +84,8 @@ async function getEvents(): Promise<{ events: EventItem[]; error?: string | null
   }
 }
 
-// Revalidate page every 60 seconds (ISR)
-export const revalidate = 60
+// Disable caching to ensure fresh data from filesystem
+export const dynamic = 'force-dynamic'
 
 export default async function EventsPage() {
   const { events, error } = await getEvents()

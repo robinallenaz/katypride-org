@@ -1,4 +1,5 @@
 import { readData, type Resource } from '@/lib/data-service'
+import { ResourceCard } from './ResourceCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,6 +8,7 @@ interface ResourceLink {
   title: string
   url: string
   category: string
+  description?: string
 }
 
 type Accent = {
@@ -91,7 +93,8 @@ async function getResourceLinks(): Promise<ResourceLink[]> {
       id: resource.id,
       title: resource.title,
       url: resource.url,
-      category: resource.category.toLowerCase()
+      category: resource.category.toLowerCase(),
+      description: resource.description,
     }))
     
     // Merge with default resources - JSON resources appear first, then defaults
@@ -227,37 +230,20 @@ export default async function ResourcesPage() {
   const LinkItem = ({
     title,
     href,
+    description,
     accent,
   }: {
     title: string
     href: string
+    description?: string
     accent: Accent
   }) => (
-    <li className="h-full">
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={`${title} — Visit website (opens in a new tab)`}
-        className={`group flex h-full items-start justify-between gap-4 rounded-2xl border-2 border-l-4 px-5 py-5 shadow-lg transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${accent.cardBg} ${accent.cardHoverBg} ${accent.cardBorder} ${accent.cardHoverBorder} ${accent.stripe} ${accent.ring} motion-reduce:transition-none`}
-      >
-        <span className="min-w-0">
-          <span className="font-heading text-lg font-semibold text-gray-900 group-hover:text-purple-950 group-hover:underline decoration-2 underline-offset-4 transition-colors duration-200 motion-reduce:transition-none">
-            {title}
-          </span>
-          <span className="mt-1.5 block text-sm text-gray-600 font-medium break-words" title={href}>
-            {getHostname(href)}
-          </span>
-        </span>
-
-        <span
-          aria-hidden="true"
-          className={`font-heading antialiased mt-1 shrink-0 rounded-full border-2 px-3.5 py-2 text-[11px] font-bold leading-none tracking-wide transition-colors duration-200 ${accent.pillBorder} ${accent.pillBg} ${accent.pillText} ${accent.pillHoverBg} motion-reduce:transition-none`}
-        >
-          Visit <span aria-hidden="true">→</span>
-        </span>
-      </a>
-    </li>
+    <ResourceCard
+      title={title}
+      href={href}
+      description={description}
+      accent={accent}
+    />
   )
 
   const BackToCategories = () => (

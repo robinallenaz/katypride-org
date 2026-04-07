@@ -15,14 +15,20 @@ export interface CalendarSettings {
 
 export async function getCalendarSettings(): Promise<CalendarSettings | null> {
   try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
     const response = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337'}/api/calendar-settings`, {
       headers: {
         'Authorization': `Bearer ${process.env.STRAPI_API_TOKEN || ''}`,
         'Content-Type': 'application/json',
       },
+      signal: controller.signal,
       // Cache for 5 minutes to improve performance
       next: { revalidate: 300 },
     })
+
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
       console.error('Failed to fetch calendar settings:', response.status)

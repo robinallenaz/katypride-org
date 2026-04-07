@@ -243,8 +243,9 @@ function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (
   const localDateTimeToISO = (localDateTime: string): string => {
     if (!localDateTime) return '';
     // localDateTime is in format "YYYY-MM-DDTHH:mm" from datetime-local input
-    // Append seconds and timezone offset to preserve local time
-    const offset = new Date().getTimezoneOffset();
+    // Calculate timezone offset for the specific date being entered (handles DST)
+    const dateForOffset = new Date(localDateTime);
+    const offset = dateForOffset.getTimezoneOffset();
     const offsetHours = Math.floor(Math.abs(offset) / 60);
     const offsetMinutes = Math.abs(offset) % 60;
     const offsetSign = offset <= 0 ? '+' : '-';
