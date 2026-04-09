@@ -194,7 +194,7 @@ export default function DonationForm({ onSuccess, className = '' }: DonationForm
             onChange={handleInputChange}
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            placeholder="John Doe"
+            placeholder="Name"
           />
         </div>
 
@@ -210,7 +210,7 @@ export default function DonationForm({ onSuccess, className = '' }: DonationForm
             onChange={handleInputChange}
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            placeholder="john@example.com"
+            placeholder="email@example.com"
           />
         </div>
 

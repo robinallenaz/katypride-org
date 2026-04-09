@@ -43,6 +43,7 @@ interface SponsorFormData {
   sponsorshipLevel: string;
   customSponsorshipAmount: string;
   additionalComments: string;
+  interestedInExclusives?: string[];
   
   // Agreement
   agreeToTerms: boolean;
@@ -579,7 +580,7 @@ function SponsorSignupForm() {
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700 ${
                     errors.contactName ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="John Doe"
+                  placeholder="Name"
                 />
                 {errors.contactName && <p className="text-red-500 text-sm mt-1">{errors.contactName}</p>}
               </div>
@@ -608,7 +609,7 @@ function SponsorSignupForm() {
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700 ${
                     errors.contactEmail ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="john@example.com"
+                  placeholder="email@example.com"
                 />
                 {errors.contactEmail && <p className="text-red-500 text-sm mt-1">{errors.contactEmail}</p>}
               </div>
@@ -649,7 +650,7 @@ function SponsorSignupForm() {
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-700 ${
                     errors.organizationName ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="Acme Corporation"
+                  placeholder="Organization"
                 />
                 {errors.organizationName && <p className="text-red-500 text-sm mt-1">{errors.organizationName}</p>}
               </div>

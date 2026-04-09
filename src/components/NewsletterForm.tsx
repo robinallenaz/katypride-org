@@ -153,7 +153,7 @@ const NewsletterForm: React.FC = () => {
               onChange={handleInputChange}
               required
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
-              placeholder="Jane Doe"
+              placeholder="Name"
             />
             {errors.name && (
               <p className="mt-1 text-sm text-red-600">{errors.name}</p>
@@ -173,7 +173,7 @@ const NewsletterForm: React.FC = () => {
               onChange={handleInputChange}
               required
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
-              placeholder="jane@example.com"
+              placeholder="email@example.com"
             />
             {errors.email && (
               <p className="mt-1 text-sm text-red-600">{errors.email}</p>

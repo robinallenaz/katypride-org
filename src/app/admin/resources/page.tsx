@@ -230,7 +230,7 @@ function ResourceForm({ resource, onSave, onCancel }: { resource: Resource | nul
             required
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
             placeholder="Organization name"
           />
         </div>
@@ -240,7 +240,7 @@ function ResourceForm({ resource, onSave, onCancel }: { resource: Resource | nul
           <select
             value={formData.category}
             onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900"
           >
             {categories.map((cat) => (
               <option key={cat} value={cat}>{cat}</option>
@@ -255,7 +255,7 @@ function ResourceForm({ resource, onSave, onCancel }: { resource: Resource | nul
             required
             value={formData.url}
             onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
             placeholder="https://example.com"
           />
         </div>
@@ -266,7 +266,7 @@ function ResourceForm({ resource, onSave, onCancel }: { resource: Resource | nul
             value={formData.description || ''}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
             placeholder="Brief description of the organization"
           />
         </div>

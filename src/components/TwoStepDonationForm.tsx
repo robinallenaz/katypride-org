@@ -402,7 +402,7 @@ function TwoStepDonationForm({ onSuccess, className = '' }: TwoStepDonationFormP
                   className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder:text-gray-700 ${
                     errors.name ? 'border-red-500' : ''
                   }`}
-                  placeholder="John Doe"
+                  placeholder="Name"
                 />
                 {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
               </div>
@@ -421,7 +421,7 @@ function TwoStepDonationForm({ onSuccess, className = '' }: TwoStepDonationFormP
                   className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder:text-gray-700 ${
                     errors.email ? 'border-red-500' : ''
                   }`}
-                  placeholder="john@example.com"
+                  placeholder="email@example.com"
                 />
                 {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
               </div>
@@ -454,7 +454,7 @@ function TwoStepDonationForm({ onSuccess, className = '' }: TwoStepDonationFormP
                   name="country"
                   value={formData.country}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 bg-white"
                 >
                   <option value="United States">United States</option>
                   <option value="Canada">Canada</option>

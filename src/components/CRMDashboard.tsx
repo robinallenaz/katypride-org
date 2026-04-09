@@ -9,6 +9,16 @@ interface RecentContact {
   tags: string[];
   dateAdded: string;
   company?: string;
+  phone?: string;
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+  };
+  customFields?: Record<string, any>;
+  contactNote?: string;
 }
 
 interface CRMStats {
@@ -17,6 +27,7 @@ interface CRMStats {
   totalDonors: number;
   totalVendors: number;
   totalCommunityMembers: number;
+  totalSponsors: number;
   recentContacts: RecentContact[];
 }
 
@@ -31,12 +42,14 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
     totalDonors: 0,
     totalVendors: 0,
     totalCommunityMembers: 0,
+    totalSponsors: 0,
     recentContacts: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Re-fetch when token changes (e.g. after sessionStorage hydration)
   const fetchCRMData = useCallback(async () => {
@@ -123,6 +136,16 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
     }
   };
 
+  const toggleExpand = (contactId: string) => {
+    setExpandedId(expandedId === contactId ? null : contactId);
+  };
+
+  const renderAddress = (address?: RecentContact['address']) => {
+    if (!address) return null;
+    const parts = [address.street, address.city, address.state, address.postalCode].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : null;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -162,11 +185,12 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
           <StatCard title="Total Contacts" value={stats.totalContacts} icon="👥" color="bg-blue-600" />
           <StatCard title="Volunteers" value={stats.totalVolunteers} icon="🤝" color="bg-green-600" />
           <StatCard title="Donors" value={stats.totalDonors} icon="💝" color="bg-purple-600" />
           <StatCard title="Vendors" value={stats.totalVendors} icon="📋" color="bg-purple-600" />
+          <StatCard title="Sponsors" value={stats.totalSponsors} icon="⭐" color="bg-yellow-600" />
           <StatCard title="Community" value={stats.totalCommunityMembers} icon="🏳️‍🌈" color="bg-pink-600" />
         </div>
 
@@ -183,40 +207,113 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
                       <th className="text-left py-3 px-2 text-gray-600 font-medium hidden md:table-cell">Email</th>
                       <th className="text-left py-3 px-2 text-gray-600 font-medium">Tags</th>
                       <th className="text-left py-3 px-2 text-gray-600 font-medium hidden md:table-cell">Added</th>
+                      <th className="text-left py-3 px-2 text-gray-600 font-medium">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stats.recentContacts.map((contact) => (
-                      <tr key={contact.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-2">
-                          <p className="font-medium text-gray-900">{contact.name || 'Unknown'}</p>
-                          {contact.company && (
-                            <p className="text-xs text-gray-500">{contact.company}</p>
-                          )}
-                        </td>
-                        <td className="py-3 px-2 text-gray-600 hidden md:table-cell">{contact.email}</td>
-                        <td className="py-3 px-2">
-                          <div className="flex flex-wrap gap-1">
-                            {contact.tags.slice(0, 3).map((tag, i) => (
-                              <span key={i} className={`text-xs px-2 py-0.5 rounded-full ${getTagBadge(tag)}`}>
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="py-3 px-2 text-gray-500 text-xs hidden md:table-cell">
-                          {formatDate(contact.dateAdded)}
-                        </td>
-                        <td className="py-3 px-2">
-                          <button
-                            onClick={() => handleDelete(contact.id)}
-                            disabled={deletingId === contact.id}
-                            className="text-red-500 hover:text-red-700 text-sm disabled:opacity-50"
-                          >
-                            {deletingId === contact.id ? 'Deleting...' : 'Delete'}
-                          </button>
-                        </td>
-                      </tr>
+                      <React.Fragment key={contact.id}>
+                        <tr className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-2">
+                            <p className="font-medium text-gray-900">{contact.name || 'Unknown'}</p>
+                            {contact.company && (
+                              <p className="text-xs text-gray-500">{contact.company}</p>
+                            )}
+                          </td>
+                          <td className="py-3 px-2 text-gray-600 hidden md:table-cell">{contact.email}</td>
+                          <td className="py-3 px-2">
+                            <div className="flex flex-wrap gap-1">
+                              {contact.tags.slice(0, 3).map((tag, i) => (
+                                <span key={i} className={`text-xs px-2 py-0.5 rounded-full ${getTagBadge(tag)}`}>
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="py-3 px-2 text-gray-500 text-xs hidden md:table-cell">
+                            {formatDate(contact.dateAdded)}
+                          </td>
+                          <td className="py-3 px-2">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => toggleExpand(contact.id)}
+                                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                              >
+                                {expandedId === contact.id ? 'Hide' : 'View Details'}
+                              </button>
+                              <button
+                                onClick={() => handleDelete(contact.id)}
+                                disabled={deletingId === contact.id}
+                                className="text-red-500 hover:text-red-700 text-sm disabled:opacity-50"
+                              >
+                                {deletingId === contact.id ? 'Deleting...' : 'Delete'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {expandedId === contact.id && (
+                          <tr className="border-b border-gray-100 bg-gray-50">
+                            <td colSpan={5} className="py-4 px-4">
+                              <div className="text-sm text-gray-700 space-y-3">
+                                {/* Contact Information */}
+                                <div>
+                                  <h4 className="font-semibold text-gray-900 mb-2">Contact Information</h4>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                    <p><span className="font-medium">Email:</span> {contact.email}</p>
+                                    {contact.phone && <p><span className="font-medium">Phone:</span> {contact.phone}</p>}
+                                    {renderAddress(contact.address) && (
+                                      <p className="md:col-span-2"><span className="font-medium">Address:</span> {renderAddress(contact.address)}</p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* All Tags */}
+                                <div>
+                                  <h4 className="font-semibold text-gray-900 mb-2">All Tags</h4>
+                                  <div className="flex flex-wrap gap-1">
+                                    {contact.tags.map((tag, i) => (
+                                      <span key={i} className={`text-xs px-2 py-0.5 rounded-full ${getTagBadge(tag)}`}>
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Form Submission Details */}
+                                {contact.contactNote && (
+                                  <div>
+                                    <h4 className="font-semibold text-gray-900 mb-2">Form Submission Details</h4>
+                                    <div className="bg-white rounded-lg p-3 border border-gray-200 whitespace-pre-wrap text-sm">
+                                      {contact.contactNote}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Custom Fields */}
+                                {contact.customFields && Object.keys(contact.customFields).length > 0 && (
+                                  <div>
+                                    <h4 className="font-semibold text-gray-900 mb-2">Additional Information</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                      {Object.entries(contact.customFields).map(([key, value]) => (
+                                        value && (
+                                          <p key={key}>
+                                            <span className="font-medium">{key.replace(/_/g, ' ')}:</span> {String(value)}
+                                          </p>
+                                        )
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Contact ID for reference */}
+                                <div className="text-xs text-gray-500 pt-2 border-t border-gray-200">
+                                  Contact ID: {contact.id}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -237,7 +334,7 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 p-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
                 >
-                  <span className="text-xl">�</span>
+                  <span className="text-xl">🚀</span>
                   <div>
                     <p className="font-medium">Open GrowthSphere360</p>
                     <p className="text-xs text-purple-600">Full CRM dashboard</p>
@@ -250,7 +347,7 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 p-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
                 >
-                  <span className="text-xl">�</span>
+                  <span className="text-xl">📋</span>
                   <div>
                     <p className="font-medium">Vendor Signup Form</p>
                     <p className="text-xs text-orange-600">Chase the Rainbow 5K</p>
@@ -276,7 +373,7 @@ const CRMDashboard: React.FC<CRMDashboardProps> = ({ token }) => {
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 p-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
                 >
-                  <span className="text-xl">�</span>
+                  <span className="text-xl">💝</span>
                   <div>
                     <p className="font-medium">Donor Form</p>
                     <p className="text-xs text-blue-600">Share with potential donors</p>

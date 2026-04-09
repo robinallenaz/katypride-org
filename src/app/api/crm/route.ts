@@ -64,7 +64,7 @@ let cleanupInterval: NodeJS.Timeout | null = null;
 let rateLockCleanupInterval: NodeJS.Timeout | null = null;
 
 // Enhanced rate limiting with atomic operations using Map-based locking
-const rateLimitLock = new Map<string, { locked: boolean; timestamp: number }>();
+const rateLimitLock = new Map<string, { locked: boolean; timestamp: number; timeoutId?: NodeJS.Timeout }>();
 
 async function cleanupStaleRateLocks(): Promise<void> {
   const now = Date.now();
@@ -79,44 +79,65 @@ async function cleanupStaleRateLocks(): Promise<void> {
   staleLocks.forEach(ip => rateLimitLock.delete(ip));
 }
 
-function acquireLock(ip: string): boolean {
+function acquireLock(ip: string): NodeJS.Timeout | null {
   const now = Date.now();
   const existing = rateLimitLock.get(ip);
-  
-  // Clean up expired lock
+
+  // Clean up expired lock (clear its timeout if present)
   if (existing && (now - existing.timestamp > RATE_LOCK_MAX_AGE)) {
+    if (existing.timeoutId) {
+      clearTimeout(existing.timeoutId);
+    }
     rateLimitLock.delete(ip);
   }
-  
-  // Check if already locked
+
+  // If lock exists and hasn't expired, another request is in progress
   if (rateLimitLock.has(ip)) {
-    return false; // Already locked
+    return null;
   }
-  
-  // Acquire lock atomically
-  rateLimitLock.set(ip, { locked: true, timestamp: now });
-  
-  // Auto-release after 100ms
-  setTimeout(() => {
+
+  // Create auto-release timeout
+  const timeoutId = setTimeout(() => {
     rateLimitLock.delete(ip);
-  }, 100);
-  
-  return true; // Lock acquired
+  }, RATE_LOCK_MAX_AGE);
+
+  rateLimitLock.set(ip, { locked: true, timestamp: now, timeoutId });
+
+  return timeoutId;
 }
 
-function isRateLimited(ip: string): boolean {
+function releaseLock(ip: string, timeoutId: NodeJS.Timeout | null): void {
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+  }
+  rateLimitLock.delete(ip);
+}
+
+function checkAndIncrementRateLimit(ip: string): { limited: boolean; remaining: number } {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
-  
-  if (!entry || now > entry.resetAt) {
+
+  if (!entry) {
+    // New entry
     rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
+    return { limited: false, remaining: RATE_LIMIT_MAX - 1 };
   }
-  
-  const newCount = entry.count + 1;
-  entry.count = newCount;
-  return newCount > RATE_LIMIT_MAX;
+
+  if (now > entry.resetAt) {
+    // Expired entry - delete and create new to prevent memory leak
+    rateLimitMap.delete(ip);
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { limited: false, remaining: RATE_LIMIT_MAX - 1 };
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX) {
+    return { limited: true, remaining: 0 };
+  }
+
+  entry.count += 1;
+  return { limited: false, remaining: RATE_LIMIT_MAX - entry.count };
 }
+
 
 // Initialize cleanup intervals once at module load (not per-request)
 function initializeCleanupIntervals(): void {
@@ -190,11 +211,23 @@ process.on('SIGTERM', () => {
 
 // Cache validation helper function
 function validateCacheEntry(entry: any, now: number, maxAge: number): boolean {
-  return entry && 
-         typeof entry === 'object' && 
+  return entry &&
+         typeof entry === 'object' &&
          typeof entry.timestamp === 'number' &&
          typeof entry.data === 'object' &&
          (now - entry.timestamp) < maxAge;
+}
+
+// Safely extract contact ID from various GHL API response formats
+function extractContactId(response: any): string | undefined {
+  if (!response || typeof response !== 'object') return undefined;
+  // Try nested format: { contact: { id: ... } }
+  if (response.contact?.id) return String(response.contact.id);
+  // Try flat format: { id: ... }
+  if (response.id) return String(response.id);
+  // Try alternative format: { contactId: ... }
+  if (response.contactId) return String(response.contactId);
+  return undefined;
 }
 
 function getClientIP(request: NextRequest): string {
@@ -320,63 +353,47 @@ export async function GET(request: NextRequest) {
     try {
       if (!(global as any).crmCache) {
         (global as any).crmCache = new Map();
-        (global as any).crmCacheMetadata = { 
-          entries: new Map(), 
-          lastCleanup: now 
-        };
+        (global as any).crmCacheLastCleanup = now;
       }
     } catch (error) {
       console.error('Failed to initialize CRM cache:', error);
       // Fallback to in-memory cache if global fails
-      const fallbackCache = new Map();
-      const fallbackMetadata = { 
-        entries: new Map(), 
-        lastCleanup: now 
-      };
-      (global as any).crmCache = fallbackCache;
-      (global as any).crmCacheMetadata = fallbackMetadata;
+      (global as any).crmCache = new Map();
+      (global as any).crmCacheLastCleanup = now;
     }
-    
+
     const cache = (global as any).crmCache as Map<string, any>;
-    const cacheMetadata = (global as any).crmCacheMetadata;
-    
+    let lastCleanup = (global as any).crmCacheLastCleanup as number;
+
     // Periodic cache cleanup with immediate cleanup if needed
-    if (now - cacheMetadata.lastCleanup > 300_000 || cache.size > MAX_CACHE_SIZE * 1.5) {
-      // Remove expired entries and cleanup metadata atomically
+    if (now - lastCleanup > 300_000 || cache.size > MAX_CACHE_SIZE * 1.5) {
+      // Remove expired entries
       const keysToDelete: string[] = [];
-      
+
       for (const [key, value] of cache.entries()) {
         if (value && typeof value === 'object' && 'timestamp' in value && (now - value.timestamp) > CACHE_DURATION_MS) {
           keysToDelete.push(key);
         }
       }
-      
-      // Delete entries and metadata atomically
-      keysToDelete.forEach(key => {
-        cache.delete(key);
-        cacheMetadata.entries.delete(key);
-      });
-      
+
+      keysToDelete.forEach(key => cache.delete(key));
+
       // Remove oldest entries if cache is too large
       if (cache.size > MAX_CACHE_SIZE) {
         const entries = Array.from(cache.entries())
           .filter(([, value]) => value && typeof value === 'object' && 'timestamp' in value)
           .sort(([, a], [, b]) => a.timestamp - b.timestamp);
-        
+
         const oldestKeys: string[] = [];
         while (entries.length > MAX_CACHE_SIZE) {
           const [oldestKey] = entries.shift()!;
           oldestKeys.push(oldestKey);
         }
-        
-        // Delete oldest entries and metadata atomically
-        oldestKeys.forEach(key => {
-          cache.delete(key);
-          cacheMetadata.entries.delete(key);
-        });
+
+        oldestKeys.forEach(key => cache.delete(key));
       }
-      
-      cacheMetadata.lastCleanup = now;
+
+      (global as any).crmCacheLastCleanup = now;
     }
     
     // Check cache with validation
@@ -395,7 +412,6 @@ export async function GET(request: NextRequest) {
       } else {
         // Invalid cache data, remove it immediately
         cache.delete(CACHE_KEY);
-        cacheMetadata.entries.delete(CACHE_KEY);
       }
     }
 
@@ -407,6 +423,7 @@ export async function GET(request: NextRequest) {
     let totalDonors = 0;
     let totalVendors = 0;
     let totalCommunityMembers = 0;
+    let totalSponsors = 0;
     let recentContacts: any[] = [];
     
     let startAfterId = '';
@@ -434,12 +451,13 @@ export async function GET(request: NextRequest) {
         // Process batch immediately to avoid memory buildup
         batch.forEach((contact: any) => {
           totalContacts++;
-          
+
           // Count by tags
           if (contact.tags?.includes('volunteer')) totalVolunteers++;
           if (contact.tags?.includes('donor')) totalDonors++;
           if (contact.tags?.some((t: string) => t.startsWith('vendor'))) totalVendors++;
           if (contact.tags?.includes('community-member')) totalCommunityMembers++;
+          if (contact.tags?.includes('sponsor') || contact.tags?.some((t: string) => t.startsWith('sponsor-'))) totalSponsors++;
         });
         
         // Keep only recent contacts (last 10) to minimize memory with safe date parsing
@@ -467,11 +485,19 @@ export async function GET(request: NextRequest) {
           })
           .slice(0, 10)
           .map((c: any) => ({
+            id: c.id,
             name: c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
             email: c.email,
+            phone: c.phone,
             tags: c.tags || [],
             dateAdded: c.dateAdded,
             company: c.companyName,
+            // Full address details
+            address: c.address,
+            // Custom fields for sponsors
+            customFields: c.customFields || {},
+            // Full contact note (contains sponsorship level, comments, etc.)
+            contactNote: c.contactNote,
           }));
         
         recentContacts = allRecent;
@@ -504,17 +530,28 @@ export async function GET(request: NextRequest) {
       totalDonors,
       totalVendors,
       totalCommunityMembers,
+      totalSponsors,
       recentContacts,
     };
 
-    // Cache the result with proper Map usage
+    // Cache the result with proper Map usage and immediate size enforcement
+    // Remove oldest entries if at capacity before adding new one
+    if (cache.size >= MAX_CACHE_SIZE) {
+      const entries = Array.from(cache.entries())
+        .filter(([, value]) => value && typeof value === 'object' && 'timestamp' in value)
+        .sort(([, a], [, b]) => a.timestamp - b.timestamp);
+
+      // Remove oldest entry to make room
+      if (entries.length > 0) {
+        const [oldestKey] = entries[0];
+        cache.delete(oldestKey);
+      }
+    }
+
     cache.set(CACHE_KEY, {
       data: dashboardData,
       timestamp: now,
     });
-    
-    // Update cache metadata
-    cacheMetadata.entries.set(CACHE_KEY, now);
 
     return NextResponse.json({
       success: true,
@@ -542,6 +579,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Rate-limiting variables - declared outside try so finally can access them
+  const ip = getClientIP(request);
+  let lockTimeoutId: NodeJS.Timeout | null = null;
+
   try {
     const {
       type, name, email, phone, interests, availability, amount, frequency, pronouns,
@@ -555,7 +596,11 @@ export async function POST(request: NextRequest) {
       event,
       source, // Track form source (e.g., 'Newsletter Signup')
       _gotcha, // honeypot field — bots fill this, real users don't see it
+      // Vendor-specific fields
+      agreeToTexts,
     } = requestBody;
+
+    // Rate-limit public form submissions with atomic check-and-increment
 
     // Reject bot submissions that filled the hidden honeypot field
     if (_gotcha) {
@@ -576,34 +621,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rate-limit public form submissions with proper locking
-    const ip = getClientIP(request);
-    
-    // Try to acquire lock - if failed, reject request
-    if (!acquireLock(ip)) {
-      return NextResponse.json(
-        { success: false, error: 'Too many concurrent requests. Please try again.' },
-        { status: 429 }
-      );
-    }
-    
-    // Check rate limit after acquiring lock
-    if (isRateLimited(ip)) {
-      return NextResponse.json(
-        { success: false, error: 'Too many submissions. Please try again later.' },
-        { status: 429 }
-      );
-    }
-
-    // Build tags — only allow known interest values to prevent tag injection
-    const tags: string[] = [type];
-    
-    // Add sponsor-specific tags immediately if type is sponsor
+    // Pre-validate sponsor data before rate limiting
     if (type === 'sponsor') {
-      tags.push('sponsor');
-      if (sponsorshipLevel && (ALLOWED_SPONSORSHIP_LEVELS as readonly string[]).includes(sponsorshipLevel)) {
-        tags.push(`sponsor-${sponsorshipLevel}`);
-      }
       // Validate custom sponsorship amount is numeric when level is 'custom'
       if (sponsorshipLevel === 'custom' && customSponsorshipAmount) {
         const parsedCustomAmount = parseFloat(customSponsorshipAmount);
@@ -613,6 +632,49 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
+      }
+    }
+
+    // Pre-validate vendor type before rate limiting
+    if (vendorType && !ALLOWED_VENDOR_TYPES.includes(vendorType)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid vendor type' },
+        { status: 400 }
+      );
+    }
+
+    // Try to acquire lock - if failed, reject request (another request is in progress)
+    lockTimeoutId = acquireLock(ip);
+    if (!lockTimeoutId) {
+      return NextResponse.json(
+        { success: false, error: 'Too many concurrent requests. Please try again.' },
+        { status: 429, headers: { 'Retry-After': '60' } }
+      );
+    }
+
+    // Check rate limit atomically while holding the lock
+    const rateLimitResult = checkAndIncrementRateLimit(ip);
+    
+    // ALWAYS release lock after rate check - don't hold it during CRM processing
+    releaseLock(ip, lockTimeoutId);
+    lockTimeoutId = null;
+    
+    if (rateLimitResult.limited) {
+      const retryAfter = Math.ceil(RATE_LIMIT_WINDOW_MS / 1000);
+      return NextResponse.json(
+        { success: false, error: 'Too many submissions. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+      );
+    }
+
+    // Build tags — only allow known interest values to prevent tag injection
+    let tags: string[] = [type];
+
+    // Add sponsor-specific tags immediately if type is sponsor
+    // Note: base 'sponsor' tag is already added via [type] above
+    if (type === 'sponsor') {
+      if (sponsorshipLevel && (ALLOWED_SPONSORSHIP_LEVELS as readonly string[]).includes(sponsorshipLevel)) {
+        tags.push(`sponsor-${sponsorshipLevel}`);
       }
       if (event) {
         const normalizedEvent = event.toLowerCase().replace(/\s+/g, '-');
@@ -637,14 +699,12 @@ export async function POST(request: NextRequest) {
       tags.push(...safeInterests);
     }
     if (vendorType) {
-      if (!ALLOWED_VENDOR_TYPES.includes(vendorType)) {
-        return NextResponse.json(
-          { success: false, error: 'Invalid vendor type' },
-          { status: 400 }
-        );
-      }
       tags.push(`vendor-${vendorType}`);
-      tags.push('katy-pride-celebration-2026');
+      // Only add celebration tag for vendors registering for that specific event
+      // Vendors for the 5K should NOT get this tag
+      if (event === 'katy-pride-celebration-2026') {
+        tags.push('katy-pride-celebration-2026');
+      }
     }
 
     // Build custom fields — scope donor fields to donor type only
@@ -717,77 +777,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create contact in GrowthSphere360
-    const contactPayload: Record<string, any> = {
-      locationId: GHL_LOCATION_ID,
-      name,
-      email,
-      phone,
-      tags,
-      customFields,
-    }
-    if (company) contactPayload.companyName = company;
-    if (Object.keys(contactAddress).length > 0) contactPayload.address = contactAddress;
-
-    // Add contact notes based on type
-    if (type === 'community-member') {
-      const sanitizedSource = source ? sanitizeText(source) : 'Website Form';
-      const interestList = interests && Array.isArray(interests) && interests.length > 0 
-        ? interests.join(', ')
-        : 'None specified';
-      
-      contactPayload.contactNote = `Source: ${sanitizedSource}\nInterests: ${interestList}`;
-    }
-
-    if (type === 'volunteer') {
-      const sanitizedSource = source ? sanitizeText(source) : 'Website Form';
-      const interestList = interests && Array.isArray(interests) && interests.length > 0 
-        ? interests.join(', ')
-        : 'None specified';
-      const availabilityInfo = availability ? sanitizeText(availability) : 'Not specified';
-      
-      contactPayload.contactNote = `Source: ${sanitizedSource}\nInterests: ${interestList}\nAvailability: ${availabilityInfo}`;
-    }
-
-    if (type === 'sponsor') {
-      const sanitizedSponsorshipLevel = sanitizeText(sponsorshipLevel || 'Not specified');
-      const sanitizedOrganizationType = sanitizeText(organizationType || 'Not specified');
-      const sanitizedCustomAmount = customSponsorshipAmount ? sanitizeText(customSponsorshipAmount) : '';
-      const sanitizedExclusives = interestedInExclusives && Array.isArray(interestedInExclusives) 
-        ? interestedInExclusives.map(e => sanitizeText(e)).filter(Boolean).join(', ')
-        : '';
-      const sanitizedEvent = sanitizeText(event || 'General');
-      
-      let sponsorNote = `Sponsorship Level: ${sanitizedSponsorshipLevel}\nOrganization Type: ${sanitizedOrganizationType}\nEvent: ${sanitizedEvent}`;
-      
-      if (sanitizedCustomAmount) sponsorNote += `\nCustom Amount: ${sanitizedCustomAmount}`;
-      if (sanitizedExclusives) sponsorNote += `\nExclusive Opportunities: ${sanitizedExclusives}`;
-      if (wantInvoice) sponsorNote += '\nInvoice Requested: Yes';
-      
-      contactPayload.contactNote = sponsorNote;
-    }
-
-    if (type === 'vendor') {
-      const sanitizedVendorType = sanitizeText(vendorType || 'Not specified');
-      const sanitizedProductsServices = sanitizeText(productsServices || '');
-      const sanitizedAdditionalInfo = additionalInfo ? sanitizeText(additionalInfo) : '';
-      const sanitizedWebsite = website ? sanitizeText(website) : '';
-      const sanitizedSocialMedia = socialMedia ? sanitizeText(socialMedia) : '';
-      const sponsorshipInterestInfo = sponsorshipInterest ? 'Yes' : 'No';
-      
-      let vendorNote = `Vendor Type: ${sanitizedVendorType}\nProducts/Services: ${sanitizedProductsServices}`;
-      
-      if (sanitizedWebsite) vendorNote += `\nWebsite: ${sanitizedWebsite}`;
-      if (sanitizedSocialMedia) vendorNote += `\nSocial Media: ${sanitizedSocialMedia}`;
-      if (sanitizedAdditionalInfo) vendorNote += `\nAdditional Info: ${sanitizedAdditionalInfo}`;
-      vendorNote += `\nInterested in Sponsorship: ${sponsorshipInterestInfo}`;
-      
-      contactPayload.contactNote = vendorNote;
-    }
-
-    // Check if contact already exists to prevent tag merging issues
+    // Check if contact already exists to prevent tag merging issues and preserve note history
     let existingContactId: string | null = null;
     let existingTags: string[] = [];
+    let existingContactNote: string | null = null;
     
     try {
       const searchUrl = `/contacts/?locationId=${GHL_LOCATION_ID}&query=${encodeURIComponent(email)}&limit=1`;
@@ -801,21 +794,133 @@ export async function POST(request: NextRequest) {
         if (existingContact) {
           existingContactId = existingContact.id;
           existingTags = existingContact.tags || [];
+          existingContactNote = existingContact.contactNote || existingContact.note || null;
           
-          // Remove old vendor-type tags to prevent double-tagging
-          const vendorTypeTags = ALLOWED_VENDOR_TYPES.map(t => `vendor-${t}`);
-          const cleanedTags = existingTags.filter((tag: string) => 
-            !vendorTypeTags.includes(tag)
-          );
+          // Remove old dynamic tags to prevent double-tagging and accumulation
+          // Use base prefixes to match both exact tags and suffixed variants
+          const dynamicTagBases = [
+            'vendor',
+            'sponsor',
+            'event',
+            'exclusive',
+          ];
+          
+          // Also remove generic dynamic tags
+          const genericDynamicTags = ['katy-pride-celebration-2026', 'chase-the-rainbow-5k-2026'];
+          
+          const cleanedTags = existingTags.filter((tag: string) => {
+            // Keep tag if it doesn't start with dynamic base prefix and isn't in generic list
+            // Note: We use startsWith only, NOT exact match (tag === base), to preserve base tags
+            const isDynamic = dynamicTagBases.some(base => tag.startsWith(`${base}-`));
+            const isGenericDynamic = genericDynamicTags.includes(tag);
+            return !isDynamic && !isGenericDynamic;
+          });
           
           // Merge cleaned existing tags with new tags (avoiding duplicates)
-          const mergedTags = [...new Set([...cleanedTags, ...tags])];
-          contactPayload.tags = mergedTags;
+          tags = [...new Set([...cleanedTags, ...tags])];
         }
       }
     } catch (searchError) {
       console.warn('Could not search for existing contact:', searchError);
       // Continue with create flow
+    }
+
+    // Create contact in GrowthSphere360
+    const contactPayload: Record<string, any> = {
+      locationId: GHL_LOCATION_ID,
+      name,
+      email,
+      phone,
+      tags,
+      customFields,
+    }
+    if (company) contactPayload.companyName = company;
+    if (Object.keys(contactAddress).length > 0) contactPayload.address = contactAddress;
+
+    // Add contact notes based on type - prepend new submission to preserve existing history
+    if (type === 'community-member') {
+      const sanitizedSource = source ? sanitizeText(source) : 'Website Form';
+      const interestList = interests && Array.isArray(interests) && interests.length > 0 
+        ? interests.join(', ')
+        : 'None specified';
+      
+      const communityNote = `Source: ${sanitizedSource}\nInterests: ${interestList}`;
+      
+      // Prepend new submission to existing note to preserve history
+      const MAX_NOTE_LENGTH = 5000;
+      const fullNote = existingContactNote
+        ? `${communityNote}\n\n---\nPrevious Submissions:\n${existingContactNote}`
+        : communityNote;
+      contactPayload.contactNote = fullNote.substring(0, MAX_NOTE_LENGTH);
+    }
+
+    if (type === 'volunteer') {
+      const sanitizedSource = source ? sanitizeText(source) : 'Website Form';
+      const interestList = interests && Array.isArray(interests) && interests.length > 0 
+        ? interests.join(', ')
+        : 'None specified';
+      const availabilityInfo = availability ? sanitizeText(availability) : 'Not specified';
+      
+      const volunteerNote = `Source: ${sanitizedSource}\nInterests: ${interestList}\nAvailability: ${availabilityInfo}`;
+      
+      // Prepend new submission to existing note to preserve history
+      const MAX_NOTE_LENGTH = 5000;
+      const fullNote = existingContactNote
+        ? `${volunteerNote}\n\n---\nPrevious Submissions:\n${existingContactNote}`
+        : volunteerNote;
+      contactPayload.contactNote = fullNote.substring(0, MAX_NOTE_LENGTH);
+    }
+
+    if (type === 'sponsor') {
+      const sanitizedSponsorshipLevel = sanitizeText(sponsorshipLevel || 'Not specified');
+      const sanitizedOrganizationType = sanitizeText(organizationType || 'Not specified');
+      const sanitizedCustomAmount = customSponsorshipAmount ? sanitizeText(customSponsorshipAmount) : '';
+      const sanitizedExclusives = interestedInExclusives && Array.isArray(interestedInExclusives)
+        ? interestedInExclusives.map(e => sanitizeText(e)).filter(Boolean).join(', ')
+        : '';
+      const sanitizedEvent = sanitizeText(event || 'General');
+      const sanitizedComments = requestBody.additionalComments ? sanitizeText(requestBody.additionalComments) : '';
+
+      let sponsorNote = `Sponsorship Level: ${sanitizedSponsorshipLevel}\nOrganization Type: ${sanitizedOrganizationType}\nEvent: ${sanitizedEvent}`;
+
+      if (sanitizedCustomAmount) sponsorNote += `\nCustom Amount: ${sanitizedCustomAmount}`;
+      if (sanitizedExclusives) sponsorNote += `\nExclusive Opportunities: ${sanitizedExclusives}`;
+      if (wantInvoice) sponsorNote += '\nInvoice Requested: Yes';
+      if (sanitizedComments) sponsorNote += `\n\nAdditional Comments:\n${sanitizedComments}`;
+
+      // Prepend new submission to existing note to preserve history
+      const MAX_NOTE_LENGTH = 5000;
+      const fullNote = existingContactNote
+        ? `${sponsorNote}\n\n---\nPrevious Submissions:\n${existingContactNote}`
+        : sponsorNote;
+      contactPayload.contactNote = fullNote.substring(0, MAX_NOTE_LENGTH);
+    }
+
+    if (type === 'vendor') {
+      const sanitizedVendorType = sanitizeText(vendorType || 'Not specified');
+      const sanitizedProductsServices = sanitizeText(productsServices || '');
+      const sanitizedAdditionalInfo = additionalInfo ? sanitizeText(additionalInfo) : '';
+      const sanitizedWebsite = website ? sanitizeText(website) : '';
+      const sanitizedSocialMedia = socialMedia ? sanitizeText(socialMedia) : '';
+      const sponsorshipInterestInfo = sponsorshipInterest ? 'Yes' : 'No';
+      const sanitizedPaymentStatus = sanitizeText(paymentStatus || 'pending');
+      const vendorFeeAmount = vendorFee != null ? `$${vendorFee}` : 'Not specified';
+
+      let vendorNote = `Vendor Type: ${sanitizedVendorType}\nProducts/Services: ${sanitizedProductsServices}\nVendor Fee: ${vendorFeeAmount}`;
+
+      if (sanitizedWebsite) vendorNote += `\nWebsite: ${sanitizedWebsite}`;
+      if (sanitizedSocialMedia) vendorNote += `\nSocial Media: ${sanitizedSocialMedia}`;
+      if (sanitizedAdditionalInfo) vendorNote += `\nAdditional Info: ${sanitizedAdditionalInfo}`;
+      vendorNote += `\nInterested in Sponsorship: ${sponsorshipInterestInfo}`;
+      vendorNote += `\nPayment Status: ${sanitizedPaymentStatus}`;
+      if (agreeToTexts) vendorNote += '\nAgreed to Text Updates: Yes';
+
+      // Prepend new submission to existing note to preserve history
+      const MAX_NOTE_LENGTH = 5000;
+      const fullNote = existingContactNote
+        ? `${vendorNote}\n\n---\nPrevious Submissions:\n${existingContactNote}`
+        : vendorNote;
+      contactPayload.contactNote = fullNote.substring(0, MAX_NOTE_LENGTH);
     }
     
     let contact;
@@ -834,6 +939,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Backup successful submission for audit trail
+    try {
+      await saveFormBackup({
+        ...requestBody,
+        crmSuccess: true,
+        contactId: extractContactId(contact),
+      });
+    } catch (backupSaveError) {
+      console.error('Failed to save success backup:', backupSaveError);
+      // Non-fatal - don't fail the request if backup fails
+    }
+
     return NextResponse.json({
       success: true,
       message: type === 'vendor'
@@ -841,7 +958,7 @@ export async function POST(request: NextRequest) {
         : type === 'sponsor'
         ? 'Thank you for your sponsorship interest! We will contact you within 2 business days with next steps and payment information.'
         : 'Thank you! Your information has been submitted successfully.',
-      data: { contactId: contact?.contact?.id },
+      data: { contactId: extractContactId(contact) },
     });
   } catch (error) {
     console.error('CRM API Error:', error);
@@ -851,6 +968,7 @@ export async function POST(request: NextRequest) {
       await saveFormBackup({
         ...requestBody,
         error: error instanceof Error ? error.message : 'Unknown error',
+        crmSuccess: false,
       });
     } catch (backupSaveError) {
       console.error('Failed to save form backup:', backupSaveError);
@@ -861,16 +979,9 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   } finally {
-    // Save successful submission to backup for admin review
-    if (requestBody) {
-      try {
-        await saveFormBackup({
-          ...requestBody,
-          crmSuccess: true,
-        });
-      } catch (backupSaveError) {
-        console.error('Failed to save form backup:', backupSaveError);
-      }
+    // Always release the lock to prevent blocking legitimate users
+    if (lockTimeoutId) {
+      releaseLock(ip, lockTimeoutId);
     }
   }
 }

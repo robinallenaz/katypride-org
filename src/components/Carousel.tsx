@@ -13,15 +13,15 @@ interface CarouselImage {
 const HARDCODED_IMAGES: CarouselImage[] = [
   {
     id: '1',
-    url: '/carousel/3-Attendees-At-Celebration.jpg',
-    alt: 'Katy Pride Celebration with rainbow flags and community',
-    caption: 'Katy Pride 2026 Celebration'
+    url: '/carousel/DJ-Krazy-V.jpg',
+    alt: 'Family with children in strollers at Katy Pride 2025',
+    caption: 'Celebrating Pride with family at Katy Pride 2025'
   },
   {
     id: '2',
-    url: '/carousel/DJ-Krazy-V.jpg',
-    alt: 'DJ Krazy V performing at Katy Pride',
-    caption: 'DJ Krazy V keeping the energy high'
+    url: '/carousel/3-Attendees-At-Celebration.jpg',
+    alt: 'Attendees at Katy Pride Celebration',
+    caption: 'Celebrating together at Katy Pride 2025'
   },
   {
     id: '3',

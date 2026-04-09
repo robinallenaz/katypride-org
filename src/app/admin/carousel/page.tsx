@@ -269,7 +269,7 @@ function ImageForm({ image, onSave, onCancel }: { image: CarouselImage | null; o
             required
             value={formData.url}
             onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
             placeholder="/carousel/image.jpg or https://..."
           />
           <p className="text-xs text-gray-500 mt-1">
@@ -284,7 +284,7 @@ function ImageForm({ image, onSave, onCancel }: { image: CarouselImage | null; o
             required
             value={formData.alt}
             onChange={(e) => setFormData({ ...formData, alt: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
             placeholder="Description for accessibility"
           />
         </div>
@@ -295,7 +295,7 @@ function ImageForm({ image, onSave, onCancel }: { image: CarouselImage | null; o
             type="text"
             value={formData.caption || ''}
             onChange={(e) => setFormData({ ...formData, caption: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
             placeholder="Caption to display below image"
           />
         </div>

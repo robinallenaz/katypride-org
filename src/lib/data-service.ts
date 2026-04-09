@@ -1,5 +1,24 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { Pool, PoolClient } from 'pg';
+
+// PostgreSQL connection for events
+const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      max: 10, // Limit connections for serverless environments
+      idleTimeoutMillis: 30000, // Close idle connections after 30s
+      connectionTimeoutMillis: 5000, // Timeout new connections after 5s
+    })
+  : null;
+
+// Log connection status
+if (pool) {
+  console.log('[DataService] PostgreSQL pool initialized for events');
+} else {
+  console.log('[DataService] No DATABASE_URL, events will use JSON fallback');
+}
 
 // Primary data directory (committed files)
 const primaryDataDir = path.join(process.cwd(), 'data');
@@ -47,6 +66,9 @@ async function acquireLock(filePath: string): Promise<() => void> {
       fileLocks.delete(filePath);
       break;
     }
+    
+    // Small delay to prevent CPU spinning between attempts
+    await new Promise(r => setTimeout(r, 10));
   }
   
   let release: () => void = () => {};
@@ -61,8 +83,201 @@ async function acquireLock(filePath: string): Promise<() => void> {
   return release;
 }
 
-// Read data from JSON file (tries writable dir first, then committed files)
+// Database helper to get a client from the pool
+async function getDbClient(): Promise<PoolClient | null> {
+  if (!pool) return null;
+  try {
+    return await pool.connect();
+  } catch (error) {
+    console.error('[DataService] Failed to get database client:', error);
+    return null;
+  }
+}
+
+// Convert database row to Event type
+function rowToEvent(row: any): Event {
+  return {
+    id: String(row.id),
+    title: row.title,
+    start: row.start,
+    end: row.end,
+    location: row.location,
+    imageSrc: row.image_src,
+    imageAlt: row.image_alt,
+    eventCategory: row.event_category,
+    externalUrl: row.external_url,
+    externalCtaLabel: row.external_cta_label,
+    summary: row.summary,
+    isRecurring: row.is_recurring,
+    parentId: row.parent_id ? String(row.parent_id) : undefined,
+  };
+}
+
+// Read events from PostgreSQL database
+async function readEventsFromDb(): Promise<{ events: Event[] }> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+
+  try {
+    const result = await client.query(
+      'SELECT * FROM events ORDER BY start ASC'
+    );
+    return { events: result.rows.map(rowToEvent) };
+  } finally {
+    try {
+      client.release();
+    } catch (releaseError) {
+      console.error('[DataService] Error releasing client:', releaseError);
+    }
+  }
+}
+
+// Generate a consistent lock ID based on table name to avoid collisions
+// but allow different tables to use different locks
+function getTableLockId(tableName: string): number {
+  // Simple hash: sum of char codes mod 2^31 to stay within PostgreSQL bigint range
+  let hash = 0;
+  for (let i = 0; i < tableName.length; i++) {
+    hash = ((hash << 5) - hash) + tableName.charCodeAt(i);
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash) || 1; // Ensure non-zero
+}
+
+// Write events to PostgreSQL database using advisory lock for concurrency safety
+async function writeEventsToDb(events: Event[]): Promise<void> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+
+  let lockAcquired = false;
+  const lockId = getTableLockId('events'); // Generate lock ID from table name
+
+  try {
+    await client.query('BEGIN');
+
+    // Acquire advisory lock to prevent race conditions in serverless environments
+    await client.query('SELECT pg_advisory_lock($1)', [lockId]);
+    lockAcquired = true;
+
+    // Safety check: prevent destructive operations if events array is suspiciously small
+    // This protects against accidental data loss from partial writes
+    const currentCountResult = await client.query('SELECT COUNT(*) as count FROM events');
+    const currentCount = parseInt(currentCountResult.rows[0].count, 10);
+    
+    // If we're about to delete more than 50% of events, require minimum threshold
+    const incomingIds = events.map(e => {
+      const id = parseInt(e.id, 10);
+      return isNaN(id) ? null : id;
+    }).filter((id): id is number => id !== null);
+    
+    const wouldDelete = currentCount - incomingIds.length;
+    const deleteRatio = currentCount > 0 ? wouldDelete / currentCount : 0;
+    
+    // Safety valve: if we'd delete >50% of events and have >5 events, abort
+    if (deleteRatio > 0.5 && currentCount > 5) {
+      throw new Error(
+        `Safety check failed: Attempting to delete ${wouldDelete} of ${currentCount} events ` +
+        `(${Math.round(deleteRatio * 100)}%). This looks like an accidental partial write. ` +
+        `If intentional, delete and recreate with smaller batches.`
+      );
+    }
+
+    // Delete events that are no longer in the list (orphaned records)
+    // Only delete if we have valid IDs to preserve
+    if (incomingIds.length > 0) {
+      await client.query(
+        'DELETE FROM events WHERE id <> ALL($1::int[])',
+        [incomingIds]
+      );
+    }
+    // Note: If incomingIds is empty, we don't delete anything to prevent accidental
+    // data loss from malformed input. The safety check above already validates this case.
+
+    // Upsert each event individually
+    for (const event of events) {
+      const eventId = parseInt(event.id, 10);
+      if (isNaN(eventId)) {
+        console.warn(`[DataService] Skipping event with invalid ID: ${event.title}`);
+        continue;
+      }
+      const parentId = event.parentId ? parseInt(event.parentId, 10) : null;
+      if (event.parentId && isNaN(parentId!)) {
+        console.warn(`[DataService] Skipping event with invalid parentId: ${event.title}`);
+        continue;
+      }
+      
+      await client.query(
+        `INSERT INTO events (
+          id, title, start, "end", location, image_src, image_alt,
+          event_category, external_url, external_cta_label, summary,
+          is_recurring, parent_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          start = EXCLUDED.start,
+          "end" = EXCLUDED.end,
+          location = EXCLUDED.location,
+          image_src = EXCLUDED.image_src,
+          image_alt = EXCLUDED.image_alt,
+          event_category = EXCLUDED.event_category,
+          external_url = EXCLUDED.external_url,
+          external_cta_label = EXCLUDED.external_cta_label,
+          summary = EXCLUDED.summary,
+          is_recurring = EXCLUDED.is_recurring,
+          parent_id = EXCLUDED.parent_id`,
+        [
+          eventId,
+          event.title,
+          event.start,
+          event.end || null,
+          event.location || null,
+          event.imageSrc || null,
+          event.imageAlt,
+          event.eventCategory,
+          event.externalUrl || null,
+          event.externalCtaLabel || null,
+          event.summary || null,
+          event.isRecurring || false,
+          parentId,
+        ]
+      );
+    }
+
+    // Update sequence to match highest ID for SERIAL compatibility
+    // Use 'false' as third param so nextval() returns max+1 (not max+2)
+    if (incomingIds.length > 0) {
+      await client.query(`SELECT setval('events_id_seq', COALESCE((SELECT MAX(id) FROM events), 0), false)`);
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    // Release advisory lock if acquired
+    if (lockAcquired) {
+      await client.query('SELECT pg_advisory_unlock($1)', [lockId]).catch(() => {});
+    }
+    client.release();
+  }
+}
+
+// Read data from JSON file or PostgreSQL for events
 export async function readData<T>(filename: string): Promise<T> {
+  // Use database for events if available
+  if (filename === 'events' && pool) {
+    try {
+      return await readEventsFromDb() as unknown as T;
+    } catch (error) {
+      console.warn('[DataService] Failed to read events from DB, falling back to JSON:', error);
+      // Fall through to JSON fallback
+    }
+  }
+
   // Try writable directory first (for admin changes on serverless)
   const writablePath = path.join(writableDataDir, `${filename}.json`);
   const release = await acquireLock(writablePath);
@@ -96,8 +311,26 @@ export async function readData<T>(filename: string): Promise<T> {
   }
 }
 
-// Write data to JSON file atomically (always writes to writable dir)
+// Write data to JSON file or PostgreSQL for events
 export async function writeData<T>(filename: string, data: T): Promise<void> {
+  // Use database for events if available
+  if (filename === 'events' && pool) {
+    try {
+      const eventsData = data as { events: Event[] };
+      await writeEventsToDb(eventsData.events);
+      return;
+    } catch (error) {
+      console.error('[DataService] CRITICAL: Failed to write events to DB:', error);
+      // DO NOT fall back to JSON for events - in serverless environments,
+      // /tmp is ephemeral and data will appear to be "lost" on next request.
+      // It's better to fail fast and alert than to silently write to ephemeral storage.
+      throw new Error(
+        `Failed to persist events to database: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
+        'JSON fallback disabled to prevent data loss in serverless environments.'
+      );
+    }
+  }
+
   const filePath = path.join(writableDataDir, `${filename}.json`);
   const tempPath = `${filePath}.tmp`;
   const release = await acquireLock(filePath);
