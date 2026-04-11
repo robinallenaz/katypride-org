@@ -15,9 +15,102 @@ const pool = process.env.DATABASE_URL
 
 // Log connection status
 if (pool) {
-  console.log('[DataService] PostgreSQL pool initialized for events');
+  console.log('[DataService] PostgreSQL pool initialized for events and site-images');
 } else {
-  console.log('[DataService] No DATABASE_URL, events will use JSON fallback');
+  console.log('[DataService] No DATABASE_URL, content will use JSON fallback');
+}
+
+async function upsertSiteImageToDb(image: SiteImage): Promise<void> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+
+  let lockAcquired = false;
+  const lockId = getTableLockId('site_images');
+
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_lock($1)', [lockId]);
+    lockAcquired = true;
+
+    await ensureSiteImagesTableExists(client);
+
+    const key = String(image.key || '').trim();
+    const id = String(image.id || '').trim();
+
+    if (!key || !id) {
+      throw new Error('Site image key and id are required');
+    }
+
+    await client.query(
+      `INSERT INTO site_images (
+        image_key, id, url, alt, caption, updated_at,
+        cloudinary_public_id, gravity, focal_x, focal_y
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ON CONFLICT (image_key) DO UPDATE SET
+        id = EXCLUDED.id,
+        url = EXCLUDED.url,
+        alt = EXCLUDED.alt,
+        caption = EXCLUDED.caption,
+        updated_at = EXCLUDED.updated_at,
+        cloudinary_public_id = EXCLUDED.cloudinary_public_id,
+        gravity = EXCLUDED.gravity,
+        focal_x = EXCLUDED.focal_x,
+        focal_y = EXCLUDED.focal_y`,
+      [
+        key,
+        id,
+        image.url,
+        image.alt,
+        image.caption || null,
+        image.updatedAt || null,
+        image.cloudinaryPublicId || null,
+        image.gravity || 'auto',
+        image.focalX ?? null,
+        image.focalY ?? null,
+      ]
+    );
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    if (lockAcquired) {
+      await client.query('SELECT pg_advisory_unlock($1)', [lockId]).catch(() => {});
+    }
+    client.release();
+  }
+}
+
+async function deleteSiteImageByKeyInDb(key: string): Promise<void> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+
+  let lockAcquired = false;
+  const lockId = getTableLockId('site_images');
+
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_lock($1)', [lockId]);
+    lockAcquired = true;
+
+    await ensureSiteImagesTableExists(client);
+    await client.query('DELETE FROM site_images WHERE image_key = $1', [key]);
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    if (lockAcquired) {
+      await client.query('SELECT pg_advisory_unlock($1)', [lockId]).catch(() => {});
+    }
+    client.release();
+  }
 }
 
 // Primary data directory (committed files)
@@ -94,23 +187,201 @@ async function getDbClient(): Promise<PoolClient | null> {
   }
 }
 
+interface EventRow {
+  id: string | number;
+  title: string;
+  start: string;
+  end: string | null;
+  location: string | null;
+  image_src: string | null;
+  image_alt: string;
+  event_category: Event['eventCategory'];
+  external_url: string | null;
+  external_cta_label: string | null;
+  summary: string | null;
+  is_recurring: boolean | null;
+  parent_id: string | number | null;
+}
+
+interface SiteImageRow {
+  id: string;
+  image_key: string;
+  url: string;
+  alt: string;
+  caption: string | null;
+  updated_at: string | Date | null;
+  cloudinary_public_id: string | null;
+  gravity: SiteImage['gravity'] | null;
+  focal_x: number | null;
+  focal_y: number | null;
+}
+
+function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
+  return typeof error === 'object' && error !== null && 'code' in error;
+}
+
 // Convert database row to Event type
-function rowToEvent(row: any): Event {
+function rowToEvent(row: EventRow): Event {
   return {
     id: String(row.id),
     title: row.title,
     start: row.start,
-    end: row.end,
-    location: row.location,
-    imageSrc: row.image_src,
+    end: row.end ?? undefined,
+    location: row.location ?? undefined,
+    imageSrc: row.image_src ?? undefined,
     imageAlt: row.image_alt,
     eventCategory: row.event_category,
-    externalUrl: row.external_url,
-    externalCtaLabel: row.external_cta_label,
-    summary: row.summary,
-    isRecurring: row.is_recurring,
+    externalUrl: row.external_url ?? undefined,
+    externalCtaLabel: row.external_cta_label ?? undefined,
+    summary: row.summary ?? undefined,
+    isRecurring: row.is_recurring ?? undefined,
     parentId: row.parent_id ? String(row.parent_id) : undefined,
   };
+}
+
+function rowToSiteImage(row: SiteImageRow): SiteImage {
+  return {
+    id: String(row.id),
+    key: String(row.image_key),
+    url: row.url,
+    alt: row.alt,
+    caption: row.caption || undefined,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : undefined,
+    cloudinaryPublicId: row.cloudinary_public_id || undefined,
+    gravity: row.gravity || 'auto',
+    focalX: row.focal_x ?? undefined,
+    focalY: row.focal_y ?? undefined,
+  };
+}
+
+function mergeSiteImagesByKey(existing: SiteImage[], incoming: SiteImage[]): SiteImage[] {
+  const merged = new Map<string, SiteImage>();
+
+  for (const image of existing) {
+    const key = String(image?.key || '').trim();
+    if (!key) continue;
+    merged.set(key, image);
+  }
+
+  for (const image of incoming) {
+    const key = String(image?.key || '').trim();
+    if (!key) continue;
+    merged.set(key, image);
+  }
+
+  return Array.from(merged.values());
+}
+
+async function ensureSiteImagesTableExists(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS site_images (
+      image_key VARCHAR(120) PRIMARY KEY,
+      id VARCHAR(120) NOT NULL,
+      url TEXT NOT NULL,
+      alt TEXT NOT NULL,
+      caption TEXT,
+      updated_at TIMESTAMPTZ,
+      cloudinary_public_id TEXT,
+      gravity VARCHAR(32),
+      focal_x DOUBLE PRECISION,
+      focal_y DOUBLE PRECISION,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+}
+
+async function readSiteImagesFromDb(): Promise<{ images: SiteImage[] }> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+
+  try {
+    await ensureSiteImagesTableExists(client);
+    const result = await client.query(
+      `SELECT id, image_key, url, alt, caption, updated_at, cloudinary_public_id, gravity, focal_x, focal_y
+       FROM site_images
+       ORDER BY image_key ASC`
+    );
+    return { images: result.rows.map((row) => rowToSiteImage(row as SiteImageRow)) };
+  } finally {
+    try {
+      client.release();
+    } catch (releaseError) {
+      console.error('[DataService] Error releasing client:', releaseError);
+    }
+  }
+}
+
+async function writeSiteImagesToDb(images: SiteImage[]): Promise<void> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+
+  let lockAcquired = false;
+  const lockId = getTableLockId('site_images');
+
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_lock($1)', [lockId]);
+    lockAcquired = true;
+
+    await ensureSiteImagesTableExists(client);
+
+    for (const image of images) {
+      if (!image?.key || !image?.id) {
+        console.warn('[DataService] Skipping site image with missing key/id');
+        continue;
+      }
+
+      const key = String(image.key).trim();
+      const id = String(image.id).trim();
+      if (!key || !id) {
+        console.warn('[DataService] Skipping site image with blank key/id');
+        continue;
+      }
+
+      await client.query(
+        `INSERT INTO site_images (
+          image_key, id, url, alt, caption, updated_at,
+          cloudinary_public_id, gravity, focal_x, focal_y
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (image_key) DO UPDATE SET
+          id = EXCLUDED.id,
+          url = EXCLUDED.url,
+          alt = EXCLUDED.alt,
+          caption = EXCLUDED.caption,
+          updated_at = EXCLUDED.updated_at,
+          cloudinary_public_id = EXCLUDED.cloudinary_public_id,
+          gravity = EXCLUDED.gravity,
+          focal_x = EXCLUDED.focal_x,
+          focal_y = EXCLUDED.focal_y`,
+        [
+          key,
+          id,
+          image.url,
+          image.alt,
+          image.caption || null,
+          image.updatedAt || null,
+          image.cloudinaryPublicId || null,
+          image.gravity || 'auto',
+          image.focalX ?? null,
+          image.focalY ?? null,
+        ]
+      );
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    if (lockAcquired) {
+      await client.query('SELECT pg_advisory_unlock($1)', [lockId]).catch(() => {});
+    }
+    client.release();
+  }
 }
 
 // Read events from PostgreSQL database
@@ -124,7 +395,7 @@ async function readEventsFromDb(): Promise<{ events: Event[] }> {
     const result = await client.query(
       'SELECT * FROM events ORDER BY start ASC'
     );
-    return { events: result.rows.map(rowToEvent) };
+    return { events: result.rows.map((row) => rowToEvent(row as EventRow)) };
   } finally {
     try {
       client.release();
@@ -278,6 +549,22 @@ export async function readData<T>(filename: string): Promise<T> {
     }
   }
 
+  // Use database for site-images if available.
+  // Do not fall back to JSON on DB read errors, because that can serve stale
+  // content (e.g. deleted images reappearing from old JSON snapshots).
+  if (filename === 'site-images' && pool) {
+    try {
+      const dbData = await readSiteImagesFromDb();
+      return dbData as unknown as T;
+    } catch (error) {
+      console.error('[DataService] CRITICAL: Failed to read site-images from DB:', error);
+      throw new Error(
+        `Failed to read site-images from database: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
+        'JSON fallback disabled to prevent stale content and data inconsistency.'
+      );
+    }
+  }
+
   // Try writable directory first (for admin changes on serverless)
   const writablePath = path.join(writableDataDir, `${filename}.json`);
   const release = await acquireLock(writablePath);
@@ -286,8 +573,8 @@ export async function readData<T>(filename: string): Promise<T> {
     try {
       const data = await fs.readFile(writablePath, 'utf8');
       return JSON.parse(data) as T;
-    } catch (error: any) {
-      if (error.code !== 'ENOENT') {
+    } catch (error: unknown) {
+      if (!isErrnoException(error) || error.code !== 'ENOENT') {
         console.error(`Error reading ${filename} from writable:`, error);
       }
       // File doesn't exist in writable dir, try primary (committed) dir
@@ -296,8 +583,8 @@ export async function readData<T>(filename: string): Promise<T> {
     const primaryPath = path.join(primaryDataDir, `${filename}.json`);
     const data = await fs.readFile(primaryPath, 'utf8');
     return JSON.parse(data) as T;
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
+  } catch (error: unknown) {
+    if (isErrnoException(error) && error.code === 'ENOENT') {
       // File doesn't exist anywhere - return default empty structure
       if (filename === 'carousel') return { images: [] } as unknown as T;
       if (filename === 'events') return { events: [] } as unknown as T;
@@ -312,7 +599,50 @@ export async function readData<T>(filename: string): Promise<T> {
   }
 }
 
-// Write data to JSON file or PostgreSQL for events
+export async function upsertSiteImage(image: SiteImage): Promise<void> {
+  if (pool) {
+    try {
+      await upsertSiteImageToDb(image);
+      return;
+    } catch (error) {
+      console.error('[DataService] CRITICAL: Failed to upsert site-image in DB:', error);
+      throw new Error(
+        `Failed to upsert site-image in database: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
+        'JSON fallback disabled to prevent data loss in serverless environments.'
+      );
+    }
+  }
+
+  const data = await readData<{ images: SiteImage[] }>('site-images');
+  const existingIndex = data.images.findIndex((i) => i.key === image.key);
+  if (existingIndex >= 0) {
+    data.images[existingIndex] = image;
+  } else {
+    data.images.push(image);
+  }
+  await writeData('site-images', data);
+}
+
+export async function deleteSiteImageByKey(key: string): Promise<void> {
+  if (pool) {
+    try {
+      await deleteSiteImageByKeyInDb(key);
+      return;
+    } catch (error) {
+      console.error('[DataService] CRITICAL: Failed to delete site-image in DB:', error);
+      throw new Error(
+        `Failed to delete site-image from database: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
+        'JSON fallback disabled to prevent data loss in serverless environments.'
+      );
+    }
+  }
+
+  const data = await readData<{ images: SiteImage[] }>('site-images');
+  data.images = data.images.filter((i) => i.key !== key);
+  await writeData('site-images', data);
+}
+
+// Write data to JSON file or PostgreSQL for events/content
 export async function writeData<T>(filename: string, data: T): Promise<void> {
   // Use database for events if available
   if (filename === 'events' && pool) {
@@ -332,13 +662,63 @@ export async function writeData<T>(filename: string, data: T): Promise<void> {
     }
   }
 
+  // Use database for site-images if available.
+  // Intentional behavior: upsert-only by key so partial payloads do not delete existing records.
+  if (filename === 'site-images' && pool) {
+    try {
+      const siteImagesData = data as { images: SiteImage[] };
+      await writeSiteImagesToDb(siteImagesData.images || []);
+      return;
+    } catch (error) {
+      console.error('[DataService] CRITICAL: Failed to write site-images to DB:', error);
+      throw new Error(
+        `Failed to persist site-images to database: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
+        'JSON fallback disabled to prevent data loss in serverless environments.'
+      );
+    }
+  }
+
   const filePath = path.join(writableDataDir, `${filename}.json`);
   const tempPath = `${filePath}.tmp`;
   const release = await acquireLock(filePath);
   
   try {
+    let dataToWrite = data;
+
+    // Safety merge for site-images in JSON mode: callers may pass partial subsets.
+    // Merge by key under the same file lock to avoid dropping previously stored images.
+    if (filename === 'site-images') {
+      const incomingImages = ((data as unknown as { images?: SiteImage[] })?.images || []) as SiteImage[];
+      let existingImages: SiteImage[] = [];
+
+      try {
+        const existingRaw = await fs.readFile(filePath, 'utf8');
+        const existingParsed = JSON.parse(existingRaw) as { images?: SiteImage[] };
+        existingImages = Array.isArray(existingParsed.images) ? existingParsed.images : [];
+      } catch (error: unknown) {
+        const primaryPath = path.join(primaryDataDir, `${filename}.json`);
+        try {
+          const primaryRaw = await fs.readFile(primaryPath, 'utf8');
+          const primaryParsed = JSON.parse(primaryRaw) as { images?: SiteImage[] };
+          existingImages = Array.isArray(primaryParsed.images) ? primaryParsed.images : [];
+        } catch (primaryError: unknown) {
+          if (!isErrnoException(primaryError) || primaryError.code !== 'ENOENT') {
+            console.warn('[DataService] Failed to read existing site-images for merge, writing incoming payload only:', primaryError);
+          }
+        }
+
+        if (!isErrnoException(error) || error.code !== 'ENOENT') {
+          console.warn('[DataService] Failed to read writable site-images for merge, fell back to primary data:', error);
+        }
+      }
+
+      dataToWrite = {
+        images: mergeSiteImagesByKey(existingImages, incomingImages),
+      } as unknown as T;
+    }
+
     // Write to temporary file first for atomicity
-    await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf8');
+    await fs.writeFile(tempPath, JSON.stringify(dataToWrite, null, 2), 'utf8');
     // Rename is atomic on most filesystems
     await fs.rename(tempPath, filePath);
   } catch (error) {

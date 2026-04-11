@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
-import { readData, writeData, type SiteImage } from '@/lib/data-service';
+import { readData, upsertSiteImage, deleteSiteImageByKey, type SiteImage } from '@/lib/data-service';
 import { isValidImageUrl } from '@/lib/validation';
 import { verifySession } from '../auth/route';
 
@@ -152,9 +152,7 @@ export async function POST(request: NextRequest) {
     });
     
     const data = await readData<{ images: SiteImage[] }>('site-images');
-    
-    const existingIndex = data.images.findIndex(i => i.key === image.key);
-    const existingImage = existingIndex >= 0 ? data.images[existingIndex] : null;
+    const existingImage = data.images.find(i => i.key === image.key) || null;
 
     // If replacing an uploaded image, clean up the old Cloudinary asset.
     if (
@@ -169,13 +167,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (existingIndex >= 0) {
-      data.images[existingIndex] = image;
-    } else {
-      data.images.push(image);
-    }
-    
-    await writeData('site-images', data);
+    await upsertSiteImage(image);
     return NextResponse.json({ success: true, image });
   } catch (error) {
     console.error('Error saving site image:', error);
@@ -208,9 +200,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    data.images = data.images.filter(i => i.key !== key);
-
-    await writeData('site-images', data);
+    await deleteSiteImageByKey(key);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting site image:', error);
