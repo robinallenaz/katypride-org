@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { cloudinaryUrl } from '@/lib/cloudinary'
+import { cloudinaryUrl, generateSrcSet } from '@/lib/cloudinary'
 
 const navItems = [
   { href: '/', label: 'Home' },
@@ -25,12 +25,14 @@ export default function Nav() {
         <div className="flex justify-between items-center py-4">
           <Link href="/" className="flex items-center space-x-2">
             <img
-              src={cloudinaryUrl('65ad7fd64707829ac5cdbe0d_epa64u', 300)}
+              src={cloudinaryUrl('65ad7fd64707829ac5cdbe0d_epa64u', 144, { quality: 'auto:good' })}
               alt="Katy Pride Logo"
               width={72}
               height={72}
               className="h-12 w-auto"
               loading="eager"
+              srcSet={generateSrcSet('65ad7fd64707829ac5cdbe0d_epa64u', [72, 144, 200], { quality: 'auto:good' })}
+              sizes="72px"
             />
             <span className="font-heading text-xl font-bold text-purple-600">Katy Pride</span>
           </Link>

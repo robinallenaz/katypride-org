@@ -29,6 +29,7 @@ export default function AdminLayout({
     { href: '/admin/events', label: 'Events' },
     { href: '/admin/resources', label: 'Resources' },
     { href: '/admin/carousel', label: 'Carousel' },
+    { href: '/admin/site-images', label: 'Site Images' },
   ];
 
   return (

@@ -1,14 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
-
-interface CarouselImage {
-  id: string;
-  url: string;
-  alt: string;
-  caption?: string;
-}
+import type { CarouselImage } from '@/lib/data-service';
+import { isValidImageUrl, getFileValidationError, generateUniqueId } from '@/lib/validation';
 
 export default function CarouselAdmin() {
   const [images, setImages] = useState<CarouselImage[]>([]);
@@ -33,6 +28,9 @@ export default function CarouselAdmin() {
       if (response.status === 401) {
         window.location.href = '/admin';
         return;
+      }
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
       const data = await response.json();
       setImages(data.images || []);
@@ -65,10 +63,13 @@ export default function CarouselAdmin() {
         loadImages();
         setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage('Error saving image');
+        const data = await response.json().catch(() => ({ error: 'Unknown error' }));
+        setMessage(`Error: ${data.error || 'Failed to save image'}`);
+        setTimeout(() => setMessage(''), 5000);
       }
     } catch (error) {
-      setMessage('Error saving image');
+      setMessage('Network error. Please check your connection and try again.');
+      setTimeout(() => setMessage(''), 5000);
     }
   };
 
@@ -90,9 +91,14 @@ export default function CarouselAdmin() {
         setMessage('Image deleted!');
         loadImages();
         setTimeout(() => setMessage(''), 3000);
+      } else {
+        const data = await response.json().catch(() => ({ error: 'Unknown error' }));
+        setMessage(`Error: ${data.error || 'Failed to delete image'}`);
+        setTimeout(() => setMessage(''), 5000);
       }
     } catch (error) {
-      setMessage('Error deleting image');
+      setMessage('Network error. Please try again.');
+      setTimeout(() => setMessage(''), 5000);
     }
   };
 
@@ -100,9 +106,13 @@ export default function CarouselAdmin() {
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= images.length) return;
 
+    const originalImages = [...images];
     const newImages = [...images];
     [newImages[index], newImages[newIndex]] = [newImages[newIndex], newImages[index]];
-    
+
+    // Optimistic update
+    setImages(newImages);
+
     try {
       const response = await fetch('/api/admin/carousel', {
         method: 'POST',
@@ -111,14 +121,23 @@ export default function CarouselAdmin() {
       });
 
       if (response.status === 401) {
+        // Rollback on auth error
+        setImages(originalImages);
         window.location.href = '/admin';
         return;
       }
 
-      if (response.ok) {
-        setImages(newImages);
+      if (!response.ok) {
+        // Rollback on server error
+        setImages(originalImages);
+        setMessage('Failed to reorder images. Please try again.');
+        setTimeout(() => setMessage(''), 3000);
       }
     } catch (error) {
+      // Rollback on network error
+      setImages(originalImages);
+      setMessage('Network error. Changes reverted.');
+      setTimeout(() => setMessage(''), 3000);
       console.error('Failed to reorder:', error);
     }
   };
@@ -153,6 +172,7 @@ export default function CarouselAdmin() {
             setEditingImage(null);
             setIsCreating(false);
           }}
+          getAuthHeaders={getAuthHeaders}
         />
       )}
 
@@ -160,7 +180,7 @@ export default function CarouselAdmin() {
         {images.map((image, index) => (
           <div key={image.id} className="bg-white rounded-xl shadow-md overflow-hidden">
             <div className="aspect-video bg-gray-100 relative">
-              {image.url && (image.url.startsWith('/') || image.url.startsWith('http://') || image.url.startsWith('https://')) ? (
+              {image.url && (image.url.startsWith('/') || image.url.startsWith('https://')) ? (
                 <img
                   src={image.url}
                   alt={image.alt}
@@ -223,7 +243,7 @@ export default function CarouselAdmin() {
   );
 }
 
-function ImageForm({ image, onSave, onCancel }: { image: CarouselImage | null; onSave: (i: CarouselImage) => void; onCancel: () => void }) {
+function ImageForm({ image, onSave, onCancel, getAuthHeaders }: { image: CarouselImage | null; onSave: (i: CarouselImage) => void; onCancel: () => void; getAuthHeaders: () => Record<string, string> }) {
   const [formData, setFormData] = useState<CarouselImage>(
     image || {
       id: '',
@@ -232,27 +252,135 @@ function ImageForm({ image, onSave, onCancel }: { image: CarouselImage | null; o
       caption: '',
     }
   );
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Validate URL to prevent XSS (javascript: protocol, etc.)
-  const isValidImageUrl = (url: string): boolean => {
-    if (!url || typeof url !== 'string') return false;
-    // Allow relative paths starting with /
-    if (url.startsWith('/')) return true;
-    // Allow http/https URLs only
-    try {
-      const parsed = new URL(url);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  };
+  // Reset form data when image prop changes (prevents stale state)
+  useEffect(() => {
+    setFormData(image || {
+      id: '',
+      url: '',
+      alt: '',
+      caption: '',
+    });
+  }, [image?.id]);
+
+  // Cleanup abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Use shared validation utility
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate URL before submission
+    if (!formData.url || !isValidImageUrl(formData.url)) {
+      alert('Please provide a valid image URL or upload an image.');
+      return;
+    }
+
+    // Validate alt text
+    if (!formData.alt || formData.alt.trim().length === 0) {
+      alert('Please provide alt text for accessibility.');
+      return;
+    }
+
+    // Generate unique ID to avoid collisions
+    const newId = formData.id || generateUniqueId();
+
     onSave({
       ...formData,
-      id: formData.id || Date.now().toString(),
+      id: newId,
     });
+  };
+
+  const handleFileUpload = async (file: File) => {
+    // Validate file using shared utility
+    const error = getFileValidationError(file);
+    if (error) {
+      alert(error);
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress('Uploading...');
+
+    // Create new abort controller for this upload
+    abortControllerRef.current = new AbortController();
+
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+      uploadFormData.append('folder', 'katypride/carousel');
+
+      const response = await fetch('/api/admin/upload', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: uploadFormData,
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (response.status === 401) {
+        window.location.href = '/admin';
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        setFormData(prev => ({ ...prev, url: data.url, cloudinaryPublicId: data.publicId }));
+        setUploadProgress('Upload complete!');
+        setTimeout(() => setUploadProgress(''), 2000);
+      } else {
+        alert(data.error || 'Upload failed');
+        setUploadProgress('');
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        console.log('Upload aborted');
+        return;
+      }
+      console.error('Upload error:', error);
+      alert('Failed to upload image. Please try again.');
+      setUploadProgress('');
+    } finally {
+      setUploading(false);
+      abortControllerRef.current = null;
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileUpload(e.target.files[0]);
+    }
   };
 
   return (
@@ -263,18 +391,52 @@ function ImageForm({ image, onSave, onCancel }: { image: CarouselImage | null; o
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Image URL *</label>
-          <input
-            type="text"
-            required
-            value={formData.url}
-            onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
-            placeholder="/carousel/image.jpg or https://..."
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Use relative path (e.g., /carousel/photo.jpg) for local images or full URL for external images
-          </p>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Image *</label>
+
+          {/* Upload Area */}
+          <div
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+              dragActive
+                ? 'border-[#760088] bg-purple-50'
+                : 'border-gray-300 hover:border-gray-400'
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={handleFileInputChange}
+              className="hidden"
+            />
+            <div className="text-gray-600">
+              <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                <path d="M14 30.5V12a2 2 0 012-2h16a2 2 0 012 2v18.5M24 31V18m0 0l-5 5m5-5l5 5M10 36h28" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <p className="text-sm font-medium">
+                {uploading ? uploadProgress : 'Click to upload or drag and drop'}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                JPEG, PNG, WebP, GIF up to 5MB
+              </p>
+            </div>
+          </div>
+
+          {/* Or enter URL manually */}
+          <div className="mt-3">
+            <p className="text-xs text-gray-500 text-center mb-2">— OR enter URL manually —</p>
+            <input
+              type="text"
+              value={formData.url}
+              onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
+              placeholder="/carousel/image.jpg or https://..."
+            />
+          </div>
         </div>
 
         <div>
@@ -314,7 +476,7 @@ function ImageForm({ image, onSave, onCancel }: { image: CarouselImage | null; o
         {formData.url && !isValidImageUrl(formData.url) && (
           <div className="border rounded-lg p-4 bg-red-50">
             <p className="text-sm font-medium text-red-700">
-              Invalid URL. Please use a relative path (starting with /) or a valid http/https URL.
+              Invalid URL. Please use a relative path (starting with /) or a valid HTTPS URL.
             </p>
           </div>
         )}

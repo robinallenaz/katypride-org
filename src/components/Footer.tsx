@@ -1,6 +1,6 @@
 'use client'
 
-import { cloudinaryUrl } from '@/lib/cloudinary'
+import { cloudinaryUrl, generateSrcSet } from '@/lib/cloudinary'
 
 export default function Footer() {
   return (
@@ -11,12 +11,14 @@ export default function Footer() {
           <div className="space-y-6">
             <div className="flex items-center space-x-3">
               <img
-                src={cloudinaryUrl('65ad7fd64707829ac5cdbe0d_epa64u', 160)}
+                src={cloudinaryUrl('65ad7fd64707829ac5cdbe0d_epa64u', 160, { quality: 'auto:good' })}
                 alt="Katy Pride Logo"
                 width={80}
                 height={80}
                 style={{ width: 'auto', height: 'auto' }}
                 loading="lazy"
+                srcSet={generateSrcSet('65ad7fd64707829ac5cdbe0d_epa64u', [80, 160, 240], { quality: 'auto:good' })}
+                sizes="80px"
               />
               <h2 className="font-heading text-2xl font-bold">Katy Pride</h2>
             </div>

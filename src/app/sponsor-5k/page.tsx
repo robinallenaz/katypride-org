@@ -23,7 +23,7 @@ export default function SponsorSignupPage() {
             <strong>Support Katy Pride & Gain Visibility</strong>
           </p>
           <p className="text-lg sm:text-xl text-gray-700 mb-6 sm:mb-8">
-            Partner with us to create an inclusive community while showcasing your organization's commitment to diversity and inclusion.
+            Partner with us to create an inclusive community while showcasing your organization&apos;s commitment to diversity and inclusion.
           </p>
           
           {/* Sponsor Packet Download */}

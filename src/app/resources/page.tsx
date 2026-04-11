@@ -28,6 +28,96 @@ type Accent = {
   chipText: string
 }
 
+type JumpLinkProps = {
+  href: string
+  label: string
+  accent: Accent
+}
+
+type LinkItemProps = {
+  title: string
+  href: string
+  description?: string
+  accent: Accent
+}
+
+type SectionProps = {
+  title: string
+  items: ResourceLink[]
+  id: string
+  accent: Accent
+}
+
+function JumpLink({ href, label, accent }: JumpLinkProps) {
+  return (
+    <a
+      href={href}
+      role="tab"
+      className={`font-heading antialiased inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-[13px] font-semibold leading-none tracking-wide shadow-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${accent.chipBorder} ${accent.chipBg} ${accent.chipHoverBg} ${accent.chipText} ${accent.ring} motion-reduce:transition-none`}
+    >
+      {label}
+    </a>
+  )
+}
+
+function LinkItem({ title, href, description, accent }: LinkItemProps) {
+  return (
+    <ResourceCard
+      title={title}
+      href={href}
+      description={description}
+      accent={accent}
+    />
+  )
+}
+
+function BackToCategories() {
+  return (
+    <a
+      href="#categories"
+      className="inline-flex items-center gap-1.5 text-sm text-[#760088] hover:text-[#5a0066] font-medium mt-4 transition-colors"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M5 10l7-7m0 0l7 7m-7-7v18"
+        />
+      </svg>
+      Back to categories
+    </a>
+  )
+}
+
+function Section({ title, items, id, accent }: SectionProps) {
+  return (
+    <section id={id} className="mt-10 scroll-mt-24">
+      <h2 className="font-heading text-2xl md:text-3xl font-bold text-[#760088] mb-4">
+        {title}
+      </h2>
+      <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {items.map((item) => (
+          <LinkItem
+            key={item.id}
+            title={item.title}
+            href={item.url}
+            description={item.description}
+            accent={accent}
+          />
+        ))}
+      </ul>
+      <BackToCategories />
+    </section>
+  )
+}
+
 const defaultResources: ResourceLink[] = [
   { id: 'h1', title: 'AHF Pharmacy', url: 'https://ahfpharmacy.org/', category: 'health' },
   { id: 'h2', title: 'Houston Wellness Center (AHF)', url: 'https://locations.aidshealth.org/tx-houston-wellness18-25', category: 'health' },
@@ -118,14 +208,6 @@ export default async function ResourcesPage() {
   const regionalResources = resources.filter((r) => r.category === 'regional')
   const nationalResources = resources.filter((r) => r.category === 'national')
 
-  const getHostname = (href: string) => {
-    try {
-      return new URL(href).hostname.replace(/^www\./, "")
-    } catch {
-      return href
-    }
-  }
-
   const accents: Record<string, Accent> = {
     health: {
       cardBg: "bg-gradient-to-br from-green-50 to-emerald-50 border-green-200",
@@ -208,95 +290,6 @@ export default async function ResourcesPage() {
       chipText: "text-[#001566] font-medium",
     },
   }
-
-  const JumpLink = ({
-    href,
-    label,
-    accent,
-  }: {
-    href: string
-    label: string
-    accent: Accent
-  }) => (
-    <a
-      href={href}
-      role="tab"
-      className={`font-heading antialiased inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-[13px] font-semibold leading-none tracking-wide shadow-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${accent.chipBorder} ${accent.chipBg} ${accent.chipHoverBg} ${accent.chipText} ${accent.ring} motion-reduce:transition-none`}
-    >
-      {label}
-    </a>
-  )
-
-  const LinkItem = ({
-    title,
-    href,
-    description,
-    accent,
-  }: {
-    title: string
-    href: string
-    description?: string
-    accent: Accent
-  }) => (
-    <ResourceCard
-      title={title}
-      href={href}
-      description={description}
-      accent={accent}
-    />
-  )
-
-  const BackToCategories = () => (
-    <a
-      href="#categories"
-      className="inline-flex items-center gap-1.5 text-sm text-[#760088] hover:text-[#5a0066] font-medium mt-4 transition-colors"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-4 w-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M5 10l7-7m0 0l7 7m-7-7v18"
-        />
-      </svg>
-      Back to categories
-    </a>
-  )
-
-  const Section = ({
-    title,
-    items,
-    id,
-    accent,
-  }: {
-    title: string
-    items: Array<{ id: string; title: string; url: string }>
-    id: string
-    accent: Accent
-  }) => (
-    <section id={id} className="mt-10 scroll-mt-24">
-      <h2 className="font-heading text-2xl md:text-3xl font-bold text-[#760088] mb-4">
-        {title}
-      </h2>
-      <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {items.map((item) => (
-          <LinkItem
-            key={item.id}
-            title={item.title}
-            href={item.url}
-            accent={accent}
-          />
-        ))}
-      </ul>
-      <BackToCategories />
-    </section>
-  )
 
   return (
     <>

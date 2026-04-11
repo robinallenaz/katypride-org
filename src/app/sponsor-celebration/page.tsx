@@ -42,7 +42,7 @@ export default function SponsorCelebrationPage() {
               Bear Creek Rodeo Arena · 3230 Hwy 6, Houston, TX 77084
             </p>
             <p className="text-lg text-gray-700 max-w-3xl mx-auto mb-8">
-              Gain valuable exposure, connect with a diverse audience, and show your commitment to inclusivity at one of Katy's largest community events.
+              Gain valuable exposure, connect with a diverse audience, and show your commitment to inclusivity at one of Katy&apos;s largest community events.
             </p>
 
             {/* Action Buttons */}
@@ -84,7 +84,7 @@ export default function SponsorCelebrationPage() {
               <div>
                 <h3 className="font-semibold text-gray-900 mb-2">Stand Up as a Brand</h3>
                 <p className="text-gray-700 text-sm leading-relaxed">
-                  Demonstrate your commitment to diversity, equity, inclusion, and social responsibility. An affiliation with Katy Pride enhances your company's reputation and helps attract a diverse, socially conscious customer and employee base.
+                  Demonstrate your commitment to diversity, equity, inclusion, and social responsibility. An affiliation with Katy Pride enhances your company&apos;s reputation and helps attract a diverse, socially conscious customer and employee base.
                 </p>
               </div>
               <div>

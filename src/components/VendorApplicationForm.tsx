@@ -283,7 +283,7 @@ const VendorApplicationForm: React.FC = () => {
         <p className="text-lg text-gray-700 mb-2">Saturday, October 3, 2026 • 11AM - 4PM</p>
         <p className="text-md text-gray-600">Bear Creek Rodeo Arena, Houston, TX</p>
         <div className="mt-4 inline-flex items-center px-4 py-2 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full">
-          <span className="text-white font-bold text-sm">STAND TALL, Y'ALL!</span>
+          <span className="text-white font-bold text-sm">STAND TALL, Y&apos;ALL!</span>
         </div>
       </div>
 

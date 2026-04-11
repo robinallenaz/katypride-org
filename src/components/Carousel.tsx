@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { cloudinaryUrl, generateSrcSet, SIZES } from '@/lib/cloudinary'
 
 interface CarouselImage {
   id: string;
@@ -105,15 +106,23 @@ export default function Carousel() {
         <div className="relative w-full h-full">
           {currentSlide ? (
             <>
-              {/* Static image display */}
+              {/* Static image display with Cloudinary optimization */}
               <div className="absolute inset-0 h-full w-full carousel-image">
                 <picture>
+                  {/* Desktop optimized */}
                   <source
                     media="(min-width: 768px)"
-                    srcSet={currentSlide.url}
+                    srcSet={generateSrcSet(currentSlide.url, [640, 960, 1280, 1920], { quality: 'auto:good' })}
+                    sizes={SIZES.carousel}
+                  />
+                  {/* Mobile optimized */}
+                  <source
+                    media="(max-width: 767px)"
+                    srcSet={generateSrcSet(currentSlide.url, [320, 640, 960], { quality: 'auto:good' })}
+                    sizes="100vw"
                   />
                   <img
-                    src={currentSlide.url}
+                    src={cloudinaryUrl(currentSlide.url, 1200, { quality: 'auto:good' })}
                     alt={currentSlide.alt || 'Katy Pride image'}
                     className="absolute inset-0 h-full w-full object-contain carousel-image"
                     loading="lazy"

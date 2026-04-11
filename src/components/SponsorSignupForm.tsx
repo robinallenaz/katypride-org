@@ -538,9 +538,9 @@ function SponsorSignupForm() {
           <h4 className="font-semibold text-green-800 mb-2">What Happens Next?</h4>
           <ul className="text-green-700 text-sm space-y-1">
             <li>• Our sponsorship coordinator will review your application</li>
-            <li>• You'll receive an email within 2 business days</li>
-            <li>• We'll send payment instructions and sponsorship agreement</li>
-            <li>• Once payment is confirmed, we'll start promoting your sponsorship!</li>
+            <li>• You&apos;ll receive an email within 2 business days</li>
+            <li>• We&apos;ll send payment instructions and sponsorship agreement</li>
+            <li>• Once payment is confirmed, we&apos;ll start promoting your sponsorship!</li>
           </ul>
         </div>
       </div>
@@ -554,7 +554,7 @@ function SponsorSignupForm() {
           <h2 className="font-heading text-3xl font-bold text-[#760088] mb-4">Become a 5K Sponsor</h2>
           <p className="text-gray-700">
             Support Katy Pride and gain visibility for your organization. 
-            Fill out the form below and we'll contact you with next steps.
+            Fill out the form below and we&apos;ll contact you with next steps.
           </p>
         </div>
 

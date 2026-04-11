@@ -77,6 +77,15 @@ export default function AdminLogin() {
           <h2 className="font-heading text-xl font-bold text-[#760088] mb-2">Form Submissions</h2>
           <p className="text-gray-600 text-sm">View vendor, sponsor, and volunteer form submissions</p>
         </a>
+
+        <a
+          href="/admin/site-images"
+          className="block bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow"
+        >
+          <div className="text-4xl mb-3">🖼️</div>
+          <h2 className="font-heading text-xl font-bold text-[#760088] mb-2">Site Images</h2>
+          <p className="text-gray-600 text-sm">Manage images used across the website (About page, hero images, etc.)</p>
+        </a>
       </div>
     );
   }

@@ -1,4 +1,32 @@
-export default function AboutPage() {
+import { readData, type SiteImage } from '@/lib/data-service';
+import { cloudinaryUrl } from '@/lib/cloudinary';
+
+export const dynamic = 'force-dynamic';
+
+async function getBoardPhoto(): Promise<SiteImage | null> {
+  try {
+    const data = await readData<{ images: SiteImage[] }>('site-images');
+    const boardPhoto = data.images?.find(img => img.key === 'board-photo');
+    return boardPhoto || null;
+  } catch (error) {
+    console.error('Error loading board photo:', error);
+    return null;
+  }
+}
+
+export default async function AboutPage() {
+  const boardPhoto = await getBoardPhoto();
+  const boardSrcSet = boardPhoto?.url
+    ? [640, 960, 1280]
+        .map((w) => `${cloudinaryUrl(boardPhoto.url, w, {
+          quality: 'auto:good',
+          height: Math.round((w * 9) / 16),
+          crop: 'fill',
+          gravity: boardPhoto.gravity,
+        })} ${w}w`)
+        .join(', ')
+    : undefined;
+
   return (
     <>
       <a 
@@ -38,13 +66,22 @@ export default function AboutPage() {
             <div className="max-w-2xl mx-auto">
               <div className="relative rounded-xl overflow-hidden shadow-xl aspect-[16/9]">
                 <img
-                  src="/katy-pride-board.jpg"
-                  alt="Katy Pride Board Members"
+                  src={boardPhoto?.url ? cloudinaryUrl(boardPhoto.url, 800, {
+                    quality: 'auto:good',
+                    height: 450,
+                    crop: 'fill',
+                    gravity: boardPhoto.gravity,
+                  }) : '/katy-pride-board.jpg'}
+                  alt={boardPhoto?.alt || 'Katy Pride Board Members'}
                   className="w-full h-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                  srcSet={boardSrcSet}
+                  sizes="(max-width: 768px) 100vw, 50vw"
                 />
               </div>
               <p className="text-center text-gray-600 mt-4 text-sm">
-                The dedicated board members behind Katy Pride
+                {boardPhoto?.caption || 'The dedicated board members behind Katy Pride'}
               </p>
             </div>
           </section>

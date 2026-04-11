@@ -303,6 +303,7 @@ export async function readData<T>(filename: string): Promise<T> {
       if (filename === 'events') return { events: [] } as unknown as T;
       if (filename === 'resources') return { resources: [] } as unknown as T;
       if (filename === 'form-backup') return { submissions: [] } as unknown as T;
+      if (filename === 'site-images') return { images: [] } as unknown as T;
     }
     console.error(`Error reading ${filename}:`, error);
     throw new Error(`Failed to read ${filename}`);
@@ -384,4 +385,19 @@ export interface CarouselImage {
   url: string;
   alt: string;
   caption?: string;
+  cloudinaryPublicId?: string; // For cleanup when deleting
+  gravity?: 'auto' | 'face' | 'center' | 'north' | 'south' | 'north_west' | 'north_east' | 'south_west' | 'south_east';
+}
+
+export interface SiteImage {
+  id: string;
+  key: string;
+  url: string;
+  alt: string;
+  caption?: string;
+  updatedAt?: string; // Optional - undefined for predefined keys without images
+  cloudinaryPublicId?: string; // For cleanup when deleting
+  gravity?: 'auto' | 'face' | 'center' | 'north' | 'south' | 'north_west' | 'north_east' | 'south_west' | 'south_east'; // Crop focus point
+  focalX?: number; // Focal point X coordinate (0-100)
+  focalY?: number; // Focal point Y coordinate (0-100)
 }

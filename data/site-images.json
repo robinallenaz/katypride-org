@@ -1,0 +1,14 @@
+{
+  "images": [
+    {
+      "id": "board-photo",
+      "key": "board-photo",
+      "url": "https://res.cloudinary.com/dpus8jzix/image/upload/v1775945418/katypride/site-images/yzbcbu6v9h1tcbbmxm4q.jpg",
+      "alt": "Board Photo",
+      "caption": "Photo displayed on the About page under Our Board",
+      "updatedAt": "2026-04-11T22:11:01.281Z",
+      "cloudinaryPublicId": "katypride/site-images/yzbcbu6v9h1tcbbmxm4q",
+      "gravity": "auto"
+    }
+  ]
+}
