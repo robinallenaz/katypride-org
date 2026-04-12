@@ -29,7 +29,7 @@ export default function SponsorSignupPage() {
           {/* Sponsor Packet Download */}
           <div className="mb-6">
             <a
-              href="/sponsorship-packet.pdf"
+              href="/sponsorship-packet%20(3).pdf"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center bg-white border-2 border-[#760088] text-[#760088] px-6 py-3 rounded-full font-semibold hover:bg-[#EEEDFE] transition-colors gap-2"

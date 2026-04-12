@@ -59,7 +59,7 @@ export default function CelebrationPage() {
               </svg>
             </a>
             <a
-              href="/sponsorship-packet.pdf"
+              href="/sponsorship-packet%20(3).pdf"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-white border-2 border-[#760088] text-[#760088] font-semibold px-6 py-3 rounded-full hover:bg-purple-50 transition-colors"
