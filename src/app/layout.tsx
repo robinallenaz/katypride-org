@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { EB_Garamond, Montserrat } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
@@ -29,12 +30,21 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const givebutterAccountId = process.env.NEXT_PUBLIC_GIVEBUTTER_ACCOUNT_ID || 'gmYUd1W44Y3hdT1Q';
+
   return (
     <html lang="en">
       <body
         className={`${ebGaramond.variable} ${montserrat.variable} antialiased`}
         suppressHydrationWarning={true}
       >
+        {givebutterAccountId && (
+          <Script
+            id="givebutter-widget-library"
+            src={`https://widgets.givebutter.com/latest.umd.cjs?acct=${encodeURIComponent(givebutterAccountId)}`}
+            strategy="afterInteractive"
+          />
+        )}
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-gray-900 focus:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#760088]"

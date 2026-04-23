@@ -1,278 +1,289 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { CheckCircle, Mail, Calendar, Heart } from 'lucide-react';
 
-interface NewsletterFormData {
-  name: string;
-  email: string;
-  phone: string;
-  interests: string[];
-  agreeToTerms: boolean;
+const givebutterWidgetId = process.env.NEXT_PUBLIC_GIVEBUTTER_WIDGET_ID || '';
+
+interface FallbackFormProps {
+  onSuccess: () => void;
 }
 
-const NewsletterForm: React.FC = () => {
-  const [formData, setFormData] = useState<NewsletterFormData>({
-    name: '',
-    email: '',
-    phone: '',
-    interests: [],
-    agreeToTerms: false,
-  });
-
+const FallbackEmailForm: React.FC<FallbackFormProps> = ({ onSuccess }) => {
+  const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitMessage, setSubmitMessage] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const interestOptions = [
-    'Events & Celebrations',
-    'Volunteer Opportunities', 
-    'Advocacy & Education',
-    'Community Support',
-    'Youth Programs',
-    'Fundraising & Donations',
-    'Partnership Opportunities',
-    'Monthly Coffee Meetups',
-    'Pride Nights at Momentum Climbing',
-    'Small Business Meet-Ups'
-  ];
-
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-
-    if (formData.phone && !/^\+?[\d\s\-\(\)]+$/.test(formData.phone)) {
-      newErrors.phone = 'Please enter a valid phone number';
-    }
-
-    if (!formData.agreeToTerms) {
-      newErrors.agreeToTerms = 'You must agree to the terms';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
-
-  const handleInterestToggle = (interest: string) => {
-    setFormData(prev => ({
-      ...prev,
-      interests: prev.interests.includes(interest)
-        ? prev.interests.filter(i => i !== interest)
-        : [...prev.interests, interest]
-    }));
-  };
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
-
     setIsSubmitting(true);
-    setSubmitMessage('');
+    setError(null);
 
     try {
-      const payload = {
-        type: 'community-member' as const,
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        interests: formData.interests,
-        source: 'Newsletter Signup',
-        _gotcha: '', // Honeypot field
-      };
-
-      const response = await fetch('/api/crm', {
+      const response = await fetch('/api/newsletter', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, firstName, lastName }),
       });
 
-      if (response.ok) {
-        setSubmitMessage('Thank you for subscribing to our newsletter! You\'ll receive updates about Katy Pride events and initiatives.');
-        setFormData({
-          name: '',
-          email: '',
-          phone: '',
-          interests: [],
-          agreeToTerms: false,
-        });
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to subscribe to newsletter');
+      if (!response.ok) {
+        throw new Error('Failed to subscribe');
       }
-    } catch (error) {
-      console.error('Newsletter submission error:', error);
-      setSubmitMessage('There was an error subscribing to the newsletter. Please try again later.');
+
+      onSuccess();
+    } catch (err) {
+      setError('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+            First Name
+          </label>
+          <input
+            type="text"
+            id="firstName"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-colors"
+            placeholder="Alex"
+          />
+        </div>
+        <div>
+          <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+            Last Name
+          </label>
+          <input
+            type="text"
+            id="lastName"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-colors"
+            placeholder="Smith"
+          />
+        </div>
+      </div>
+      <div>
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+          Email Address *
+        </label>
+        <input
+          type="email"
+          id="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-colors"
+          placeholder="example@email.com"
+        />
+      </div>
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+          {error}
+        </div>
+      )}
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className="w-full bg-purple-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        {isSubmitting ? 'Subscribing...' : 'Subscribe to Newsletter'}
+      </button>
+      <p className="text-xs text-gray-500 text-center">
+        We respect your privacy. Unsubscribe at any time.
+      </p>
+    </form>
+  );
+};
+
+const NewsletterForm: React.FC = () => {
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [widgetError, setWidgetError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [useFallback, setUseFallback] = useState(false);
+  const widgetContainerRef = useRef<HTMLDivElement>(null);
+  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasInjectedRef = useRef(false);
+  const widgetRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    // Ensure widget only renders on client side after hydration
+    setIsMounted(true);
+    
+    // Check if widget already succeeded before hydration (rare but possible)
+    if (typeof window !== 'undefined' && (window as Window & { givebutterSuccess?: boolean }).givebutterSuccess) {
+      setIsSuccess(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+
+    const handleGivebutterSuccess = (event: Event) => {
+      // Mark success globally to catch race conditions
+      (window as Window & { givebutterSuccess?: boolean }).givebutterSuccess = true;
+      setIsSuccess(true);
+    };
+
+    window.addEventListener('givebutter:success', handleGivebutterSuccess);
+    window.addEventListener('givebutter:signup:success', handleGivebutterSuccess);
+
+    return () => {
+      window.removeEventListener('givebutter:success', handleGivebutterSuccess);
+      window.removeEventListener('givebutter:signup:success', handleGivebutterSuccess);
+    };
+  }, [isMounted]);
+
+  // Inject widget HTML only on client side
+  useEffect(() => {
+    if (!isMounted || !widgetContainerRef.current || isSuccess || hasInjectedRef.current || useFallback) return;
+
+    // Check if widget ID is configured
+    if (!givebutterWidgetId) {
+      setIsLoading(false);
+      setWidgetError('Newsletter signup is not configured. Please use the backup form below.');
+      return;
+    }
+
+    // Mark as injected to prevent duplicate injection during Fast Refresh
+    hasInjectedRef.current = true;
+
+    setIsLoading(true);
+    setWidgetError(null);
+
+    // Inject widget immediately - custom element will upgrade itself
+    try {
+      // Re-use existing widget if available (from before Fast Refresh)
+      if (widgetRef.current && widgetRef.current.isConnected) {
+        widgetContainerRef.current!.appendChild(widgetRef.current);
+      } else {
+        const widget = document.createElement('givebutter-widget');
+        widget.setAttribute('id', givebutterWidgetId);
+        widgetRef.current = widget;
+        widgetContainerRef.current!.appendChild(widget);
+      }
+
+      // Check if widget rendered content after 3 seconds
+      const checkTimeout = setTimeout(() => {
+        const widgetElement = widgetContainerRef.current?.querySelector('givebutter-widget');
+        // Check for shadow root presence (Givebutter renders into shadow DOM)
+        const hasContent = widgetElement && widgetElement.shadowRoot;
+        if (hasContent) {
+          setIsLoading(false);
+          setWidgetError(null);
+        } else {
+          setIsLoading(false);
+          setWidgetError('Our signup form is taking longer than expected to load. Please try using the backup form below, or refresh the page and try again.');
+        }
+      }, 3000);
+
+      loadingTimeoutRef.current = checkTimeout;
+    } catch (error) {
+      console.error('Error creating Givebutter widget:', error);
+      setIsLoading(false);
+      setWidgetError('Something went wrong loading our signup form. Please try the backup form below.');
+    }
+
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+      // Remove widget from DOM on unmount (safe removal)
+      widgetRef.current?.remove();
+    };
+  }, [isMounted, isSuccess, useFallback]);
+
+  if (isSuccess) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-purple-700 mb-2">You're All Set!</h2>
+            <p className="text-gray-600 mb-6">
+              Thank you for subscribing to the Katy Pride newsletter. Please check your inbox for a confirmation email.
+            </p>
+            
+            <div className="bg-purple-50 rounded-xl p-6 border border-purple-100 mb-6">
+              <h3 className="font-heading text-lg font-semibold text-purple-700 mb-4">What's Next?</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="flex flex-col items-center">
+                  <Mail className="w-6 h-6 text-purple-600 mb-2" />
+                  <p className="text-sm text-gray-700 text-center">Check your inbox for our welcome email</p>
+                </div>
+                <div className="flex flex-col items-center">
+                  <Calendar className="w-6 h-6 text-purple-600 mb-2" />
+                  <p className="text-sm text-gray-700 text-center">Watch for event announcements</p>
+                </div>
+                <div className="flex flex-col items-center">
+                  <Heart className="w-6 h-6 text-purple-600 mb-2" />
+                  <p className="text-sm text-gray-700 text-center">Join us in building community</p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setIsSuccess(false);
+                hasInjectedRef.current = false;
+                widgetRef.current = null;
+              }}
+              className="text-purple-600 hover:text-purple-800 underline text-sm"
+            >
+              Subscribe another email address
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
     <div className="max-w-2xl mx-auto">
       <div className="bg-white rounded-lg shadow-lg p-8">
         <h2 className="text-2xl font-bold text-purple-700 mb-6">Subscribe to Our Newsletter</h2>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Name */}
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-              Full Name *
-            </label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
-              placeholder="Name"
-            />
-            {errors.name && (
-              <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-            )}
-          </div>
 
-          {/* Email */}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address *
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
-              placeholder="email@example.com"
-            />
-            {errors.email && (
-              <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-            )}
-          </div>
-
-          {/* Phone */}
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-              Phone Number (Optional)
-            </label>
-            <input
-              type="tel"
-              id="phone"
-              name="phone"
-              value={formData.phone}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
-              placeholder="(555) 123-4567"
-            />
-            {errors.phone && (
-              <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-            )}
-          </div>
-
-          {/* Interests */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              What interests you most? (Select all that apply)
-            </label>
-            <div className="space-y-2">
-              {interestOptions.map((interest) => (
-                <label key={interest} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formData.interests.includes(interest)}
-                    onChange={() => handleInterestToggle(interest)}
-                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">{interest}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Terms Agreement */}
-          <div>
-            <label className="flex items-start">
-              <input
-                type="checkbox"
-                id="agreeToTerms"
-                name="agreeToTerms"
-                checked={formData.agreeToTerms}
-                onChange={handleInputChange}
-                required
-                className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 mt-0.5"
+        {useFallback ? (
+          <FallbackEmailForm onSuccess={() => setIsSuccess(true)} />
+        ) : (
+          <>
+            <div className="relative">
+              {isLoading && (
+                <div className="text-center py-8 text-gray-500 min-h-[200px]">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                  Loading signup form...
+                </div>
+              )}
+              {widgetError && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800 text-sm mb-4">
+                  <p>{widgetError}</p>
+                </div>
+              )}
+              {/* Widget container - React doesn't manage children here */}
+              <div 
+                ref={widgetContainerRef}
+                className={isLoading ? 'absolute inset-0' : ''}
+                suppressHydrationWarning
               />
-              <span className="ml-2 text-sm text-gray-700">
-                I agree to receive email updates from Katy Pride LGBTQ Inc. and understand I can unsubscribe at any time. *
-              </span>
-            </label>
-            {errors.agreeToTerms && (
-              <p className="mt-1 text-sm text-red-600">{errors.agreeToTerms}</p>
-            )}
-          </div>
-
-          {/* Submit Button */}
-          <div>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-purple-600 text-white font-semibold py-3 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isSubmitting ? 'Subscribing...' : 'Subscribe to Newsletter'}
-            </button>
-          </div>
-
-          {/* Submit Message */}
-          {submitMessage && (
-            <div className={`p-4 rounded-md ${
-              submitMessage.includes('Thank you') 
-                ? 'bg-green-50 border border-green-200 text-green-800' 
-                : 'bg-red-50 border border-red-200 text-red-800'
-            }`}>
-              {submitMessage}
             </div>
-          )}
-
-          {/* Honeypot */}
-          <input
-            type="text"
-            name="_gotcha"
-            defaultValue=""
-            readOnly
-            style={{ display: 'none' }}
-            tabIndex={-1}
-            autoComplete="off"
-          />
-        </form>
+            <button
+              onClick={() => setUseFallback(true)}
+              className="mt-4 text-sm text-gray-500 underline hover:text-gray-700"
+            >
+              Having trouble? Use backup form
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

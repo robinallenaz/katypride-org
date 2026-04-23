@@ -27,6 +27,11 @@ export default function NewsletterPage() {
             </p>
           </div>
 
+          {/* Newsletter Form - Moved up for mobile visibility */}
+          <div className="mb-12">
+            <NewsletterForm />
+          </div>
+
           {/* What You'll Receive Section */}
           <div className="mb-12">
             <h3 className="font-heading text-2xl font-bold text-[#760088] mb-6 text-center">What You'll Receive</h3>
@@ -76,11 +81,6 @@ export default function NewsletterPage() {
             </div>
           </div>
 
-          {/* Newsletter Form */}
-          <div className="mb-12">
-            <NewsletterForm />
-          </div>
-
           {/* Our Commitment Section */}
           <div className="bg-purple-50 rounded-xl p-8 border border-purple-100">
             <h3 className="font-heading text-2xl font-bold text-[#760088] mb-6 text-center">Our Commitment to You</h3>
@@ -98,7 +98,7 @@ export default function NewsletterPage() {
                   No Spam, Just Value
                 </h4>
                 <p className="text-gray-700 text-sm">
-                  We send thoughtful, relevant updates typically 2-4 times per month. You can unsubscribe at any time with a single click - no questions asked.
+                  We send thoughtful, relevant updates monthly. You can unsubscribe at any time with a single click - no questions asked.
                 </p>
               </div>
               <div>
