@@ -1,0 +1,28 @@
+{
+  "_comment": "Coffee Meetup Configuration - Edit this file to manage recurring coffee meetup dates",
+  "_instructions": {
+    "manualOverride": "Set to true to use specific dates below instead of auto-calculated 2nd Friday",
+    "specificDates": "Add specific meetup dates here. Each date should be in YYYY-MM-DD format. Leave empty to use auto-calculated 2nd Friday.",
+    "skipMonths": "List months (1-12) to skip auto-generation. Example: [12] to skip December.",
+    "time": "Event time in HH:MM format (24-hour)",
+    "duration": "Duration in hours"
+  },
+  "enabled": true,
+  "manualOverride": false,
+  "specificDates": [
+    {
+      "date": "2025-05-09",
+      "title": "Espresso Yourself Coffee Meet-Up",
+      "location": "Coffee Fellows, 3329 W Grand Pkwy N #700, Katy, TX 77449",
+      "timeOverride": null,
+      "notes": "2nd Friday of May"
+    }
+  ],
+  "skipMonths": [],
+  "defaultTime": "13:00",
+  "defaultDuration": 2,
+  "defaultLocation": "Coffee Fellows, 3329 W Grand Pkwy N #700, Katy, TX 77449",
+  "title": "Espresso Yourself Coffee Meet-Up",
+  "description": "Join us for a casual coffee meet up at an LGBTQ-affirming business, Coffee Fellows, to meet other LGBTQ+ community members and allies. Grab a coffee, tea, pastry or whatever suits your fancy, and make new connections or even get some work done. Enjoy a safe space of community and allyship!",
+  "image": "/espresso-yourself-new-graphic.jpg"
+}
