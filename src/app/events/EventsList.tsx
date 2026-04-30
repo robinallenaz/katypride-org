@@ -290,8 +290,8 @@ export default function EventsList({ initialEvents, error }: EventsListProps) {
                         <div className="relative bg-gray-100">
                           {event.eventCategory === 'coffee' ? (
                             <img
-                              src="/espresso-yourself-new-graphic.jpg"
-                              alt="Espresso Yourself Coffee Meetup"
+                              src={event.imageSrc || '/espresso-yourself-new-graphic.jpg'}
+                              alt={event.imageAlt || 'Espresso Yourself Coffee Meetup'}
                               className="block w-full h-auto"
                               loading="lazy"
                             />

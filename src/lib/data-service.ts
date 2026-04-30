@@ -384,6 +384,84 @@ async function writeSiteImagesToDb(images: SiteImage[]): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Generic app_config (key/JSONB) storage. Used for small JSON configs that
+// admins edit via /admin (e.g. coffee meetup config). Persisting to Postgres
+// instead of /tmp is required on serverless hosts where /tmp is ephemeral.
+// ---------------------------------------------------------------------------
+
+async function ensureAppConfigTableExists(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS app_config (
+      config_key VARCHAR(120) PRIMARY KEY,
+      value JSONB NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+}
+
+async function readAppConfigFromDb<T>(key: string): Promise<T | null> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+  try {
+    await ensureAppConfigTableExists(client);
+    const result = await client.query(
+      'SELECT value FROM app_config WHERE config_key = $1 LIMIT 1',
+      [key]
+    );
+    if (result.rows.length === 0) return null;
+    return result.rows[0].value as T;
+  } finally {
+    try {
+      client.release();
+    } catch (releaseError) {
+      console.error('[DataService] Error releasing client:', releaseError);
+    }
+  }
+}
+
+async function writeAppConfigToDb<T>(key: string, value: T): Promise<void> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+
+  let lockAcquired = false;
+  const lockId = getTableLockId(`app_config:${key}`);
+
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_lock($1)', [lockId]);
+    lockAcquired = true;
+
+    await ensureAppConfigTableExists(client);
+
+    await client.query(
+      `INSERT INTO app_config (config_key, value, updated_at)
+       VALUES ($1, $2::jsonb, CURRENT_TIMESTAMP)
+       ON CONFLICT (config_key) DO UPDATE SET
+         value = EXCLUDED.value,
+         updated_at = CURRENT_TIMESTAMP`,
+      [key, JSON.stringify(value)]
+    );
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    if (lockAcquired) {
+      await client.query('SELECT pg_advisory_unlock($1)', [lockId]).catch(() => {});
+    }
+    client.release();
+  }
+}
+
+// Filenames that should be persisted via the generic app_config table.
+const APP_CONFIG_KEYS = new Set<string>(['coffee-meetup-config']);
+
 // Read events from PostgreSQL database
 async function readEventsFromDb(): Promise<{ events: Event[] }> {
   const client = await getDbClient();
@@ -549,6 +627,20 @@ export async function readData<T>(filename: string): Promise<T> {
     }
   }
 
+  // Use database for app_config-backed files if available.
+  // On DB miss (no row yet), fall back to the committed JSON seed so a fresh
+  // database still serves a sensible default. On DB error, surface it.
+  if (APP_CONFIG_KEYS.has(filename) && pool) {
+    try {
+      const value = await readAppConfigFromDb<T>(filename);
+      if (value !== null) return value;
+      // Fall through to JSON seed below if no row yet.
+    } catch (error) {
+      console.error(`[DataService] Failed to read app_config "${filename}" from DB:`, error);
+      // Fall through to JSON so the public site keeps rendering.
+    }
+  }
+
   // Use database for site-images if available.
   // Do not fall back to JSON on DB read errors, because that can serve stale
   // content (e.g. deleted images reappearing from old JSON snapshots).
@@ -657,6 +749,21 @@ export async function writeData<T>(filename: string, data: T): Promise<void> {
       // It's better to fail fast and alert than to silently write to ephemeral storage.
       throw new Error(
         `Failed to persist events to database: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
+        'JSON fallback disabled to prevent data loss in serverless environments.'
+      );
+    }
+  }
+
+  // Persist app_config-backed files to Postgres when DB is available so admin
+  // edits survive deploys and serverless cold starts (/tmp is ephemeral).
+  if (APP_CONFIG_KEYS.has(filename) && pool) {
+    try {
+      await writeAppConfigToDb(filename, data);
+      return;
+    } catch (error) {
+      console.error(`[DataService] CRITICAL: Failed to write app_config "${filename}" to DB:`, error);
+      throw new Error(
+        `Failed to persist ${filename} to database: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
         'JSON fallback disabled to prevent data loss in serverless environments.'
       );
     }

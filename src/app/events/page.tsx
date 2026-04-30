@@ -1,38 +1,31 @@
 import { readData, type Event } from '@/lib/data-service'
 import EventsList, { type EventItem } from './EventsList'
-import { promises as fs } from 'fs'
-import path from 'path'
+import type { CoffeeMeetupConfig } from '@/lib/coffee-meetup-config'
 
-// Coffee Meetup Config Types
-interface CoffeeMeetupConfig {
-  enabled: boolean
-  manualOverride: boolean
-  specificDates: Array<{
-    date: string
-    title?: string
-    location?: string
-    timeOverride?: string | null
-    notes?: string
-  }>
-  skipMonths: number[]
-  defaultTime: string
-  defaultDuration: number
-  defaultLocation: string
-  title: string
-  description: string
-  image: string
-}
-
-// Read coffee meetup config from JSON file
+// Read coffee meetup config via the shared data service so admin edits
+// (written through /api/admin/coffee-meetup) are picked up automatically.
 async function getCoffeeMeetupConfig(): Promise<CoffeeMeetupConfig | null> {
   try {
-    const configPath = path.join(process.cwd(), 'content', 'coffee-meetups.json')
-    const configData = await fs.readFile(configPath, 'utf-8')
-    return JSON.parse(configData)
+    const config = await readData<CoffeeMeetupConfig>('coffee-meetup-config')
+    if (!config || typeof config !== 'object') return null
+    return config
   } catch (error) {
     console.error('Failed to load coffee meetup config:', error)
     return null
   }
+}
+
+// Parse a YYYY-MM-DD string as a local-time Date at midnight.
+// Avoids the UTC drift you get from `new Date("YYYY-MM-DD")` in negative timezones.
+function parseLocalDate(dateStr: string): Date | null {
+  if (!dateStr || typeof dateStr !== 'string') return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
+  if (!match) {
+    const fallback = new Date(dateStr)
+    return isNaN(fallback.getTime()) ? null : fallback
+  }
+  const [, y, m, d] = match
+  return new Date(Number(y), Number(m) - 1, Number(d))
 }
 
 // Helper function to get 2nd Friday of current/upcoming month
@@ -49,8 +42,9 @@ function getSecondFridayOfMonth(year: number, month: number): Date {
 
 function getSecondFridayDate(skipMonths: number[] = []): Date | null {
   const today = new Date()
-  let currentMonth = today.getMonth()
-  let currentYear = today.getFullYear()
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const currentMonth = today.getMonth()
+  const currentYear = today.getFullYear()
 
   // Try current month first, then up to 12 months ahead
   for (let i = 0; i < 12; i++) {
@@ -63,8 +57,9 @@ function getSecondFridayDate(skipMonths: number[] = []): Date | null {
 
     const targetDate = getSecondFridayOfMonth(targetYear, normalizedMonth)
 
-    // Return first 2nd Friday that hasn't passed yet
-    if (targetDate >= today) {
+    // Return first 2nd Friday that hasn't passed yet (date-only comparison
+    // so the meetup still appears on the day of the event)
+    if (targetDate >= todayMidnight) {
       return targetDate
     }
   }
@@ -72,10 +67,16 @@ function getSecondFridayDate(skipMonths: number[] = []): Date | null {
   return null
 }
 
-// Parse time string (HH:MM) to hours and minutes
+// Parse time string (HH:MM) to hours and minutes.
+// Falls back to 13:00 if input is malformed so a corrupt config never produces
+// an Invalid Date when passed to setHours().
 function parseTime(timeStr: string): { hours: number; minutes: number } {
-  const [hours, minutes] = timeStr.split(':').map(Number)
-  return { hours, minutes }
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(timeStr || '')
+  if (!match) {
+    console.warn(`[CoffeeMeetup] Invalid time string "${timeStr}", falling back to 13:00`)
+    return { hours: 13, minutes: 0 }
+  }
+  return { hours: Number(match[1]), minutes: Number(match[2]) }
 }
 
 // Create coffee meetup event from config
@@ -94,13 +95,18 @@ async function createCoffeeMeetupFromConfig(): Promise<EventItem | null> {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    // Find first specific date that hasn't passed
-    for (const event of config.specificDates) {
-      const eventDate = new Date(event.date)
-      eventDate.setHours(0, 0, 0, 0)
+    // Sort by date ascending so we always pick the soonest upcoming meetup.
+    // Parse as local-time to avoid UTC midnight shifting the date a day earlier
+    // for users in negative timezones (e.g. US Central).
+    const sortedDates = [...config.specificDates]
+      .map((event) => ({ event, parsed: parseLocalDate(event.date) }))
+      .filter((entry): entry is { event: typeof entry.event; parsed: Date } => entry.parsed !== null)
+      .sort((a, b) => a.parsed.getTime() - b.parsed.getTime())
 
-      if (eventDate >= today) {
-        targetDate = new Date(event.date)
+    // Find first specific date that hasn't passed
+    for (const { event, parsed } of sortedDates) {
+      if (parsed >= today) {
+        targetDate = new Date(parsed)
         specificEvent = event
         break
       }
@@ -124,16 +130,20 @@ async function createCoffeeMeetupFromConfig(): Promise<EventItem | null> {
   // Calculate end date
   const endDate = new Date(targetDate.getTime() + config.defaultDuration * 60 * 60 * 1000)
 
+  const resolvedLocation = specificEvent?.location || config.defaultLocation
+  // Build directions URL dynamically so location overrides work correctly
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(resolvedLocation)}`
+
   return {
     id: 'coffee-meetup-static',
     title: specificEvent?.title || config.title,
     start: targetDate,
     end: endDate,
-    location: specificEvent?.location || config.defaultLocation,
+    location: resolvedLocation,
     imageSrc: config.image,
     imageAlt: config.title,
     eventCategory: 'coffee',
-    externalUrl: 'https://www.google.com/maps/dir//3329%20W%20Grand%20Pkwy%20N%20%23700,%20Katy,%20TX%2077449',
+    externalUrl: directionsUrl,
     externalCtaLabel: 'Get Directions',
     summary: config.description,
   }
@@ -163,8 +173,13 @@ async function getEvents(): Promise<{ events: EventItem[]; error?: string | null
   try {
     const data = await readData<{ events: Event[] }>('events')
     
+    // Use date-only "today" so events still show on their event day even after
+    // the start time has passed (matches the coffee meetup date-only logic).
+    const now = new Date()
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
     const eventItems: EventItem[] = data.events
-      .filter(event => new Date(event.start) >= new Date()) // Only future events
+      .filter(event => new Date(event.start) >= todayMidnight) // Only events today or later
       .map(convertToEventItem)
 
     // Add coffee meetup from config ONLY if no coffee event already exists on that date

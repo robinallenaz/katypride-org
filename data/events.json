@@ -49,6 +49,19 @@
       "externalUrl": "/celebration",
       "externalCtaLabel": "Learn More",
       "summary": "Our biggest event of the year! Join 2000+ attendees for vendors, entertainment, food trucks, and community celebration. Theme: 'Stand Tall, Y'all!'"
+    },
+    {
+      "id": "5",
+      "title": "Katy Pride's 3rd Birthday Party: Bases Loaded With Pride",
+      "start": "2026-06-18T18:00:00-05:00",
+      "end": "2026-06-18T21:00:00-05:00",
+      "location": "Home Run Dugout, 1220 Grand W Blvd, Katy, TX 77449",
+      "imageSrc": "",
+      "imageAlt": "Katy Pride's 3rd Birthday Party: Bases Loaded With Pride",
+      "eventCategory": "community",
+      "externalUrl": "https://givebutter.com/birthday-2026",
+      "externalCtaLabel": "Reserve Free Ticket",
+      "summary": "Step up to the plate and celebrate 3 years of Pride with us! Join Katy Pride LGBTQ Inc. for a night of food, drinks, music, raffles, and birthday cake as we mark three years of building community, creating safe spaces, and standing together in West Houston and Katy. This event is FREE — but tickets are required and include appetizers, one drink, and birthday cake."
     }
   ]
 }

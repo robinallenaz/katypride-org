@@ -52,6 +52,15 @@ export default function AdminLogin() {
         </a>
 
         <a
+          href="/admin/coffee-meetup"
+          className="block bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow"
+        >
+          <div className="text-4xl mb-3">☕</div>
+          <h2 className="font-heading text-xl font-bold text-[#760088] mb-2">Coffee Meetup</h2>
+          <p className="text-gray-600 text-sm">Configure recurring coffee meetup dates, locations, and schedule</p>
+        </a>
+
+        <a
           href="/admin/resources"
           className="block bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow"
         >
