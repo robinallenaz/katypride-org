@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const fileField = formData.get('file');
-    const ALLOWED_FOLDERS = ['katypride/carousel', 'katypride/site-images'];
+    const ALLOWED_FOLDERS = ['katypride/carousel', 'katypride/site-images', 'katypride/events'];
     const requestedFolder = formData.get('folder') as string;
     const folder = ALLOWED_FOLDERS.includes(requestedFolder) ? requestedFolder : 'katypride/carousel';
 

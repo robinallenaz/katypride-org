@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { getFileValidationError } from '@/lib/validation';
 
 interface Event {
   id: string;
@@ -170,6 +171,7 @@ export default function EventsAdmin() {
             setIsCreating(false);
             setMessage('');
           }}
+          getAuthHeaders={getAuthHeaders}
         />
       )}
 
@@ -227,7 +229,7 @@ export default function EventsAdmin() {
   );
 }
 
-function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (e: Event) => void; onCancel: () => void }) {
+function EventForm({ event, onSave, onCancel, getAuthHeaders }: { event: Event | null; onSave: (e: Event) => void; onCancel: () => void; getAuthHeaders: () => Record<string, string> }) {
   const [formData, setFormData] = useState<Event>(
     event || {
       id: '',
@@ -243,6 +245,96 @@ function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (
       summary: '',
     }
   );
+
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  const handleFileUpload = async (file: File) => {
+    const error = getFileValidationError(file);
+    if (error) {
+      alert(error);
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress('Uploading...');
+    abortControllerRef.current = new AbortController();
+
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+      uploadFormData.append('folder', 'katypride/events');
+
+      const response = await fetch('/api/admin/upload', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: uploadFormData,
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (response.status === 401) {
+        window.location.href = '/admin';
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        setFormData(prev => ({ ...prev, imageSrc: data.url }));
+        setUploadProgress('Upload complete!');
+        setTimeout(() => setUploadProgress(''), 2000);
+      } else {
+        alert(data.error || 'Upload failed');
+        setUploadProgress('');
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
+      console.error('Upload error:', err);
+      alert('Failed to upload image. Please try again.');
+      setUploadProgress('');
+    } finally {
+      setUploading(false);
+      abortControllerRef.current = null;
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileUpload(e.target.files[0]);
+    }
+  };
 
   // Convert local datetime string to ISO string preserving local time
   const localDateTimeToISO = (localDateTime: string): string => {
@@ -330,18 +422,59 @@ function EventForm({ event, onSave, onCancel }: { event: Event | null; onSave: (
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
-          <input
-            type="text"
-            value={formData.imageSrc || ''}
-            onChange={(e) => setFormData({ ...formData, imageSrc: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
-            placeholder="/path/to/image.jpg or https://..."
-          />
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Event Image</label>
+          <div
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+              dragActive ? 'border-[#760088] bg-purple-50' : 'border-gray-300 hover:border-gray-400'
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={handleFileInputChange}
+              className="hidden"
+            />
+            <div className="text-gray-600">
+              <svg className="mx-auto h-10 w-10 text-gray-400 mb-2" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                <path d="M14 30.5V12a2 2 0 012-2h16a2 2 0 012 2v18.5M24 31V18m0 0l-5 5m5-5l5 5M10 36h28" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <p className="text-sm font-medium">
+                {uploading ? uploadProgress : 'Click to upload or drag and drop'}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">JPEG, PNG, WebP, GIF up to 5MB</p>
+            </div>
+          </div>
+          <div className="mt-3">
+            <p className="text-xs text-gray-500 text-center mb-2">— OR enter URL manually —</p>
+            <input
+              type="text"
+              value={formData.imageSrc || ''}
+              onChange={(e) => setFormData({ ...formData, imageSrc: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
+              placeholder="/path/to/image.jpg or https://..."
+            />
+          </div>
+          {formData.imageSrc && (
+            <div className="border rounded-lg p-3 bg-gray-50 mt-3">
+              <p className="text-xs font-medium text-gray-700 mb-2">Preview:</p>
+              <img
+                src={formData.imageSrc}
+                alt={formData.imageAlt || 'Event image preview'}
+                className="max-h-32 rounded"
+                onError={(e) => (e.currentTarget.style.display = 'none')}
+              />
+            </div>
+          )}
         </div>
 
-        <div>
+        <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Image Alt Text</label>
           <input
             type="text"
