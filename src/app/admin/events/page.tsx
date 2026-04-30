@@ -2,7 +2,50 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
-import { getFileValidationError } from '@/lib/validation';
+import { getFileValidationError, isValidImageUrl } from '@/lib/validation';
+
+// Format a Date as a local "YYYY-MM-DDTHH:mm" string suitable for the
+// initial value of a <input type="datetime-local"> in the user's local tz.
+function toLocalDateTimeInputValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
+}
+
+// Convert a "YYYY-MM-DDTHH:mm" local datetime string into an ISO string with
+// an explicit local timezone offset (preserves the wall-clock time the user
+// typed, regardless of DST).
+function localDateTimeToISO(localDateTime: string): string {
+  if (!localDateTime) return '';
+  const dateForOffset = new Date(localDateTime);
+  const offset = dateForOffset.getTimezoneOffset();
+  const offsetHours = Math.floor(Math.abs(offset) / 60);
+  const offsetMinutes = Math.abs(offset) % 60;
+  const offsetSign = offset <= 0 ? '+' : '-';
+  const offsetStr = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+  return `${localDateTime}:00${offsetStr}`;
+}
+
+// Convert a stored ISO/offset string back to "YYYY-MM-DDTHH:mm" in local tz
+// for use as the value of a datetime-local input.
+function isoToLocalDateTimeInputValue(iso: string): string {
+  if (!iso) return '';
+  // Strings produced by localDateTimeToISO already start with the local
+  // wall-clock value ("YYYY-MM-DDTHH:mm:ss±HH:MM"), so we can take the first
+  // 16 chars directly. Anything else (e.g. seeded UTC ISO) must be converted.
+  const localPrefix = iso.slice(0, 16);
+  const hasOffset = /[Zz]|[+-]\d{2}:?\d{2}$/.test(iso);
+  if (hasOffset && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(localPrefix) && !/Z$/i.test(iso.slice(0, 17))) {
+    // Has explicit offset (not Z) — assume the leading wall-clock portion is
+    // already in the desired local tz (this is the format we write).
+    return localPrefix;
+  }
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return toLocalDateTimeInputValue(d);
+}
 
 interface Event {
   id: string;
@@ -234,7 +277,9 @@ function EventForm({ event, onSave, onCancel, getAuthHeaders }: { event: Event |
     event || {
       id: '',
       title: '',
-      start: new Date().toISOString(),
+      // Initialize with the current local wall-clock time so the datetime-local
+      // picker shows the user's local time (not UTC) on first render.
+      start: localDateTimeToISO(toLocalDateTimeInputValue(new Date())),
       end: '',
       location: '',
       imageSrc: '',
@@ -336,22 +381,14 @@ function EventForm({ event, onSave, onCancel, getAuthHeaders }: { event: Event |
     }
   };
 
-  // Convert local datetime string to ISO string preserving local time
-  const localDateTimeToISO = (localDateTime: string): string => {
-    if (!localDateTime) return '';
-    // localDateTime is in format "YYYY-MM-DDTHH:mm" from datetime-local input
-    // Calculate timezone offset for the specific date being entered (handles DST)
-    const dateForOffset = new Date(localDateTime);
-    const offset = dateForOffset.getTimezoneOffset();
-    const offsetHours = Math.floor(Math.abs(offset) / 60);
-    const offsetMinutes = Math.abs(offset) % 60;
-    const offsetSign = offset <= 0 ? '+' : '-';
-    const offsetStr = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
-    return `${localDateTime}:00${offsetStr}`;
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Validate optional image URL to prevent XSS via javascript:/data: URLs
+    // and to keep parity with the carousel admin's defense-in-depth.
+    if (formData.imageSrc && !isValidImageUrl(formData.imageSrc)) {
+      alert('Image URL must be a relative path (starting with /) or an https:// URL.');
+      return;
+    }
     onSave({
       ...formData,
       // Leave id empty for new events; the server will assign one via Postgres SERIAL.
@@ -396,7 +433,7 @@ function EventForm({ event, onSave, onCancel, getAuthHeaders }: { event: Event |
           <input
             type="datetime-local"
             required
-            value={formData.start.slice(0, 16)}
+            value={isoToLocalDateTimeInputValue(formData.start)}
             onChange={(e) => setFormData({ ...formData, start: localDateTimeToISO(e.target.value) })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
           />
@@ -406,7 +443,7 @@ function EventForm({ event, onSave, onCancel, getAuthHeaders }: { event: Event |
           <label className="block text-sm font-medium text-gray-700 mb-1">End Date/Time (optional)</label>
           <input
             type="datetime-local"
-            value={formData.end?.slice(0, 16) || ''}
+            value={formData.end ? isoToLocalDateTimeInputValue(formData.end) : ''}
             onChange={(e) => setFormData({ ...formData, end: e.target.value ? localDateTimeToISO(e.target.value) : undefined })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
           />
@@ -465,7 +502,10 @@ function EventForm({ event, onSave, onCancel, getAuthHeaders }: { event: Event |
           {formData.imageSrc && (
             <div className="border rounded-lg p-3 bg-gray-50 mt-3">
               <p className="text-xs font-medium text-gray-700 mb-2">Preview:</p>
+              {/* key forces a fresh <img> element when the URL changes so a
+                  previous onError display:none doesn't persist across URLs. */}
               <img
+                key={formData.imageSrc}
                 src={formData.imageSrc}
                 alt={formData.imageAlt || 'Event image preview'}
                 className="max-h-32 rounded"
