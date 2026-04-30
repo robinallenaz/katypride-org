@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readData, writeData, type Event } from '@/lib/data-service';
+import { readData, writeData, createEvent, type Event } from '@/lib/data-service';
 import { verifySession } from '../auth/route';
 
 // Enhanced text sanitization to prevent XSS
@@ -16,7 +16,9 @@ function sanitizeText(text: string | undefined): string {
 }
 
 function validateEvent(event: Partial<Event>): { valid: boolean; error?: string } {
-  if (!event.id || typeof event.id !== 'string') {
+  // id is optional for new events (server/DB assigns it via SERIAL).
+  // For updates, id will be present and must be a string.
+  if (event.id !== undefined && typeof event.id !== 'string') {
     return { valid: false, error: 'Invalid event ID' };
   }
   if (!event.title || typeof event.title !== 'string' || event.title.trim().length === 0) {
@@ -46,8 +48,13 @@ function sanitizeEvent(event: Partial<Event>): Event {
     ? category as EventCategory 
     : 'general';
   
+  // Only keep id if it's a non-empty integer string (existing DB row).
+  // New events should pass through with id=''; the DB assigns a SERIAL id.
+  const rawId = String(event.id || '').trim();
+  const safeId = /^\d+$/.test(rawId) ? rawId : '';
+
   return {
-    id: String(event.id || '').trim(),
+    id: safeId,
     title: sanitizeText(event.title),
     start: event.start || new Date().toISOString(),
     end: event.end && !isNaN(Date.parse(event.end)) ? event.end : undefined,
@@ -112,19 +119,30 @@ export async function POST(request: NextRequest) {
     // Sanitize input
     const event = sanitizeEvent(rawEvent);
     console.log('[Events API] Sanitized event:', JSON.stringify(event, null, 2));
-    
+
+    // New event: no id present → let DB assign one via SERIAL.
+    if (!event.id) {
+      const created = await createEvent(event);
+      console.log('[Events API] Created new event with id:', created.id);
+      return NextResponse.json({ success: true, event: created });
+    }
+
+    // Existing event: upsert via the rewrite-all path.
     const data = await readData<{ events: Event[] }>('events');
     console.log('[Events API] Read existing events count:', data.events.length);
-    
+
     const existingIndex = data.events.findIndex(e => e.id === event.id);
     if (existingIndex >= 0) {
       data.events[existingIndex] = event;
       console.log('[Events API] Updated existing event at index:', existingIndex);
     } else {
-      data.events.push(event);
-      console.log('[Events API] Added new event');
+      // Client provided an id we don't have a record of — treat as a new insert
+      // rather than trusting the client-supplied id (which may overflow int4).
+      const created = await createEvent({ ...event, id: undefined });
+      console.log('[Events API] Created new event (client id ignored), id:', created.id);
+      return NextResponse.json({ success: true, event: created });
     }
-    
+
     await writeData('events', data);
     console.log('[Events API] Successfully wrote events');
     return NextResponse.json({ success: true, event });

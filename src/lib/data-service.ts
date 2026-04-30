@@ -495,6 +495,58 @@ function getTableLockId(tableName: string): number {
   return Math.abs(hash) || 1; // Ensure non-zero
 }
 
+// Insert a single new event into PostgreSQL, letting SERIAL assign the id.
+// Returns the inserted event with its newly assigned id.
+async function insertEventToDb(event: Event): Promise<Event> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+
+  try {
+    const parentId = event.parentId ? parseInt(event.parentId, 10) : null;
+    const result = await client.query(
+      `INSERT INTO events (
+        title, start, "end", location, image_src, image_alt,
+        event_category, external_url, external_cta_label, summary,
+        is_recurring, parent_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING *`,
+      [
+        event.title,
+        event.start,
+        event.end || null,
+        event.location || null,
+        event.imageSrc || null,
+        event.imageAlt,
+        event.eventCategory,
+        event.externalUrl || null,
+        event.externalCtaLabel || null,
+        event.summary || null,
+        event.isRecurring || false,
+        parentId && !isNaN(parentId) ? parentId : null,
+      ]
+    );
+    return rowToEvent(result.rows[0] as EventRow);
+  } finally {
+    client.release();
+  }
+}
+
+// Public helper: insert a new event. Falls back to rewrite-all path when no DB
+// is configured (local JSON dev mode).
+export async function createEvent(event: Omit<Event, 'id'> & { id?: string }): Promise<Event> {
+  if (pool) {
+    return await insertEventToDb(event as Event);
+  }
+  // JSON fallback (dev): generate a string id and append
+  const data = await readData<{ events: Event[] }>('events');
+  const newEvent: Event = { ...(event as Event), id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` };
+  data.events.push(newEvent);
+  await writeData('events', data);
+  return newEvent;
+}
+
 // Write events to PostgreSQL database using advisory lock for concurrency safety
 async function writeEventsToDb(events: Event[]): Promise<void> {
   const client = await getDbClient();

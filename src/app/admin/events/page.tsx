@@ -354,7 +354,8 @@ function EventForm({ event, onSave, onCancel, getAuthHeaders }: { event: Event |
     e.preventDefault();
     onSave({
       ...formData,
-      id: formData.id || Date.now().toString(),
+      // Leave id empty for new events; the server will assign one via Postgres SERIAL.
+      id: formData.id || '',
     });
   };
 
