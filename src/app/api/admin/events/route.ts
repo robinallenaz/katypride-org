@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readData, writeData, createEvent, type Event } from '@/lib/data-service';
 import { verifySession } from '../auth/route';
 
-// Enhanced text sanitization to prevent XSS
+// Enhanced text sanitization to prevent XSS.
+// IMPORTANT: '&' must be escaped FIRST, otherwise the '&' it produces in
+// later replacements (e.g. &lt;, &#x27;) gets re-escaped into &amp;lt;.
 function sanitizeText(text: string | undefined): string {
   if (!text || typeof text !== 'string') return '';
   return text
+    .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#x27;')
-    .replace(/&/g, '&amp;')
     .trim()
     .substring(0, 1000);
 }
