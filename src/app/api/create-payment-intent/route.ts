@@ -103,6 +103,38 @@ export async function POST(request: Request) {
     const paymentMethodTypes = payment_method_type === 'card' ? ['card'] : undefined
     const automaticPaymentMethods = payment_method_type !== 'card' ? { enabled: true } : undefined
 
+    // Build Stripe metadata. Stripe allows up to 50 keys, 40 char keys,
+    // 500 char values. Start with the standard fields and merge any
+    // client-supplied metadata (coerced to strings and length-capped) so
+    // vendor/CRM reconciliation data (type, vendorType, crmContactId,
+    // promoCode, discountAmount, baseFee, company, etc.) is preserved on
+    // the PaymentIntent for webhooks, refunds, and dashboard lookups.
+    const stripeMetadata: Record<string, string> = {
+      donor_email: String(donor_email || '').substring(0, 500),
+      donor_name: String(donor_name || '').substring(0, 500),
+      donation_frequency: String(donation_frequency || '').substring(0, 500),
+      payment_method_type: String(payment_method_type || '').substring(0, 500),
+    };
+
+    if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+      for (const [rawKey, rawValue] of Object.entries(metadata)) {
+        if (rawValue == null) continue;
+        // Stripe metadata keys: <= 40 chars. Skip keys we've already set so
+        // client can't clobber authoritative values.
+        const key = String(rawKey).substring(0, 40);
+        if (!key || key in stripeMetadata) continue;
+        if (Object.keys(stripeMetadata).length >= 50) break;
+        let valueStr: string;
+        if (typeof rawValue === 'string' || typeof rawValue === 'number' || typeof rawValue === 'boolean') {
+          valueStr = String(rawValue);
+        } else {
+          // Skip nested objects/arrays — Stripe metadata is flat key/value strings.
+          continue;
+        }
+        stripeMetadata[key] = valueStr.substring(0, 500);
+      }
+    }
+
     // Create payment intent with metadata for CRM tracking
     // Amount is already in cents from frontend
     const paymentIntent = await stripe.paymentIntents.create({
@@ -110,12 +142,7 @@ export async function POST(request: Request) {
       currency,
       ...(paymentMethodTypes && { payment_method_types: paymentMethodTypes }),
       ...(automaticPaymentMethods && { automatic_payment_methods: automaticPaymentMethods }),
-      metadata: {
-        donor_email: String(donor_email || ''),
-        donor_name: String(donor_name || ''),
-        donation_frequency: String(donation_frequency || ''),
-        payment_method_type: String(payment_method_type || ''),
-      },
+      metadata: stripeMetadata,
     })
 
     return NextResponse.json({

@@ -67,6 +67,27 @@ export default function SponsorCelebrationPage() {
             </div>
           </div>
 
+          {/* Sponsor vs Vendor Callout */}
+          <div className="bg-purple-50 border-l-4 border-[#760088] rounded-r-xl p-5 mb-10 max-w-4xl mx-auto">
+            <h2 className="font-heading text-lg font-bold text-[#760088] mb-2">
+              Looking to rent a vendor booth instead?
+            </h2>
+            <p className="text-sm text-gray-700 leading-relaxed mb-2">
+              This page is for <strong>sponsorships</strong> — brand visibility, naming opportunities,
+              and premium placement, with levels from $250 to $10,000.
+            </p>
+            <p className="text-sm text-gray-700 leading-relaxed mb-3">
+              If you just want a <strong>vendor booth</strong> ($225–$300) to sell products, promote
+              your organization, or share information at the event,{' '}
+              <a href="/vendor-signup" className="text-[#760088] font-semibold underline hover:text-[#5a0666]">
+                sign up as a vendor instead →
+              </a>
+            </p>
+            <p className="text-xs text-gray-600 italic">
+              Returning vendors: check your renewal email for a promo code good through May 31, 2026.
+            </p>
+          </div>
+
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
             {STATS.map(stat => (

@@ -7,6 +7,60 @@ const GHL_API_KEY = process.env.GHL_API_KEY || '';
 const CRM_ADMIN_SECRET = process.env.CRM_ADMIN_SECRET || '';
 const ALLOWED_CONTACT_TYPES = ['volunteer', 'donor', 'community-member', 'vendor', 'sponsor'] as const;
 const ALLOWED_VENDOR_TYPES = ['nonprofit', 'forprofit', 'food', 'political', 'government'] as const;
+
+// Server-side vendor pricing — authoritative source of truth.
+// Keep in sync with src/components/VendorSignupForm.tsx and
+// src/app/api/create-payment-intent/route.ts.
+const VENDOR_PRICES: Record<string, { price: number; loyaltyEligible: boolean }> = {
+  nonprofit:  { price: 225, loyaltyEligible: true  },
+  forprofit:  { price: 275, loyaltyEligible: true  },
+  food:       { price: 300, loyaltyEligible: false },
+  political:  { price: 275, loyaltyEligible: false },
+  government: { price: 275, loyaltyEligible: false },
+};
+
+const LOYALTY_CODE = 'LOYAL50';
+const LOYALTY_DISCOUNT = 50;
+const LOYALTY_START = new Date('2026-05-01T00:00:00-05:00');
+const LOYALTY_END = new Date('2026-06-01T00:00:00-05:00');
+
+function isLoyaltyWindowActive(now: Date = new Date()): boolean {
+  return now >= LOYALTY_START && now < LOYALTY_END;
+}
+
+/**
+ * Server-authoritative computation of vendor fee + discount.
+ * Ignores client-supplied vendorFee/discountAmount to prevent tampering.
+ * Returns null if vendorType is invalid.
+ */
+function computeVendorPricing(vendorType: string, promoCode: unknown): {
+  baseFee: number;
+  discount: number;
+  finalFee: number;
+  appliedCode: string;
+  promoValid: boolean;
+} | null {
+  const pricing = VENDOR_PRICES[vendorType];
+  if (!pricing) return null;
+
+  const submittedPromo = typeof promoCode === 'string'
+    ? promoCode.trim().toUpperCase()
+    : '';
+  const promoValid =
+    submittedPromo === LOYALTY_CODE &&
+    pricing.loyaltyEligible &&
+    isLoyaltyWindowActive();
+
+  const discount = promoValid ? LOYALTY_DISCOUNT : 0;
+  return {
+    baseFee: pricing.price,
+    discount,
+    finalFee: Math.max(0, pricing.price - discount),
+    appliedCode: promoValid ? LOYALTY_CODE : '',
+    promoValid,
+  };
+}
+
 const ALLOWED_SPONSORSHIP_LEVELS = [
   // 5K levels
   'water-station', 'community', 'bronze', 'color-run', 'silver',
@@ -707,9 +761,12 @@ export async function POST(request: NextRequest) {
         tags.push('katy-pride-celebration-2026');
       }
     }
-    if (type === 'vendor' && promoCode && typeof promoCode === 'string') {
-      const normalizedPromo = promoCode.trim().toUpperCase();
-      if (normalizedPromo === 'LOYAL50' && Number(discountAmount) > 0) {
+    // Loyalty tags — only apply when the server confirms the promo is
+    // actually valid for this vendor type and within the eligibility
+    // window. Do NOT trust client-supplied discountAmount.
+    if (type === 'vendor' && vendorType) {
+      const vendorPricing = computeVendorPricing(vendorType, promoCode);
+      if (vendorPricing?.promoValid) {
         tags.push('loyalty-vendor', 'promo-loyal50');
       }
     }
@@ -911,17 +968,18 @@ export async function POST(request: NextRequest) {
       const sanitizedSocialMedia = socialMedia ? sanitizeText(socialMedia) : '';
       const sponsorshipInterestInfo = sponsorshipInterest ? 'Yes' : 'No';
       const sanitizedPaymentStatus = sanitizeText(paymentStatus || 'pending');
-      const vendorFeeAmount = vendorFee != null ? `$${vendorFee}` : 'Not specified';
-      const sanitizedPromoCode = promoCode ? sanitizeText(String(promoCode)) : '';
-      const discountAmountNum = Number(discountAmount);
-      const hasDiscount = sanitizedPromoCode && Number.isFinite(discountAmountNum) && discountAmountNum > 0;
-      const baseFeeDisplay = vendorBaseFee != null ? `$${vendorBaseFee}` : null;
+
+      // Recompute fee/discount from server-side pricing — never echo
+      // client-supplied vendorFee/vendorBaseFee/discountAmount, which could
+      // be tampered to misrepresent the charge in the CRM note.
+      const serverPricing = vendorType ? computeVendorPricing(vendorType, promoCode) : null;
+      const vendorFeeAmount = serverPricing ? `$${serverPricing.finalFee}` : 'Not specified';
 
       let vendorNote = `Vendor Type: ${sanitizedVendorType}\nProducts/Services: ${sanitizedProductsServices}\nVendor Fee: ${vendorFeeAmount}`;
-      if (hasDiscount) {
-        if (baseFeeDisplay) vendorNote += `\nBase Fee: ${baseFeeDisplay}`;
-        vendorNote += `\nPromo Code: ${sanitizedPromoCode}`;
-        vendorNote += `\nDiscount: -$${discountAmountNum}`;
+      if (serverPricing && serverPricing.promoValid) {
+        vendorNote += `\nBase Fee: $${serverPricing.baseFee}`;
+        vendorNote += `\nPromo Code: ${serverPricing.appliedCode}`;
+        vendorNote += `\nDiscount: -$${serverPricing.discount}`;
       }
 
       if (sanitizedWebsite) vendorNote += `\nWebsite: ${sanitizedWebsite}`;

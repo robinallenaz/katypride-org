@@ -450,6 +450,16 @@ function VendorSignupForm() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-0">
+      {/* Sponsor cross-link */}
+      <div className="bg-purple-50 border-l-4 border-purple-400 rounded-r-lg p-4 mb-6 text-sm text-gray-700">
+        Looking for <strong>brand visibility, naming opportunities, or premium placement</strong>?
+        Consider a{' '}
+        <a href="/sponsor-celebration" className="text-[#760088] font-semibold underline hover:text-[#5a0666]">
+          Celebration sponsorship
+        </a>{' '}
+        instead ($250–$10,000).
+      </div>
+
       {/* Event Requirements */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg mb-8 overflow-hidden">
         {/* Header - Always Visible */}
@@ -813,7 +823,7 @@ function VendorSignupForm() {
               name="promoCode"
               value={formData.promoCode}
               onChange={handleChange}
-              placeholder="Enter code (e.g., LOYAL50)"
+              placeholder="Enter promo code"
               disabled={!!appliedDiscount}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white placeholder:text-gray-700 uppercase disabled:bg-gray-100"
             />
@@ -841,47 +851,54 @@ function VendorSignupForm() {
             </p>
           )}
           <p className="mt-1 text-xs text-gray-500">
-            Returning vendors: use <strong>LOYAL50</strong> for $50 off between May 1–31, 2026.
+            Returning vendors: check your renewal email for a promo code.
             Not eligible for government, political, or food vendors.
           </p>
         </div>
 
-        {/* Payment Information */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Payment Information <span className="text-red-500">*</span>
-          </label>
-          <div className="p-4 border border-gray-300 rounded-lg bg-white">
+        {/* Payment Information — only shown once a vendor type is chosen so
+            the fee and Stripe card input are meaningful. */}
+        {selectedVendorType ? (
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Card Details
+              Payment Information <span className="text-red-500">*</span>
             </label>
-            <div className="p-3 border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-transparent">
-              <CardElement 
-                options={{
-                  style: {
-                    base: {
-                      fontSize: '16px',
-                      color: '#1a1a1a',
-                      '::placeholder': {
-                        color: '#374151',
+            <div className="p-4 border border-gray-300 rounded-lg bg-white">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Card Details
+              </label>
+              <div className="p-3 border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-transparent">
+                <CardElement
+                  options={{
+                    style: {
+                      base: {
+                        fontSize: '16px',
+                        color: '#1a1a1a',
+                        '::placeholder': {
+                          color: '#374151',
+                        },
+                      },
+                      invalid: {
+                        color: '#dc2626',
                       },
                     },
-                    invalid: {
-                      color: '#dc2626',
-                    },
-                  },
-                }}
-              />
+                  }}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Your card will be charged ${finalPrice}.00 for the vendor fee
+                {discountAmount > 0 ? ` (${appliedDiscount?.code} applied, $${discountAmount} off)` : ''}.
+              </p>
+              <p className="text-xs text-gray-500">
+                Your card information is securely processed by Stripe.
+              </p>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Your card will be charged ${finalPrice}.00 for the vendor fee
-              {discountAmount > 0 ? ` (${appliedDiscount?.code} applied, $${discountAmount} off)` : ''}.
-            </p>
-            <p className="text-xs text-gray-500">
-              Your card information is securely processed by Stripe.
-            </p>
           </div>
-        </div>
+        ) : (
+          <div className="p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-600">
+            Select a vendor type above to see the fee and enter payment details.
+          </div>
+        )}
 
         {/* Products/Services */}
         <div>
