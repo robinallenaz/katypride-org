@@ -44,12 +44,23 @@ const isValidURL = (url: string): boolean => {
 };
 
 const vendorTypes = [
-  { value: 'nonprofit', label: 'Non-Profit', price: 225 },
-  { value: 'forprofit', label: 'For-Profit', price: 275 },
-  { value: 'food', label: 'Food Vendor', price: 300 },
-  { value: 'political', label: 'Political Campaign', price: 275 },
-  { value: 'government', label: 'Government Entity', price: 275 },
+  { value: 'nonprofit', label: 'Non-Profit', price: 225, loyaltyEligible: true },
+  { value: 'forprofit', label: 'For-Profit', price: 275, loyaltyEligible: true },
+  { value: 'food', label: 'Food Vendor', price: 300, loyaltyEligible: false },
+  { value: 'political', label: 'Political Campaign', price: 275, loyaltyEligible: false },
+  { value: 'government', label: 'Government Entity', price: 275, loyaltyEligible: false },
 ];
+
+// LOYAL50 returning-vendor discount: $50 off, valid May 1-31, 2026.
+// Not eligible for government, political, or food vendors.
+const LOYALTY_CODE = 'LOYAL50';
+const LOYALTY_DISCOUNT = 50;
+const LOYALTY_START = new Date('2026-05-01T00:00:00-05:00');
+const LOYALTY_END = new Date('2026-06-01T00:00:00-05:00');
+
+function isLoyaltyWindowActive(now: Date = new Date()): boolean {
+  return now >= LOYALTY_START && now < LOYALTY_END;
+}
 
 export default function VendorSignupFormWrapper() {
   const stripe = getStripe();
@@ -87,7 +98,10 @@ function VendorSignupForm() {
     vendorType: '',
     productsServices: '',
     agreeToTexts: false,
+    promoCode: '',
   });
+  const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; amount: number } | null>(null);
+  const [promoMessage, setPromoMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [submitMessage, setSubmitMessage] = useState('');
@@ -152,7 +166,24 @@ function VendorSignupForm() {
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
     }));
-    
+
+    // If the vendor type changed to an ineligible type, remove any applied loyalty discount.
+    if (name === 'vendorType' && appliedDiscount) {
+      const newType = vendorTypes.find(v => v.value === value);
+      if (!newType || !newType.loyaltyEligible) {
+        setAppliedDiscount(null);
+        setPromoMessage({
+          type: 'error',
+          text: 'LOYAL50 is not eligible for government, political, or food vendors.',
+        });
+      }
+    }
+
+    // Clear promo status when user edits the promo code field
+    if (name === 'promoCode') {
+      setPromoMessage(null);
+    }
+
     // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors(prev => {
@@ -164,6 +195,45 @@ function VendorSignupForm() {
   };
 
   const selectedVendorType = vendorTypes.find(v => v.value === formData.vendorType);
+  const discountAmount = appliedDiscount && selectedVendorType?.loyaltyEligible ? appliedDiscount.amount : 0;
+  const finalPrice = Math.max(0, (selectedVendorType?.price || 0) - discountAmount);
+
+  const handleApplyPromo = () => {
+    const code = formData.promoCode.trim().toUpperCase();
+    if (!code) {
+      setPromoMessage({ type: 'error', text: 'Please enter a promo code.' });
+      return;
+    }
+    if (code !== LOYALTY_CODE) {
+      setPromoMessage({ type: 'error', text: 'Invalid promo code.' });
+      setAppliedDiscount(null);
+      return;
+    }
+    if (!isLoyaltyWindowActive()) {
+      setPromoMessage({ type: 'error', text: 'This code is only valid May 1–31, 2026.' });
+      setAppliedDiscount(null);
+      return;
+    }
+    if (selectedVendorType && !selectedVendorType.loyaltyEligible) {
+      setPromoMessage({
+        type: 'error',
+        text: 'LOYAL50 is not eligible for government, political, or food vendors.',
+      });
+      setAppliedDiscount(null);
+      return;
+    }
+    setAppliedDiscount({ code: LOYALTY_CODE, amount: LOYALTY_DISCOUNT });
+    setPromoMessage({
+      type: 'success',
+      text: `LOYAL50 applied! $${LOYALTY_DISCOUNT} returning-vendor discount.`,
+    });
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedDiscount(null);
+    setPromoMessage(null);
+    setFormData(prev => ({ ...prev, promoCode: '' }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,6 +260,15 @@ function VendorSignupForm() {
       return;
     }
 
+    // Revalidate discount at submit time (guards against vendor-type changes after apply)
+    const discountValid =
+      appliedDiscount !== null &&
+      currentVendorType.loyaltyEligible &&
+      isLoyaltyWindowActive();
+    const appliedDiscountAmount = discountValid ? appliedDiscount!.amount : 0;
+    const appliedDiscountCode = discountValid ? appliedDiscount!.code : '';
+    const chargeAmount = Math.max(0, currentVendorType.price - appliedDiscountAmount);
+
     setIsSubmitting(true);
     setSubmitMessage('');
 
@@ -215,7 +294,10 @@ function VendorSignupForm() {
           website: formData.website,
           socialMedia: formData.socialMedia,
           vendorType: currentVendorTypeValue,
-          vendor_fee: currentVendorType.price,
+          vendorFee: chargeAmount,
+          vendorBaseFee: currentVendorType.price,
+          promoCode: appliedDiscountCode,
+          discountAmount: appliedDiscountAmount,
           productsServices: formData.productsServices,
           agreeToTexts: formData.agreeToTexts,
           paymentStatus: 'pending',
@@ -233,7 +315,7 @@ function VendorSignupForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: Math.round(currentVendorType.price * 100),
+          amount: Math.round(chargeAmount * 100),
           currency: 'usd',
           payment_method_type: 'card',
           donor_email: currentFormData.email,
@@ -244,6 +326,9 @@ function VendorSignupForm() {
             vendorType: currentVendorTypeValue,
             company: currentFormData.company,
             crmContactId: crmResult.contactId || '',
+            baseFee: String(currentVendorType.price),
+            promoCode: appliedDiscountCode,
+            discountAmount: String(appliedDiscountAmount),
           },
         }),
       });
@@ -697,10 +782,68 @@ function VendorSignupForm() {
             <p className="mt-1 text-sm text-red-600">{errors.vendorType}</p>
           )}
           {selectedVendorType && (
-            <p className="mt-2 text-sm text-purple-700 font-medium">
-              Vendor Fee: ${selectedVendorType.price}
+            <div className="mt-2 text-sm text-purple-700 font-medium space-y-0.5">
+              <p>
+                Vendor Fee: ${selectedVendorType.price}
+                {discountAmount > 0 && (
+                  <span className="text-gray-500 line-through ml-2">${selectedVendorType.price}</span>
+                )}
+              </p>
+              {discountAmount > 0 && (
+                <>
+                  <p className="text-green-700">
+                    {appliedDiscount?.code} discount: −${discountAmount}
+                  </p>
+                  <p className="text-purple-800 font-semibold">Total: ${finalPrice}</p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Promo Code */}
+        <div>
+          <label htmlFor="promoCode" className="block text-sm font-medium text-gray-700 mb-1">
+            Promo Code
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              id="promoCode"
+              name="promoCode"
+              value={formData.promoCode}
+              onChange={handleChange}
+              placeholder="Enter code (e.g., LOYAL50)"
+              disabled={!!appliedDiscount}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 bg-white placeholder:text-gray-700 uppercase disabled:bg-gray-100"
+            />
+            {appliedDiscount ? (
+              <button
+                type="button"
+                onClick={handleRemovePromo}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm font-medium"
+              >
+                Remove
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleApplyPromo}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm font-medium"
+              >
+                Apply
+              </button>
+            )}
+          </div>
+          {promoMessage && (
+            <p className={`mt-1 text-sm ${promoMessage.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
+              {promoMessage.text}
             </p>
           )}
+          <p className="mt-1 text-xs text-gray-500">
+            Returning vendors: use <strong>LOYAL50</strong> for $50 off between May 1–31, 2026.
+            Not eligible for government, political, or food vendors.
+          </p>
         </div>
 
         {/* Payment Information */}
@@ -731,7 +874,8 @@ function VendorSignupForm() {
               />
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              Your card will be charged ${selectedVendorType?.price || 0}.00 for the vendor fee.
+              Your card will be charged ${finalPrice}.00 for the vendor fee
+              {discountAmount > 0 ? ` (${appliedDiscount?.code} applied, $${discountAmount} off)` : ''}.
             </p>
             <p className="text-xs text-gray-500">
               Your card information is securely processed by Stripe.

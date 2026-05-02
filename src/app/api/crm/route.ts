@@ -587,7 +587,8 @@ export async function POST(request: NextRequest) {
     const {
       type, name, email, phone, interests, availability, amount, frequency, pronouns,
       company, address, city, state, postalCode, website, socialMedia,
-      vendorType, vendorFee, productsServices, sponsorshipInterest, additionalInfo,
+      vendorType, vendorFee, vendorBaseFee, promoCode, discountAmount,
+      productsServices, sponsorshipInterest, additionalInfo,
       donationAmount, donationFrequency, anonymous, comments,
       paymentMethod, paymentIntentId, paymentStatus, transactionId,
       // Sponsor-specific fields
@@ -704,6 +705,12 @@ export async function POST(request: NextRequest) {
       // Vendors for the 5K should NOT get this tag
       if (event === 'katy-pride-celebration-2026') {
         tags.push('katy-pride-celebration-2026');
+      }
+    }
+    if (type === 'vendor' && promoCode && typeof promoCode === 'string') {
+      const normalizedPromo = promoCode.trim().toUpperCase();
+      if (normalizedPromo === 'LOYAL50' && Number(discountAmount) > 0) {
+        tags.push('loyalty-vendor', 'promo-loyal50');
       }
     }
 
@@ -905,8 +912,17 @@ export async function POST(request: NextRequest) {
       const sponsorshipInterestInfo = sponsorshipInterest ? 'Yes' : 'No';
       const sanitizedPaymentStatus = sanitizeText(paymentStatus || 'pending');
       const vendorFeeAmount = vendorFee != null ? `$${vendorFee}` : 'Not specified';
+      const sanitizedPromoCode = promoCode ? sanitizeText(String(promoCode)) : '';
+      const discountAmountNum = Number(discountAmount);
+      const hasDiscount = sanitizedPromoCode && Number.isFinite(discountAmountNum) && discountAmountNum > 0;
+      const baseFeeDisplay = vendorBaseFee != null ? `$${vendorBaseFee}` : null;
 
       let vendorNote = `Vendor Type: ${sanitizedVendorType}\nProducts/Services: ${sanitizedProductsServices}\nVendor Fee: ${vendorFeeAmount}`;
+      if (hasDiscount) {
+        if (baseFeeDisplay) vendorNote += `\nBase Fee: ${baseFeeDisplay}`;
+        vendorNote += `\nPromo Code: ${sanitizedPromoCode}`;
+        vendorNote += `\nDiscount: -$${discountAmountNum}`;
+      }
 
       if (sanitizedWebsite) vendorNote += `\nWebsite: ${sanitizedWebsite}`;
       if (sanitizedSocialMedia) vendorNote += `\nSocial Media: ${sanitizedSocialMedia}`;

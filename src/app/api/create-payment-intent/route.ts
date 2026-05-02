@@ -25,6 +25,25 @@ function getStripe(): Stripe {
   return stripeInstance;
 }
 
+// Server-side vendor pricing — authoritative source of truth.
+// Keep in sync with src/components/VendorSignupForm.tsx.
+const VENDOR_PRICES: Record<string, { price: number; loyaltyEligible: boolean }> = {
+  nonprofit:  { price: 225, loyaltyEligible: true  },
+  forprofit:  { price: 275, loyaltyEligible: true  },
+  food:       { price: 300, loyaltyEligible: false },
+  political:  { price: 275, loyaltyEligible: false },
+  government: { price: 275, loyaltyEligible: false },
+};
+
+const LOYALTY_CODE = 'LOYAL50';
+const LOYALTY_DISCOUNT = 50;
+const LOYALTY_START = new Date('2026-05-01T00:00:00-05:00');
+const LOYALTY_END = new Date('2026-06-01T00:00:00-05:00');
+
+function isLoyaltyWindowActive(now: Date = new Date()): boolean {
+  return now >= LOYALTY_START && now < LOYALTY_END;
+}
+
 export async function POST(request: Request) {
   // Check kill switch first
   if (!stripeEnabled) {
@@ -37,10 +56,47 @@ export async function POST(request: Request) {
   const stripe = getStripe();
 
   try {
-    const { amount, currency = 'usd', payment_method_type, donor_email, donor_name, donation_frequency } = await request.json()
+    const { amount, currency = 'usd', payment_method_type, donor_email, donor_name, donation_frequency, metadata } = await request.json()
 
     if (!amount || typeof amount !== 'number' || amount <= 0 || amount > 5000000) {
       return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
+    }
+
+    // Server-side validation for vendor payments: recompute expected amount
+    // from vendorType + promoCode and reject mismatches. This guards against
+    // client-side tampering (e.g. faking LOYAL50 on a food/political/government
+    // vendor, or using the code outside the May 1–31, 2026 window).
+    if (metadata && metadata.type === 'vendor') {
+      const vendorType = String(metadata.vendorType || '');
+      const pricing = VENDOR_PRICES[vendorType];
+      if (!pricing) {
+        return NextResponse.json({ error: 'Invalid vendor type' }, { status: 400 });
+      }
+
+      const submittedPromo = String(metadata.promoCode || '').trim().toUpperCase();
+      const promoApplies =
+        submittedPromo === LOYALTY_CODE &&
+        pricing.loyaltyEligible &&
+        isLoyaltyWindowActive();
+
+      const expectedDiscount = promoApplies ? LOYALTY_DISCOUNT : 0;
+      const expectedAmountCents = Math.max(0, (pricing.price - expectedDiscount) * 100);
+
+      if (Math.round(amount) !== expectedAmountCents) {
+        return NextResponse.json(
+          { error: 'Vendor fee amount does not match server-calculated price. Please refresh and try again.' },
+          { status: 400 }
+        );
+      }
+
+      // If client sent a promo code that doesn't apply, reject so CRM/Stripe
+      // records never show a fake discount.
+      if (submittedPromo && submittedPromo !== '' && !promoApplies) {
+        return NextResponse.json(
+          { error: 'Promo code is not valid for this vendor type or is outside the eligible window.' },
+          { status: 400 }
+        );
+      }
     }
 
     // payment_method_types and automatic_payment_methods are mutually exclusive in Stripe
