@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Circular Favicon Editor</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h2 { margin-top: 0; color: #760088; }
+    .drop-zone {
+      border: 2px dashed #760088;
+      border-radius: 8px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .drop-zone:hover { background: #fafafa; border-color: #5a0066; }
+    .preview-area {
+      display: none;
+      margin-top: 20px;
+    }
+    .canvas-wrapper {
+      position: relative;
+      display: inline-block;
+      background: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 50% / 20px 20px;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    canvas { display: block; }
+    .controls {
+      margin-top: 20px;
+      display: grid;
+      gap: 12px;
+    }
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    label {
+      width: 80px;
+      font-size: 14px;
+      color: #666;
+    }
+    input[type="range"] {
+      flex: 1;
+    }
+    input[type="number"] {
+      width: 70px;
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    button {
+      background: #760088;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-top: 16px;
+    }
+    button:hover { background: #5a0066; }
+    .output {
+      margin-top: 20px;
+      display: none;
+    }
+    .instructions {
+      margin-top: 16px;
+      padding: 12px;
+      background: #f8f8f8;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🎯 Circular Favicon Editor</h2>
+    
+    <div class="drop-zone" id="dropZone">
+      <p><strong>Drop your favicon here</strong></p>
+      <p style="color: #666; font-size: 13px;">or click to select</p>
+      <input type="file" id="fileInput" accept="image/*" style="display: none">
+    </div>
+    
+    <div class="preview-area" id="previewArea">
+      <div class="canvas-wrapper">
+        <canvas id="canvas" width="256" height="256"></canvas>
+      </div>
+      
+      <div class="controls">
+        <div class="control-row">
+          <label>Zoom</label>
+          <input type="range" id="zoom" min="50" max="150" value="100">
+          <input type="number" id="zoomNum" value="100" min="50" max="150">
+        </div>
+        <div class="control-row">
+          <label>Vertical</label>
+          <input type="range" id="offsetY" min="-50" max="50" value="0">
+          <input type="number" id="offsetYNum" value="0" min="-50" max="50">
+        </div>
+        <div class="control-row">
+          <label>Horizontal</label>
+          <input type="range" id="offsetX" min="-50" max="50" value="0">
+          <input type="number" id="offsetXNum" value="0" min="-50" max="50">
+        </div>
+      </div>
+      
+      <button id="downloadBtn">Download 128x128 ICO-Ready PNG</button>
+      
+      <div class="instructions">
+        <strong>Tips:</strong>
+        <ul style="margin: 8px 0 0 16px; padding: 0;">
+          <li><strong>Zoom</strong>: Make the image smaller to add padding inside the circle</li>
+          <li><strong>Vertical</strong>: Move up/down if parts are getting cropped</li>
+          <li>After downloading, convert to .ico at icoconverter.com</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const previewArea = document.getElementById('previewArea');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let sourceImage = null;
+    let zoom = 100;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.style.background = '#f0e6f2';
+    });
+    
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.style.background = '';
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.style.background = '';
+      const file = e.dataTransfer.files[0];
+      if (file) loadImage(file);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) loadImage(file);
+    });
+
+    function loadImage(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        sourceImage = new Image();
+        sourceImage.onload = () => {
+          dropZone.style.display = 'none';
+          previewArea.style.display = 'block';
+          draw();
+        };
+        sourceImage.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function draw() {
+      const size = 256;
+      ctx.clearRect(0, 0, size, size);
+      
+      // Create circular clip
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      
+      // Calculate draw dimensions with zoom and offset
+      const scale = zoom / 100;
+      const drawSize = size * scale;
+      const centerX = (size - drawSize) / 2 + (offsetX * 2.56);
+      const centerY = (size - drawHeight) / 2 + (offsetY * 2.56);
+      
+      // Draw image centered
+      ctx.drawImage(
+        sourceImage,
+        centerX,
+        centerY,
+        drawSize,
+        drawSize
+      );
+      
+      ctx.restore();
+    }
+
+    // Control event listeners
+    const zoomInput = document.getElementById('zoom');
+    const zoomNum = document.getElementById('zoomNum');
+    const offsetXInput = document.getElementById('offsetX');
+    const offsetXNum = document.getElementById('offsetXNum');
+    const offsetYInput = document.getElementById('offsetY');
+    const offsetYNum = document.getElementById('offsetYNum');
+
+    function syncControls() {
+      zoom = parseInt(zoomInput.value);
+      offsetX = parseInt(offsetXInput.value);
+      offsetY = parseInt(offsetYInput.value);
+      zoomNum.value = zoom;
+      offsetXNum.value = offsetX;
+      offsetYNum.value = offsetY;
+      draw();
+    }
+
+    zoomInput.addEventListener('input', syncControls);
+    zoomNum.addEventListener('change', () => { zoomInput.value = zoomNum.value; syncControls(); });
+    offsetXInput.addEventListener('input', syncControls);
+    offsetXNum.addEventListener('change', () => { offsetXInput.value = offsetXNum.value; syncControls(); });
+    offsetYInput.addEventListener('input', syncControls);
+    offsetYNum.addEventListener('change', () => { offsetYInput.value = offsetYNum.value; syncControls(); });
+
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      // Create 128x128 version
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = 128;
+      exportCanvas.height = 128;
+      const exportCtx = exportCanvas.getContext('2d');
+      
+      exportCtx.beginPath();
+      exportCtx.arc(64, 64, 64, 0, Math.PI * 2);
+      exportCtx.closePath();
+      exportCtx.clip();
+      
+      const scale = zoom / 100;
+      const drawSize = 128 * scale;
+      const centerX = (128 - drawSize) / 2 + (offsetX * 1.28);
+      const centerY = (128 - drawSize) / 2 + (offsetY * 1.28);
+      
+      exportCtx.drawImage(sourceImage, centerX, centerY, drawSize, drawSize);
+      
+      const link = document.createElement('a');
+      link.download = 'favicon-circular.png';
+      link.href = exportCanvas.toDataURL('image/png');
+      link.click();
+    });
+  </script>
+</body>
+</html>

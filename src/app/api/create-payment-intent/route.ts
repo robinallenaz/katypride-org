@@ -17,9 +17,7 @@ function getStripe(): Stripe {
     if (!stripeKey) {
       throw new Error('STRIPE_SECRET_KEY is not configured');
     }
-    stripeInstance = new Stripe(stripeKey, {
-      apiVersion: '2026-03-25.dahlia',
-    });
+    stripeInstance = new Stripe(stripeKey);
   }
   
   return stripeInstance;

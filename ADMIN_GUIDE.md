@@ -1,10 +1,32 @@
+# 🎨 Katy Pride Admin Guide
 
+> **Purpose**: Complete guide for managing Katy Pride website content and operations  
+> **Time Required**: 15-30 minutes for initial setup, 5-10 minutes daily  
+> **Target Audience**: Website administrators, content managers, event coordinators  
+> **Prerequisites**: Admin credentials for Strapi CMS
 
-Welcome to the Katy Pride website administration guide. This document explains how to manage website content using **Strapi CMS**.
+---
 
-## Getting Started
+## 🚀 Quick Start (5 Minutes)
 
-### Content You Can Manage
+### **Step 1: Access Admin Panel**
+- **Production**: `https://katypride-strapi.onrender.com/admin`
+- **Development**: `http://localhost:1337/admin`
+
+### **Step 2: Daily Tasks (2 minutes)**
+- [ ] **Check new submissions** → Content Manager → Review forms
+- [ ] **Update Facebook events** → Add upcoming activities to Facebook page
+- [ ] **Check homepage** → Carousel Images → Refresh photos
+- [ ] **Monitor calendar** → Verify Facebook events are displaying
+
+### **Step 3: Emergency Actions**
+- 🆘 **Website Down**: Check [Vercel Status](./VERCEL_DEPLOYMENT.md)
+- 🆘 **Payment Issues**: Review [Payment Integration](./PAYMENT_INTEGRATION.md)
+- 🆘 **CRM Not Working**: Use [CRM Testing Guide](./CRM_TESTING_GUIDE.md)
+
+---
+
+## 📋 Content Management Overview
 
 - **Events** – Community events and celebrations (katypride.org/events)
 - **Coffee Meetups** – Recurring coffee meetup details (katypride.org/events)
@@ -17,37 +39,70 @@ Welcome to the Katy Pride website administration guide. This document explains h
 
 ## Accessing the Admin Panel
 
-**Development:** `http://localhost:3000/admin`  
-**Production:** `https://your-backend-name.vercel.app/admin`
+**Production URLs** (Updated):
+- **Strapi Admin**: `https://katypride-strapi.onrender.com/admin`
+- **Website**: `https://katypride.org`
+- **API**: `https://katypride-strapi.onrender.com/api`
 
-The admin panel is powered by Strapi CMS and provides an intuitive interface for managing all website content.
+> ⚠️ **Note**: Old Vercel URLs have been migrated to Render for better performance.
 
-### Production Setup
-See [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md) for complete deployment instructions.
+### 📅 Events & Calendar Management
 
-## Managing Events
+#### **Facebook Events Integration**
+The website calendar now pulls events directly from our Facebook Page (`KatyPrideLGBTQ`), eliminating the need for duplicate calendar management.
 
-### Adding a New Event
+**How to Add Events**:
+1. **Go to Facebook**: [KatyPrideLGBTQ/events](https://www.facebook.com/KatyPrideLGBTQ/events)
+2. **Create Event** → Fill details, add photo, publish
+3. **Automatic Display** → Event appears on website calendar within 5 minutes
 
-1. **Select Events** from the sidebar
-2. **Click New event**
-3. **Fill in details:**
+**Benefits**:
+- ✅ **Single source of truth** - Update once on Facebook
+- ✅ **Real-time sync** - Changes appear immediately
+- ✅ **Full Facebook integration** - Users can RSVP and interact
+- ✅ **Mobile-friendly** - Responsive event display
+- ✅ **No duplicate work** - Eliminates calendar maintenance
 
-**Required:**
+**Setup Required**:
+- Facebook Page Access Token (see [Facebook Events Setup](./FACEBOOK_EVENTS_SETUP.md))
+- One-time 15-minute setup process
 
-- **Event Title** (e.g., "Katy Pride Celebration 2026")
-- **Start Date & Time**
-- **Location**
+#### **Strapi Events (Backup System)**
+For events that need additional website features or don't fit Facebook Events format:
 
-**Optional:**
+1. **Navigate**: Content Manager → Events
+2. **Click**: + Create new entry
+3. **Fill Required Fields**:
+   - **Event Title** (e.g., "Katy Pride Celebration 2026")
+   - **Start Date & Time** (format: YYYY-MM-DD HH:mm)
+   - **Location** (full address with venue name)
 
-- **End Date & Time**
-- **Event Description** (supports bold, italics, links)
-- **Event Image / Flyer**
-- **Registration / Tickets Link**
-- **Button Text** (custom registration button text)
-- **Event Category** (General Event or Coffee Meetup)
-- **Published** (enable to show on website)
+4. **Optional Enhancements**:
+   - **End Date & Time** (for multi-hour events)
+   - **Event Description** (supports **bold**, *italics*, [links](url))
+   - **Event Image/Flyer** (recommended 1200x630px)
+   - **Registration Link** (external registration page)
+   - **Button Text** (custom CTA like "Register Now")
+   - **Event Category** (General Event or Coffee Meetup)
+   - **Published** (toggle to show/hide on website)
+
+### **Event Management Strategy**
+- **Primary**: Facebook Events for all community events
+- **Secondary**: Strapi Events for special website-only events
+- **Integration**: Both systems display on /events page
+
+### **Recurring Events**
+- **Coffee Meetups**: Set category to "Coffee Meetup" for special styling
+- **Monthly Socials**: Use consistent naming pattern (e.g., "Pride Night - Month Year")
+- **Annual Events**: Mark with "Annual" in title for prominence
+
+### **Event Best Practices**
+- ✅ Add events at least 2 weeks in advance
+- ✅ Include full address with parking information
+- ✅ Upload high-quality images (min 800px width)
+- ✅ Test registration links before publishing
+- ❌ Don't use ALL CAPS in titles
+- ❌ Don't forget to set "Published" to true
 
 **💡Tip** Use the Strapi admin panel to preview your content before publishing!
 
