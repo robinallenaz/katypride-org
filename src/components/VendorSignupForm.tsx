@@ -62,9 +62,20 @@ function isLoyaltyWindowActive(now: Date = new Date()): boolean {
   return now >= LOYALTY_START && now < LOYALTY_END;
 }
 
+// Public kill switch: when NEXT_PUBLIC_STRIPE_ENABLED === 'false', the form
+// skips Stripe entirely and submits as an invoice-request lead instead.
+// Pair with STRIPE_ENABLED=false on the server (api/create-payment-intent).
+const STRIPE_DISABLED = process.env.NEXT_PUBLIC_STRIPE_ENABLED === 'false';
+
 export default function VendorSignupFormWrapper() {
+  // Invoice-only mode: render the form without Stripe Elements so a bad/
+  // missing publishable key cannot break the page.
+  if (STRIPE_DISABLED) {
+    return <VendorSignupForm />;
+  }
+
   const stripe = getStripe();
-  
+
   if (!stripe) {
     return (
       <div className="max-w-2xl mx-auto p-8 bg-red-50 rounded-lg text-red-700">
@@ -81,8 +92,8 @@ export default function VendorSignupFormWrapper() {
 }
 
 function VendorSignupForm() {
-  const stripe = useStripe();
-  const elements = useElements();
+  const stripe = !STRIPE_DISABLED ? useStripe() : null;
+  const elements = !STRIPE_DISABLED ? useElements() : null;
   const [formData, setFormData] = useState({
     company: '',
     address: '',
@@ -238,22 +249,24 @@ function VendorSignupForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!stripe || !elements) {
+    // In invoice-only mode (Stripe disabled), Stripe hooks return null and
+    // we skip card collection / payment intent entirely.
+    if (!STRIPE_DISABLED && (!stripe || !elements)) {
       setSubmitMessage('Payment system is not ready. Please try again.');
       return;
     }
-    
+
     // Validate form before submission
     if (!validateForm()) {
       setSubmitMessage('Please correct the errors below and try again.');
       return;
     }
-    
+
     // Capture current form values to prevent race conditions
     const currentFormData = { ...formData };
     const currentVendorTypeValue = currentFormData.vendorType;
     const currentVendorType = vendorTypes.find(v => v.value === currentVendorTypeValue);
-    
+
     // Check if vendor type is selected and has a price
     if (!currentVendorType || currentVendorType.price <= 0) {
       setSubmitMessage('Please select a valid vendor type.');
@@ -271,6 +284,63 @@ function VendorSignupForm() {
 
     setIsSubmitting(true);
     setSubmitMessage('');
+
+    // ====== Invoice-only mode: short-circuit Stripe path ======
+    if (STRIPE_DISABLED) {
+      try {
+        const honeypotValue = (document.querySelector('input[name="_gotcha"]') as HTMLInputElement)?.value || '';
+        const crmResponse = await fetch('/api/crm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'vendor',
+            name: `${formData.firstName} ${formData.lastName}`,
+            _gotcha: honeypotValue,
+            email: formData.email,
+            phone: formData.phone,
+            company: formData.company,
+            address: formData.address,
+            city: formData.city,
+            state: formData.state,
+            postalCode: formData.postalCode,
+            website: formData.website,
+            socialMedia: formData.socialMedia,
+            vendorType: currentVendorTypeValue,
+            vendorFee: chargeAmount,
+            vendorBaseFee: currentVendorType.price,
+            promoCode: appliedDiscountCode,
+            discountAmount: appliedDiscountAmount,
+            productsServices: formData.productsServices,
+            agreeToTexts: formData.agreeToTexts,
+            paymentStatus: 'invoice-requested',
+            paymentMethod: 'invoice',
+            event: 'katy-pride-celebration-2026',
+          }),
+        });
+        const crmResult = await crmResponse.json();
+        if (!crmResponse.ok || !crmResult.success) {
+          throw new Error(crmResult.error || 'Failed to submit application');
+        }
+        setSubmitStatus('success');
+        setSubmitMessage(
+          'Thank you! Your vendor application has been received. Our team will email you an invoice within 2 business days at the address you provided.'
+        );
+      } catch (err) {
+        setSubmitStatus('error');
+        setSubmitMessage(err instanceof Error ? err.message : 'Something went wrong. Please try again or email info@katypride.org.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // ====== Stripe checkout path ======
+    // Re-narrow for TypeScript: the early return above guaranteed these.
+    if (!stripe || !elements) {
+      setIsSubmitting(false);
+      setSubmitMessage('Payment system is not ready. Please try again.');
+      return;
+    }
 
     try {
       // First, submit to CRM to capture the lead
@@ -301,6 +371,7 @@ function VendorSignupForm() {
           productsServices: formData.productsServices,
           agreeToTexts: formData.agreeToTexts,
           paymentStatus: 'pending',
+          event: 'katy-pride-celebration-2026',
         }),
       });
 
@@ -857,8 +928,24 @@ function VendorSignupForm() {
         </div>
 
         {/* Payment Information — only shown once a vendor type is chosen so
-            the fee and Stripe card input are meaningful. */}
-        {selectedVendorType ? (
+            the fee and Stripe card input are meaningful. In invoice-only
+            mode (STRIPE_DISABLED) we show an invoice notice instead. */}
+        {!selectedVendorType ? (
+          <div className="p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-600">
+            Select a vendor type above to see the fee
+            {STRIPE_DISABLED ? '.' : ' and enter payment details.'}
+          </div>
+        ) : STRIPE_DISABLED ? (
+          <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
+            <h4 className="text-sm font-semibold text-blue-900 mb-1">Payment by Invoice</h4>
+            <p className="text-sm text-blue-900">
+              Online card payments are temporarily unavailable. Submit your application below
+              and we&apos;ll email you an invoice for <strong>${finalPrice}.00</strong>
+              {discountAmount > 0 ? ` (${appliedDiscount?.code} applied, $${discountAmount} off)` : ''}{' '}
+              within 2 business days. You&apos;ll be able to pay by card, check, or bank transfer.
+            </p>
+          </div>
+        ) : (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Payment Information <span className="text-red-500">*</span>
@@ -893,10 +980,6 @@ function VendorSignupForm() {
                 Your card information is securely processed by Stripe.
               </p>
             </div>
-          </div>
-        ) : (
-          <div className="p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-600">
-            Select a vendor type above to see the fee and enter payment details.
           </div>
         )}
 
@@ -945,7 +1028,11 @@ function VendorSignupForm() {
             disabled={isSubmitting}
             className="w-full md:w-auto px-6 sm:px-8 py-2.5 sm:py-3 bg-purple-600 text-white font-medium rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-base sm:text-lg"
           >
-            {isSubmitting ? 'Submitting...' : 'Submit Vendor Application'}
+            {isSubmitting
+              ? 'Submitting...'
+              : STRIPE_DISABLED
+              ? 'Submit Application & Request Invoice'
+              : 'Submit Vendor Application'}
           </button>
 
           {submitMessage && (

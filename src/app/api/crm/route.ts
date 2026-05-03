@@ -771,6 +771,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Invoice-mode vendor submissions (Stripe kill switch active) — tag
+    // so staff can filter and follow up with a manual invoice.
+    if (type === 'vendor' && paymentStatus === 'invoice-requested') {
+      tags.push('needs-invoice');
+    }
+
     // Build custom fields — scope donor fields to donor type only
     const customFields: Record<string, any> = {};
     if (availability) customFields.availability = availability;

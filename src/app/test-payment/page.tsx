@@ -24,7 +24,7 @@ export default function PaymentTestPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          amount: 25.00,
+          amount: 5000, // $50.00 in cents — Stripe minimum for USD is 50 cents
           currency: 'usd',
           payment_method_type: 'card',
           donor_email: 'test@example.com',
@@ -35,10 +35,10 @@ export default function PaymentTestPage() {
 
       if (response.ok) {
         const data = await response.json()
-        setTestResult(`✅ Success! Payment Intent ID: ${data.paymentIntent.id}`)
+        setTestResult(`✅ Success! Payment Intent ID: ${data.paymentIntent.id}\n\nThis confirms your STRIPE_SECRET_KEY is valid and the server can create payment intents.\nNote: This creates a real intent in Stripe Dashboard → Payments (test it, then cancel/refund).`)
       } else {
         const error = await response.text()
-        setTestResult(`❌ Error: ${error}`)
+        setTestResult(`❌ Error (${response.status}):\n${error}\n\nThis usually means STRIPE_SECRET_KEY is invalid, expired, or from a different Stripe account/mode than the publishable key.`)
       }
     } catch (error) {
       setTestResult(`❌ Network Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
