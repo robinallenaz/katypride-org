@@ -133,6 +133,7 @@ const formatTime = (date: Date) =>
   new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: 'America/Chicago',
   }).format(date)
 
 const formatBadgeDate = (date: Date) =>

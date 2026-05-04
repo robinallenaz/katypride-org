@@ -122,10 +122,16 @@ async function createCoffeeMeetupFromConfig(): Promise<EventItem | null> {
     return null
   }
 
-  // Set time
+  // Set time — build an ISO string with explicit -05:00 offset so the
+  // Date represents the correct Central Time regardless of server timezone.
   const timeStr = specificEvent?.timeOverride || config.defaultTime
   const { hours, minutes } = parseTime(timeStr)
-  targetDate.setHours(hours, minutes, 0, 0)
+  const yyyy = targetDate.getFullYear()
+  const mm = String(targetDate.getMonth() + 1).padStart(2, '0')
+  const dd = String(targetDate.getDate()).padStart(2, '0')
+  const hh = String(hours).padStart(2, '0')
+  const min = String(minutes).padStart(2, '0')
+  targetDate = new Date(`${yyyy}-${mm}-${dd}T${hh}:${min}:00-05:00`)
 
   // Calculate end date
   const endDate = new Date(targetDate.getTime() + config.defaultDuration * 60 * 60 * 1000)
