@@ -122,6 +122,17 @@ async function createCoffeeMeetupFromConfig(): Promise<EventItem | null> {
     return null
   }
 
+  // Resolve location using the original local month BEFORE timezone reconstruction
+  // so odd/even rules are always based on the calendar date, not server timezone.
+  const originalMonth = targetDate.getMonth() + 1 // 1-12
+  const autoLocation = originalMonth % 2 === 1 ? config.oddMonthLocation : config.evenMonthLocation
+  const resolvedLocation = specificEvent?.location || autoLocation || config.defaultLocation
+
+  if (!resolvedLocation) {
+    console.error('[CoffeeMeetup] No location configured')
+    return null
+  }
+
   // Set time — build an ISO string with explicit -05:00 offset so the
   // Date represents the correct Central Time regardless of server timezone.
   const timeStr = specificEvent?.timeOverride || config.defaultTime
@@ -135,8 +146,6 @@ async function createCoffeeMeetupFromConfig(): Promise<EventItem | null> {
 
   // Calculate end date
   const endDate = new Date(targetDate.getTime() + config.defaultDuration * 60 * 60 * 1000)
-
-  const resolvedLocation = specificEvent?.location || config.defaultLocation
   // Build directions URL dynamically so location overrides work correctly
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(resolvedLocation)}`
 

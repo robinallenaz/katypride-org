@@ -24,7 +24,7 @@ export default function Home() {
             <p className="text-xl md:text-2xl text-gray-800 mb-8 max-w-3xl mx-auto leading-relaxed">
               Empowering the LGBTQ+ community in Katy and West Houston by creating inclusive events, advocating for equality, and fostering a supportive community of acceptance and diversity.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center items-center">
               <a
                 href="/donate"
                 className="font-heading inline-flex min-w-[200px] sm:min-w-[240px] flex-col items-center justify-center rounded-full bg-[#760088] px-6 sm:px-7 py-3 font-semibold text-white shadow-md transition-all hover:bg-[#5a0666] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#760088] focus-visible:ring-offset-2 focus-visible:ring-offset-white text-sm sm:text-base"
@@ -40,6 +40,13 @@ export default function Home() {
               >
                 <span>Katy Pride 5K</span>
                 <span className="mt-0.5 text-xs sm:text-sm font-normal text-white/90">Register or Volunteer</span>
+              </a>
+              <a
+                href="/celebration"
+                className="font-heading inline-flex min-w-[200px] sm:min-w-[240px] flex-col items-center justify-center rounded-full border-2 border-[#760088] text-[#760088] px-6 sm:px-7 py-3 font-semibold transition-all hover:bg-[#760088] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#760088] focus-visible:ring-offset-2 focus-visible:ring-offset-white text-sm sm:text-base"
+              >
+                <span>Vendor or Sponsor</span>
+                <span className="mt-0.5 text-xs sm:text-sm font-normal opacity-80">Join our celebration</span>
               </a>
               <a
                 href="/newsletter"

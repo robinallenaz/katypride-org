@@ -22,6 +22,8 @@
   "defaultTime": "08:00",
   "defaultDuration": 2,
   "defaultLocation": "Coffee Fellows, 3329 W Grand Pkwy N #700, Katy, TX 77449",
+  "oddMonthLocation": "Coffee Fellows, 3329 W Grand Pkwy N #700, Katy, TX 77449",
+  "evenMonthLocation": "Coffee Fellows, 3329 W Grand Pkwy N #700, Katy, TX 77449",
   "title": "Espresso Yourself Coffee Meet-Up",
   "description": "Join us for a casual coffee meet up at an LGBTQ-affirming business, Coffee Fellows, to meet other LGBTQ+ community members and allies. Grab a coffee, tea, pastry or whatever suits your fancy, and make new connections or even get some work done. Enjoy a safe space of community and allyship!",
   "image": "/espresso-yourself-new-graphic.jpg"

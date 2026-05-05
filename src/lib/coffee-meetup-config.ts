@@ -18,6 +18,8 @@ export interface CoffeeMeetupConfig {
   defaultTime: string // HH:MM (24h)
   defaultDuration: number // hours
   defaultLocation: string
+  oddMonthLocation: string
+  evenMonthLocation: string
   title: string
   description: string
   image: string
@@ -99,6 +101,8 @@ export function sanitizeCoffeeMeetupConfig(input: unknown): {
     })
   }
 
+  const defaultLocation = asString(raw.defaultLocation)
+
   const config: CoffeeMeetupConfig = {
     enabled: asBool(raw.enabled, true),
     manualOverride: asBool(raw.manualOverride, false),
@@ -106,7 +110,9 @@ export function sanitizeCoffeeMeetupConfig(input: unknown): {
     skipMonths,
     defaultTime,
     defaultDuration: duration,
-    defaultLocation: asString(raw.defaultLocation),
+    defaultLocation,
+    oddMonthLocation: asString(raw.oddMonthLocation) || defaultLocation,
+    evenMonthLocation: asString(raw.evenMonthLocation) || defaultLocation,
     title: asString(raw.title, 'Espresso Yourself Coffee Meet-Up'),
     description: asString(raw.description),
     image: asString(raw.image, '/espresso-yourself-new-graphic.jpg'),

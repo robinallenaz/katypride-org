@@ -250,9 +250,30 @@ export default function CoffeeMeetupAdmin() {
               placeholder="Coffee shop name and full address"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Used when a specific date below does not provide its own location. Get-Directions link
-              is generated from this address automatically.
+              Fallback location when no odd/even rule or specific date override applies.
             </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Odd-Month Location</label>
+            <input
+              type="text"
+              value={config.oddMonthLocation || ''}
+              onChange={(e) => update('oddMonthLocation', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+              placeholder="e.g. Coffee Fellows, 3329 W Grand Pkwy N #700, Katy, TX 77449"
+            />
+            <p className="text-xs text-gray-500 mt-1">Jan, Mar, May, Jul, Sep, Nov</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Even-Month Location</label>
+            <input
+              type="text"
+              value={config.evenMonthLocation || ''}
+              onChange={(e) => update('evenMonthLocation', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+              placeholder="e.g. Buzz and Bites, 123 Main St, Katy, TX"
+            />
+            <p className="text-xs text-gray-500 mt-1">Feb, Apr, Jun, Aug, Oct, Dec</p>
           </div>
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>

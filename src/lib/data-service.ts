@@ -290,6 +290,66 @@ async function ensureSiteImagesTableExists(client: PoolClient): Promise<void> {
   `);
 }
 
+async function ensurePaymentVerificationsTableExists(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS payment_verifications (
+      payment_intent_id VARCHAR(255) PRIMARY KEY,
+      first_verified_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      verified_count INTEGER DEFAULT 1
+    )
+  `);
+
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_payment_verifications_first_verified ON payment_verifications(first_verified_at)
+  `);
+}
+
+async function ensureRateLimitTableExists(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      identifier VARCHAR(255) PRIMARY KEY,
+      request_count INTEGER NOT NULL DEFAULT 1,
+      window_start TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_rate_limits_window_start ON rate_limits(window_start)
+  `);
+}
+
+async function ensureEventsTableExists(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS events (
+      id SERIAL PRIMARY KEY,
+      title VARCHAR(255) NOT NULL,
+      start TIMESTAMPTZ NOT NULL,
+      "end" TIMESTAMPTZ,
+      location VARCHAR(500),
+      image_src VARCHAR(500),
+      image_alt VARCHAR(255) NOT NULL,
+      event_category VARCHAR(50) NOT NULL CHECK (event_category IN (
+        'general', 'coffee', 'social', 'fundraising', 'advocacy',
+        'education', 'health', 'youth', 'pride', 'volunteer', 'cultural', 'community'
+      )),
+      external_url VARCHAR(500),
+      external_cta_label VARCHAR(100),
+      summary TEXT,
+      is_recurring BOOLEAN DEFAULT FALSE,
+      parent_id INTEGER REFERENCES events(id),
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_events_start ON events(start)
+  `);
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_events_category ON events(event_category)
+  `);
+}
+
 async function readSiteImagesFromDb(): Promise<{ images: SiteImage[] }> {
   const client = await getDbClient();
   if (!client) {
@@ -470,6 +530,7 @@ async function readEventsFromDb(): Promise<{ events: Event[] }> {
   }
 
   try {
+    await ensureEventsTableExists(client);
     const result = await client.query(
       'SELECT * FROM events ORDER BY start ASC'
     );
@@ -495,6 +556,155 @@ function getTableLockId(tableName: string): number {
   return Math.abs(hash) || 1; // Ensure non-zero
 }
 
+// Record a payment verification and return whether it's within the valid window
+export async function recordPaymentVerification(paymentIntentId: string): Promise<{ valid: boolean; error?: string }> {
+  if (!pool) {
+    // Security: Require explicit opt-in to allow payment verification without database
+    const allowWithoutDb = process.env.ALLOW_PAYMENT_VERIFICATION_WITHOUT_DB === 'true';
+    if (!allowWithoutDb) {
+      console.error('[DataService] Payment verification requires database connection');
+      return { valid: false, error: 'Database connection required for payment verification' };
+    }
+    // Dev mode fallback - only if explicitly enabled
+    console.warn('[DataService] No database for payment verification, allowing (ALLOW_PAYMENT_VERIFICATION_WITHOUT_DB=true)');
+    return { valid: true };
+  }
+
+  const client = await getDbClient();
+  if (!client) {
+    return { valid: false, error: 'Database not available' };
+  }
+
+  try {
+    await client.query('BEGIN');
+
+    await ensurePaymentVerificationsTableExists(client);
+
+    // Check if this payment intent was already verified
+    const existingResult = await client.query(
+      'SELECT first_verified_at, verified_count FROM payment_verifications WHERE payment_intent_id = $1',
+      [paymentIntentId]
+    );
+
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+    if (existingResult.rows.length > 0) {
+      const existing = existingResult.rows[0];
+      const firstVerifiedAt = new Date(existing.first_verified_at);
+
+      // If first verification was more than 1 hour ago, reject
+      if (firstVerifiedAt <= oneHourAgo) {
+        await client.query('COMMIT');
+        return { valid: false, error: 'Verification link has expired' };
+      }
+
+      // Increment verification count
+      await client.query(
+        'UPDATE payment_verifications SET verified_count = verified_count + 1 WHERE payment_intent_id = $1',
+        [paymentIntentId]
+      );
+
+      await client.query('COMMIT');
+      return { valid: true };
+    } else {
+      // First verification - record it
+      // PRIMARY KEY constraint prevents concurrent duplicate inserts
+      await client.query(
+        'INSERT INTO payment_verifications (payment_intent_id) VALUES ($1)',
+        [paymentIntentId]
+      );
+
+      await client.query('COMMIT');
+      return { valid: true };
+    }
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[DataService] Error recording payment verification:', error);
+    return { valid: false, error: 'Failed to record verification' };
+  } finally {
+    client.release();
+  }
+}
+
+// Check rate limit for a given identifier (e.g., IP address)
+// Returns { allowed: boolean } and logs when limit is exceeded
+export async function checkRateLimit(identifier: string, maxRequests: number, windowMinutes: number): Promise<{ allowed: boolean; error?: string }> {
+  if (!pool) {
+    // If no database, allow all requests (dev mode)
+    console.warn('[DataService] No database for rate limiting, allowing all requests');
+    return { allowed: true };
+  }
+
+  const client = await getDbClient();
+  if (!client) {
+    return { allowed: false, error: 'Database not available' };
+  }
+
+  try {
+    await client.query('BEGIN');
+    await ensureRateLimitTableExists(client);
+
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - windowMinutes * 60 * 1000);
+
+    // Clean up old entries to prevent table bloat
+    await client.query('DELETE FROM rate_limits WHERE window_start < $1', [windowStart]);
+
+    // Check existing entry for this identifier
+    const existingResult = await client.query(
+      'SELECT request_count, window_start FROM rate_limits WHERE identifier = $1',
+      [identifier]
+    );
+
+    if (existingResult.rows.length > 0) {
+      const existing = existingResult.rows[0];
+      const entryWindowStart = new Date(existing.window_start);
+
+      // If entry is outside the current window, reset it
+      if (entryWindowStart < windowStart) {
+        await client.query(
+          'UPDATE rate_limits SET request_count = 1, window_start = $1 WHERE identifier = $2',
+          [now, identifier]
+        );
+        await client.query('COMMIT');
+        return { allowed: true };
+      }
+
+      // Check if limit exceeded
+      if (existing.request_count >= maxRequests) {
+        await client.query('COMMIT');
+        console.warn(`[RateLimit] Identifier ${identifier} exceeded rate limit (${existing.request_count}/${maxRequests})`);
+        return { allowed: false, error: 'Rate limit exceeded' };
+      }
+
+      // Increment count
+      await client.query(
+        'UPDATE rate_limits SET request_count = request_count + 1 WHERE identifier = $1',
+        [identifier]
+      );
+      await client.query('COMMIT');
+      return { allowed: true };
+    } else {
+      // First request from this identifier
+      await client.query(
+        'INSERT INTO rate_limits (identifier, request_count, window_start) VALUES ($1, 1, $2)',
+        [identifier, now]
+      );
+      await client.query('COMMIT');
+      return { allowed: true };
+    }
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[DataService] Error checking rate limit:', error);
+    // On error, allow the request to avoid blocking legitimate traffic
+    // This is a safe default - better to allow a potential abuse than block legitimate users
+    return { allowed: true };
+  } finally {
+    client.release();
+  }
+}
+
 // Insert a single new event into PostgreSQL, letting SERIAL assign the id.
 // Returns the inserted event with its newly assigned id.
 async function insertEventToDb(event: Event): Promise<Event> {
@@ -503,7 +713,15 @@ async function insertEventToDb(event: Event): Promise<Event> {
     throw new Error('Database not available');
   }
 
+  let lockAcquired = false;
+  const lockId = getTableLockId('events');
+
   try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_lock($1)', [lockId]);
+    lockAcquired = true;
+
+    await ensureEventsTableExists(client);
     const parentId = event.parentId ? parseInt(event.parentId, 10) : null;
     const result = await client.query(
       `INSERT INTO events (
@@ -527,8 +745,16 @@ async function insertEventToDb(event: Event): Promise<Event> {
         parentId && !isNaN(parentId) ? parentId : null,
       ]
     );
+
+    await client.query('COMMIT');
     return rowToEvent(result.rows[0] as EventRow);
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
   } finally {
+    if (lockAcquired) {
+      await client.query('SELECT pg_advisory_unlock($1)', [lockId]).catch(() => {});
+    }
     client.release();
   }
 }
@@ -564,20 +790,24 @@ async function writeEventsToDb(events: Event[]): Promise<void> {
     await client.query('SELECT pg_advisory_lock($1)', [lockId]);
     lockAcquired = true;
 
+    await ensureEventsTableExists(client);
+
     // Safety check: prevent destructive operations if events array is suspiciously small
     // This protects against accidental data loss from partial writes
     const currentCountResult = await client.query('SELECT COUNT(*) as count FROM events');
     const currentCount = parseInt(currentCountResult.rows[0].count, 10);
-    
+
     // If we're about to delete more than 50% of events, require minimum threshold
     const incomingIds = events.map(e => {
       const id = parseInt(e.id, 10);
       return isNaN(id) ? null : id;
     }).filter((id): id is number => id !== null);
-    
-    const wouldDelete = currentCount - incomingIds.length;
+
+    // Count all incoming events (both numeric-ID and string-ID) since all will be kept
+    const keepingCount = events.length;
+    const wouldDelete = currentCount - keepingCount;
     const deleteRatio = currentCount > 0 ? wouldDelete / currentCount : 0;
-    
+
     // Safety valve: if we'd delete >50% of events and have >5 events, abort
     if (deleteRatio > 0.5 && currentCount > 5) {
       throw new Error(
@@ -587,72 +817,113 @@ async function writeEventsToDb(events: Event[]): Promise<void> {
       );
     }
 
+    // Additional safety: prevent deleting all events when incoming are all string-IDs
+    // unless the DB is empty or has very few events (migration scenario)
+    if (incomingIds.length === 0 && events.length > 0 && currentCount > 3) {
+      throw new Error(
+        `Safety check failed: Attempting to delete all ${currentCount} events and replace ` +
+        `with ${events.length} string-ID events. This would cause data loss. ` +
+        `If migrating from JSON to DB, first ensure the DB is empty or use a migration script.`
+      );
+    }
+
     // Delete events that are no longer in the list (orphaned records)
-    // Only delete if we have valid IDs to preserve
     if (incomingIds.length > 0) {
       await client.query(
         'DELETE FROM events WHERE id <> ALL($1::int[])',
         [incomingIds]
       );
+    } else if (events.length > 0) {
+      // All incoming events have string IDs (JSON fallback mode).
+      // Since this is a full sync, clear existing rows to avoid duplicates.
+      await client.query('DELETE FROM events');
     }
-    // Note: If incomingIds is empty, we don't delete anything to prevent accidental
-    // data loss from malformed input. The safety check above already validates this case.
+    // Note: If events.length === 0, we don't delete anything to prevent accidental
+    // data loss from an empty payload.
 
     // Upsert each event individually
     for (const event of events) {
-      const eventId = parseInt(event.id, 10);
-      if (isNaN(eventId)) {
-        console.warn(`[DataService] Skipping event with invalid ID: ${event.title}`);
-        continue;
-      }
-      const parentId = event.parentId ? parseInt(event.parentId, 10) : null;
+      let parentId = event.parentId ? parseInt(event.parentId, 10) : null;
       if (event.parentId && isNaN(parentId!)) {
-        console.warn(`[DataService] Skipping event with invalid parentId: ${event.title}`);
-        continue;
+        console.warn(`[DataService] Event "${event.title}" has invalid parentId "${event.parentId}", treating as no parent`);
+        // Set parentId to null instead of skipping the event entirely
+        parentId = null;
       }
-      
-      await client.query(
-        `INSERT INTO events (
-          id, title, start, "end", location, image_src, image_alt,
-          event_category, external_url, external_cta_label, summary,
-          is_recurring, parent_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        ON CONFLICT (id) DO UPDATE SET
-          title = EXCLUDED.title,
-          start = EXCLUDED.start,
-          "end" = EXCLUDED.end,
-          location = EXCLUDED.location,
-          image_src = EXCLUDED.image_src,
-          image_alt = EXCLUDED.image_alt,
-          event_category = EXCLUDED.event_category,
-          external_url = EXCLUDED.external_url,
-          external_cta_label = EXCLUDED.external_cta_label,
-          summary = EXCLUDED.summary,
-          is_recurring = EXCLUDED.is_recurring,
-          parent_id = EXCLUDED.parent_id`,
-        [
-          eventId,
-          event.title,
-          event.start,
-          event.end || null,
-          event.location || null,
-          event.imageSrc || null,
-          event.imageAlt,
-          event.eventCategory,
-          event.externalUrl || null,
-          event.externalCtaLabel || null,
-          event.summary || null,
-          event.isRecurring || false,
-          parentId,
-        ]
-      );
+
+      const eventId = parseInt(event.id, 10);
+      const hasNumericId = !isNaN(eventId);
+
+      if (hasNumericId) {
+        await client.query(
+          `INSERT INTO events (
+            id, title, start, "end", location, image_src, image_alt,
+            event_category, external_url, external_cta_label, summary,
+            is_recurring, parent_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          ON CONFLICT (id) DO UPDATE SET
+            title = EXCLUDED.title,
+            start = EXCLUDED.start,
+            "end" = EXCLUDED.end,
+            location = EXCLUDED.location,
+            image_src = EXCLUDED.image_src,
+            image_alt = EXCLUDED.image_alt,
+            event_category = EXCLUDED.event_category,
+            external_url = EXCLUDED.external_url,
+            external_cta_label = EXCLUDED.external_cta_label,
+            summary = EXCLUDED.summary,
+            is_recurring = EXCLUDED.is_recurring,
+            parent_id = EXCLUDED.parent_id,
+            updated_at = CURRENT_TIMESTAMP`,
+          [
+            eventId,
+            event.title,
+            event.start,
+            event.end || null,
+            event.location || null,
+            event.imageSrc || null,
+            event.imageAlt,
+            event.eventCategory,
+            event.externalUrl || null,
+            event.externalCtaLabel || null,
+            event.summary || null,
+            event.isRecurring || false,
+            parentId,
+          ]
+        );
+      } else {
+        // String IDs (JSON fallback mode) get inserted without explicit id
+        // so SERIAL assigns a new one.
+        await client.query(
+          `INSERT INTO events (
+            title, start, "end", location, image_src, image_alt,
+            event_category, external_url, external_cta_label, summary,
+            is_recurring, parent_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          [
+            event.title,
+            event.start,
+            event.end || null,
+            event.location || null,
+            event.imageSrc || null,
+            event.imageAlt,
+            event.eventCategory,
+            event.externalUrl || null,
+            event.externalCtaLabel || null,
+            event.summary || null,
+            event.isRecurring || false,
+            parentId,
+          ]
+        );
+      }
     }
 
-    // Update sequence to match highest ID for SERIAL compatibility
-    // Use 'false' as third param so nextval() returns max+1 (not max+2)
-    if (incomingIds.length > 0) {
-      await client.query(`SELECT setval('events_id_seq', COALESCE((SELECT MAX(id) FROM events), 0), false)`);
-    }
+    // Sync the sequence to the current max id so the next SERIAL insert
+    // (insertEventToDb) gets max+1 and never collides with an existing row.
+    // is_called=true means "this value is already used; next nextval = max+1".
+    // Use is_called=false when table is empty so first insert gets id=1.
+    const maxIdResult = await client.query('SELECT COALESCE((SELECT MAX(id) FROM events), 0) as max_id');
+    const maxId = parseInt(maxIdResult.rows[0].max_id, 10);
+    await client.query(`SELECT setval('events_id_seq', $1, $2)`, [maxId > 0 ? maxId : 1, maxId > 0]);
 
     await client.query('COMMIT');
   } catch (error) {

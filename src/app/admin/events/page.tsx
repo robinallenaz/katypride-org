@@ -383,6 +383,11 @@ function EventForm({ event, onSave, onCancel, getAuthHeaders }: { event: Event |
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Validate imageAlt is required for accessibility
+    if (!formData.imageAlt?.trim()) {
+      alert('Image Alt Text is required for accessibility');
+      return;
+    }
     // Validate optional image URL to prevent XSS via javascript:/data: URLs
     // and to keep parity with the carousel admin's defense-in-depth.
     if (formData.imageSrc && !isValidImageUrl(formData.imageSrc)) {
@@ -516,9 +521,12 @@ function EventForm({ event, onSave, onCancel, getAuthHeaders }: { event: Event |
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Image Alt Text</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Image Alt Text <span className="text-red-500">*</span>
+          </label>
           <input
             type="text"
+            required
             value={formData.imageAlt || ''}
             onChange={(e) => setFormData({ ...formData, imageAlt: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#760088] focus:border-transparent text-gray-900 placeholder:text-gray-500"
