@@ -16,8 +16,7 @@ CREATE INDEX IF NOT EXISTS idx_form_submissions_timestamp ON form_submissions(ti
 CREATE INDEX IF NOT EXISTS idx_form_submissions_type ON form_submissions(type);
 
 INSERT INTO form_submissions (timestamp, type, name, email, data, crm_success)
-VALUES (
-  -- Approximate time of the signup; change if you know the exact Stripe timestamp
+SELECT
   '2026-05-04T18:00:00-05:00',
   'vendor',
   'Alex Mahlstedt',
@@ -39,4 +38,7 @@ VALUES (
     "crmSuccess": true
   }'::jsonb,
   true
+WHERE NOT EXISTS (
+  SELECT 1 FROM form_submissions
+  WHERE data->>'paymentIntentId' = 'pi_3TTXGTJalYEnAxna05MEKIVK'
 );

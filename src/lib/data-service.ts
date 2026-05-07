@@ -384,6 +384,30 @@ async function readFormSubmissionsFromDb(): Promise<{ submissions: any[] }> {
       FROM form_submissions
       ORDER BY timestamp DESC
     `);
+
+    // If the table is empty, seed from the committed JSON file so that
+    // existing submissions do not vanish on the first deploy after the
+    // DB path is enabled. This is a one-time safety net; the migration
+    // script (scripts/migrate-form-submissions.mjs) should be run to
+    // permanently move data into Postgres.
+    if (result.rows.length === 0) {
+      try {
+        const jsonPath = path.join(primaryDataDir, 'form-backup.json');
+        const raw = await fs.readFile(jsonPath, 'utf8');
+        const parsed = JSON.parse(raw);
+        const jsonSubs = Array.isArray(parsed?.submissions) ? parsed.submissions : [];
+        if (jsonSubs.length > 0) {
+          console.warn(
+            `[DataService] form_submissions table is empty but form-backup.json has ${jsonSubs.length} ` +
+            `submission(s). Falling back to JSON seed. Run scripts/migrate-form-submissions.mjs to persist them.`
+          );
+          return { submissions: jsonSubs };
+        }
+      } catch (jsonError) {
+        // JSON missing or unreadable — not fatal, just return empty DB result
+      }
+    }
+
     return {
       submissions: result.rows.map((row: any) => ({
         ...(typeof row.data === 'object' && row.data !== null ? row.data : {}),
@@ -1041,7 +1065,13 @@ export async function readData<T>(filename: string): Promise<T> {
   // Use database for events if available
   if (filename === 'events' && pool) {
     try {
-      return await readEventsFromDb() as unknown as T;
+      const dbData = await readEventsFromDb() as unknown as { events: any[] };
+      console.log(`[DataService] readEventsFromDb returned ${dbData.events?.length ?? 0} events`);
+      if (dbData.events && dbData.events.length > 0) {
+        return dbData as unknown as T;
+      }
+      console.warn('[DataService] DB events table is empty, falling back to JSON');
+      // Fall through to JSON fallback
     } catch (error) {
       console.warn('[DataService] Failed to read events from DB, falling back to JSON:', error);
       // Fall through to JSON fallback
