@@ -7,6 +7,7 @@ Ensure these are set in your `.env.local`:
 ```bash
 GHL_API_KEY=your_go_high_level_api_key
 GHL_LOCATION_ID=your_location_id
+GHL_VENDOR_PIPELINE_ID=your_vendor_pipeline_id
 CRM_ADMIN_SECRET=your_admin_secret
 ```
 

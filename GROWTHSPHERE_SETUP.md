@@ -12,6 +12,7 @@ Your `.env` file should already contain the GrowthSphere360 credentials:
 # GrowthSphere360 / GoHighLevel CRM
 GHL_API_KEY=your_api_key_here
 GHL_LOCATION_ID=your_location_id_here
+GHL_VENDOR_PIPELINE_ID=your_vendor_pipeline_id_here
 GHL_WEBHOOK_SECRET=your_webhook_secret_here
 ```
 

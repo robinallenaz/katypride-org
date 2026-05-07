@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual, createHash } from 'crypto';
 import { ghlRequest, GHL_LOCATION_ID } from '@/lib/ghl';
-import { readData, writeData } from '@/lib/data-service';
+import { readData, writeData, saveFormSubmissionToDb } from '@/lib/data-service';
+import {
+  getVendorPipeline,
+  getStageIdByName,
+  createOpportunity,
+} from '@/lib/ghl-pipeline';
 
 const GHL_API_KEY = process.env.GHL_API_KEY || '';
 const CRM_ADMIN_SECRET = process.env.CRM_ADMIN_SECRET || '';
@@ -966,6 +971,13 @@ export async function POST(request: NextRequest) {
       contactPayload.contactNote = fullNote.substring(0, MAX_NOTE_LENGTH);
     }
 
+    // Recompute fee/discount from server-side pricing — never echo
+    // client-supplied vendorFee/vendorBaseFee/discountAmount, which could
+    // be tampered to misrepresent the charge in the CRM note.
+    const serverPricing = type === 'vendor' && vendorType
+      ? computeVendorPricing(vendorType, promoCode)
+      : null;
+
     if (type === 'vendor') {
       const sanitizedVendorType = sanitizeText(vendorType || 'Not specified');
       const sanitizedProductsServices = sanitizeText(productsServices || '');
@@ -974,11 +986,6 @@ export async function POST(request: NextRequest) {
       const sanitizedSocialMedia = socialMedia ? sanitizeText(socialMedia) : '';
       const sponsorshipInterestInfo = sponsorshipInterest ? 'Yes' : 'No';
       const sanitizedPaymentStatus = sanitizeText(paymentStatus || 'pending');
-
-      // Recompute fee/discount from server-side pricing — never echo
-      // client-supplied vendorFee/vendorBaseFee/discountAmount, which could
-      // be tampered to misrepresent the charge in the CRM note.
-      const serverPricing = vendorType ? computeVendorPricing(vendorType, promoCode) : null;
       const vendorFeeAmount = serverPricing ? `$${serverPricing.finalFee}` : 'Not specified';
 
       let vendorNote = `Vendor Type: ${sanitizedVendorType}\nProducts/Services: ${sanitizedProductsServices}\nVendor Fee: ${vendorFeeAmount}`;
@@ -1019,26 +1026,86 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const contactId = extractContactId(contact);
+
+    // Create pipeline opportunity for vendor/sponsor so the team can track
+    // progress through the 2025/2026 Vendor Pipeline stages.
+    if ((type === 'vendor' || type === 'sponsor') && contactId) {
+      try {
+        const pipeline = await getVendorPipeline();
+        if (pipeline) {
+          const leadsStageId = getStageIdByName(pipeline, 'Registration Form/No Payment');
+          if (leadsStageId) {
+            // Check for existing open opportunity to prevent duplicates
+            const existingOpp = await findOpportunityByContactAndPipeline(
+              contactId,
+              pipeline.id
+            );
+            if (existingOpp) {
+              console.log(
+                `[CRM Pipeline] Contact ${contactId} already has opportunity ${existingOpp.id} in pipeline ${pipeline.id}; skipping creation`
+              );
+            } else {
+              const oppName = company
+                ? `${name} — ${company}`
+                : `${name} — ${type === 'vendor' ? 'Vendor Application' : 'Sponsorship Interest'}`;
+              const monetaryValue =
+                type === 'vendor'
+                  ? (serverPricing ? serverPricing.finalFee : undefined)
+                  : undefined;
+              const opp = await createOpportunity({
+                name: oppName,
+                contactId,
+                pipelineId: pipeline.id,
+                pipelineStageId: leadsStageId,
+                monetaryValue,
+              });
+              if (opp) {
+                console.log(`[CRM Pipeline] Created opportunity ${opp.id} in Leads for contact ${contactId}`);
+              }
+            }
+          } else {
+            console.warn('[CRM Pipeline] Leads stage not found in pipeline');
+          }
+        }
+      } catch (pipelineError) {
+        console.error('[CRM Pipeline] Failed to create opportunity:', pipelineError);
+        // Non-fatal — don't fail the CRM submission if pipeline is unavailable
+      }
+    }
+
     // Backup successful submission for audit trail
     try {
       await saveFormBackup({
         ...requestBody,
         crmSuccess: true,
-        contactId: extractContactId(contact),
+        contactId,
       });
     } catch (backupSaveError) {
       console.error('Failed to save success backup:', backupSaveError);
       // Non-fatal - don't fail the request if backup fails
     }
 
+    // Also persist directly to PostgreSQL to avoid ephemeral JSON loss on Vercel
+    try {
+      await saveFormSubmissionToDb({
+        ...requestBody,
+        crmSuccess: true,
+        contactId,
+      });
+    } catch (dbSaveError) {
+      console.error('Failed to save success submission to DB:', dbSaveError);
+      // Non-fatal - don't fail the request if DB backup fails
+    }
+
     return NextResponse.json({
       success: true,
       message: type === 'vendor'
-        ? 'Thank you for your vendor application! A contract will be sent to your email after payment is processed.'
+        ? 'Thank you for your vendor application! You will receive an email with the vendor agreement after payment is confirmed.'
         : type === 'sponsor'
         ? 'Thank you for your sponsorship interest! We will contact you within 2 business days with next steps and payment information.'
         : 'Thank you! Your information has been submitted successfully.',
-      data: { contactId: extractContactId(contact) },
+      data: { contactId },
     });
   } catch (error) {
     console.error('CRM API Error:', error);
@@ -1052,6 +1119,17 @@ export async function POST(request: NextRequest) {
       });
     } catch (backupSaveError) {
       console.error('Failed to save form backup:', backupSaveError);
+    }
+
+    // Also persist directly to PostgreSQL to avoid ephemeral JSON loss on Vercel
+    try {
+      await saveFormSubmissionToDb({
+        ...requestBody,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        crmSuccess: false,
+      });
+    } catch (dbSaveError) {
+      console.error('Failed to save failed submission to DB:', dbSaveError);
     }
     
     return NextResponse.json(

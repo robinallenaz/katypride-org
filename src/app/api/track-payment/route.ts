@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { Redis } from '@upstash/redis';
 import { ghlRequest, GHL_LOCATION_ID } from '@/lib/ghl';
+import {
+  getVendorPipeline,
+  getStageIdByName,
+  findOpportunityByContactAndPipeline,
+  updateOpportunityStage,
+} from '@/lib/ghl-pipeline';
 
 // Kill switch: Check if Stripe payments are disabled
 const stripeEnabled = process.env.STRIPE_ENABLED !== 'false';
@@ -256,14 +262,17 @@ export async function POST(request: NextRequest) {
           contactData.companyName = company
         }
 
+        // Determine the contact ID to update (and later find the pipeline opp)
+        let finalContactId: string | null = crmContactId || null;
+
         // If we have a CRM contact ID from the metadata, update that contact
-        if (crmContactId) {
+        if (finalContactId) {
           try {
-            await ghlRequest(`/contacts/${crmContactId}`, {
+            await ghlRequest(`/contacts/${finalContactId}`, {
               method: 'PUT',
               body: JSON.stringify(contactData),
             })
-            console.log(`Updated ${type} contact ${crmContactId} with payment info`)
+            console.log(`Updated ${type} contact ${finalContactId} with payment info`)
           } catch (updateError) {
             markEventFailed(event.id)
             console.error(`Failed to update ${type} contact:`, updateError)
@@ -275,27 +284,27 @@ export async function POST(request: NextRequest) {
           }
         } else {
           // Lookup existing contact by email
-          let existingContactId: string | null = null
           try {
             const lookup = await ghlRequest(
               `/contacts/lookup?email=${encodeURIComponent(email)}`
             )
-            existingContactId = lookup?.contacts?.[0]?.id || null
+            finalContactId = lookup?.contacts?.[0]?.id || null
           } catch {
             // Contact not found — will create a new one below
           }
 
           try {
-            if (existingContactId) {
-              await ghlRequest(`/contacts/${existingContactId}`, {
+            if (finalContactId) {
+              await ghlRequest(`/contacts/${finalContactId}`, {
                 method: 'PUT',
                 body: JSON.stringify(contactData),
               })
             } else {
-              await ghlRequest('/contacts/', {
+              const newContact = await ghlRequest('/contacts/', {
                 method: 'POST',
                 body: JSON.stringify(contactData),
               })
+              finalContactId = newContact?.contact?.id || null
             }
           } catch (ghlError) {
             markEventFailed(event.id)
@@ -309,6 +318,42 @@ export async function POST(request: NextRequest) {
 
         // Log successful payment processing
         console.log(`Processed ${type} payment: ${session.id} for ${email}, amount: $${amount}`)
+
+        // Use the same contact ID for the pipeline opportunity update
+        const paymentContactId = finalContactId;
+
+        // Move the associated pipeline opportunity to "Application Paid" stage
+        if (paymentContactId) {
+          try {
+            const pipeline = await getVendorPipeline();
+            if (pipeline) {
+              const appPaidStageId = getStageIdByName(pipeline, 'Paid');
+              if (appPaidStageId) {
+                const opp = await findOpportunityByContactAndPipeline(
+                  paymentContactId,
+                  pipeline.id
+                );
+                if (opp && opp.stageId !== appPaidStageId) {
+                  const updated = await updateOpportunityStage(opp.id, appPaidStageId);
+                  if (updated) {
+                    console.log(
+                      `[Pipeline] Moved opportunity ${opp.id} to Paid for contact ${paymentContactId}`
+                    );
+                  }
+                } else if (!opp) {
+                  console.warn(
+                    `[Pipeline] No opportunity found for contact ${paymentContactId} in pipeline ${pipeline.id}`
+                  );
+                }
+              } else {
+                console.warn('[Pipeline] Paid stage not found');
+              }
+            }
+          } catch (pipelineError) {
+            console.error('[Pipeline] Failed to update opportunity stage:', pipelineError);
+            // Non-fatal — payment was already recorded in CRM
+          }
+        }
       } catch (outerError) {
         markEventFailed(event.id)
         console.error(`Failed to update GHL contact after ${type} payment:`, outerError)

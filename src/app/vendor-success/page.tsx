@@ -150,7 +150,7 @@ function VendorSuccessContent() {
           <h3 className="font-semibold text-purple-800 mb-2">What happens next?</h3>
           <ul className="text-sm text-purple-700 space-y-1">
             <li>• Check your email for a payment receipt</li>
-            <li>• You&apos;ll receive a vendor agreement to sign within 2 business days</li>
+            <li>• You&apos;ll receive the vendor agreement for electronic signature within a few minutes</li>
             <li>• Event details and setup information will follow</li>
             <li>• Load-in begins at 7:00 AM on event day</li>
           </ul>

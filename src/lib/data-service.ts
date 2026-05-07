@@ -472,6 +472,36 @@ async function writeFormSubmissionsToDb(submissions: any[]): Promise<void> {
   }
 }
 
+/**
+ * Save a single form submission directly to the PostgreSQL database.
+ * This avoids the read-all/write-all race condition of the batch method.
+ */
+export async function saveFormSubmissionToDb(submission: any): Promise<void> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+
+  try {
+    await ensureFormSubmissionsTableExists(client);
+    const ts = submission.timestamp ? new Date(submission.timestamp) : new Date();
+    await client.query(
+      `INSERT INTO form_submissions (timestamp, type, name, email, data, crm_success)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
+      [
+        ts,
+        submission.type || null,
+        submission.name || null,
+        submission.email || null,
+        JSON.stringify(submission),
+        submission.crmSuccess === true || submission.crm_success === true,
+      ]
+    );
+  } finally {
+    client.release();
+  }
+}
+
 async function readSiteImagesFromDb(): Promise<{ images: SiteImage[] }> {
   const client = await getDbClient();
   if (!client) {

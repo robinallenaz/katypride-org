@@ -311,6 +311,7 @@ Frontend Forms → Next.js API Route → GrowthSphere360 API → CRM Dashboard
 # GrowthSphere360 CRM Integration
 GHL_API_KEY=your_api_key_here
 GHL_LOCATION_ID=your_location_id_here
+GHL_VENDOR_PIPELINE_ID=your_vendor_pipeline_id_here
 CRM_ADMIN_SECRET=your_admin_secret_here
 ```
 
