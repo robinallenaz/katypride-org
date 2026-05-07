@@ -350,6 +350,104 @@ async function ensureEventsTableExists(client: PoolClient): Promise<void> {
   `);
 }
 
+async function ensureFormSubmissionsTableExists(client: PoolClient): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS form_submissions (
+      id SERIAL PRIMARY KEY,
+      timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      type VARCHAR(50),
+      name VARCHAR(255),
+      email VARCHAR(255),
+      data JSONB NOT NULL DEFAULT '{}',
+      crm_success BOOLEAN DEFAULT FALSE
+    )
+  `);
+
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_form_submissions_timestamp ON form_submissions(timestamp DESC)
+  `);
+  await client.query(`
+    CREATE INDEX IF NOT EXISTS idx_form_submissions_type ON form_submissions(type)
+  `);
+}
+
+async function readFormSubmissionsFromDb(): Promise<{ submissions: any[] }> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+
+  try {
+    await ensureFormSubmissionsTableExists(client);
+    const result = await client.query(`
+      SELECT timestamp, type, name, email, data, crm_success
+      FROM form_submissions
+      ORDER BY timestamp DESC
+    `);
+    return {
+      submissions: result.rows.map((row: any) => ({
+        ...(typeof row.data === 'object' && row.data !== null ? row.data : {}),
+        timestamp: row.timestamp instanceof Date ? row.timestamp.toISOString() : row.timestamp,
+        type: row.type,
+        name: row.name,
+        email: row.email,
+        crmSuccess: row.crm_success,
+      })),
+    };
+  } finally {
+    try {
+      client.release();
+    } catch (releaseError) {
+      console.error('[DataService] Error releasing client:', releaseError);
+    }
+  }
+}
+
+async function writeFormSubmissionsToDb(submissions: any[]): Promise<void> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+
+  let lockAcquired = false;
+  const lockId = getTableLockId('form_submissions');
+
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_lock($1)', [lockId]);
+    lockAcquired = true;
+
+    await ensureFormSubmissionsTableExists(client);
+    await client.query('DELETE FROM form_submissions');
+
+    for (const sub of submissions) {
+      const ts = sub.timestamp ? new Date(sub.timestamp) : new Date();
+      await client.query(
+        `INSERT INTO form_submissions (timestamp, type, name, email, data, crm_success)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
+        [
+          ts,
+          sub.type || null,
+          sub.name || null,
+          sub.email || null,
+          JSON.stringify(sub),
+          sub.crmSuccess === true || sub.crm_success === true,
+        ]
+      );
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    if (lockAcquired) {
+      await client.query('SELECT pg_advisory_unlock($1)', [lockId]).catch(() => {});
+    }
+    client.release();
+  }
+}
+
 async function readSiteImagesFromDb(): Promise<{ images: SiteImage[] }> {
   const client = await getDbClient();
   if (!client) {
@@ -964,6 +1062,22 @@ export async function readData<T>(filename: string): Promise<T> {
     }
   }
 
+  // Use database for form-backup if available.
+  // Do not fall back to JSON on DB read errors, because in serverless
+  // environments JSON writes are ephemeral and submissions appear to vanish.
+  if (filename === 'form-backup' && pool) {
+    try {
+      const dbData = await readFormSubmissionsFromDb();
+      return dbData as unknown as T;
+    } catch (error) {
+      console.error('[DataService] CRITICAL: Failed to read form-backup from DB:', error);
+      throw new Error(
+        `Failed to read form-backup from database: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
+        'JSON fallback disabled to prevent data loss in serverless environments.'
+      );
+    }
+  }
+
   // Use database for site-images if available.
   // Do not fall back to JSON on DB read errors, because that can serve stale
   // content (e.g. deleted images reappearing from old JSON snapshots).
@@ -1087,6 +1201,22 @@ export async function writeData<T>(filename: string, data: T): Promise<void> {
       console.error(`[DataService] CRITICAL: Failed to write app_config "${filename}" to DB:`, error);
       throw new Error(
         `Failed to persist ${filename} to database: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
+        'JSON fallback disabled to prevent data loss in serverless environments.'
+      );
+    }
+  }
+
+  // Use database for form-backup if available.
+  // JSON fallback disabled because /tmp is ephemeral on serverless.
+  if (filename === 'form-backup' && pool) {
+    try {
+      const fbData = data as { submissions: any[] };
+      await writeFormSubmissionsToDb(fbData.submissions || []);
+      return;
+    } catch (error) {
+      console.error('[DataService] CRITICAL: Failed to write form-backup to DB:', error);
+      throw new Error(
+        `Failed to persist form-backup to database: ${error instanceof Error ? error.message : 'Unknown error'}. ` +
         'JSON fallback disabled to prevent data loss in serverless environments.'
       );
     }

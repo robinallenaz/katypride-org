@@ -111,31 +111,66 @@ export async function GET(request: NextRequest) {
       }
 
       // Validate payment amount matches expected vendor/sponsor fees
-      const expectedAmounts: Record<string, Record<string, number>> = {
-        vendor: {
-          'non-profit': 22500,
-          'for-profit': 27500,
-          'political': 30000,
-          'government': 30000,
-          'food': 30000
-        },
-        sponsor: {
-          'friends': 25000,
-          'rainbow': 50000,
-          'silver': 100000,
-          'gold': 250000,
-          'platinum': 500000,
-          'title': 1000000
-        }
+      const sponsorAmounts: Record<string, number> = {
+        friends: 25000,
+        rainbow: 50000,
+        silver: 100000,
+        gold: 250000,
+        platinum: 500000,
+        title: 1000000,
       };
-      const expectedAmount = expectedAmounts[metadata.type]?.[metadata.tier] || expectedAmounts[metadata.type]?.[metadata.category];
-      if (!expectedAmount) {
-        console.warn(`[VerifyPayment] Payment ${paymentIntentId} has invalid tier/category (type: ${metadata.type}, tier: ${metadata.tier}, category: ${metadata.category})`);
+      const vendorBaseAmounts: Record<string, number> = {
+        nonprofit: 22500,
+        forprofit: 27500,
+        political: 30000,
+        government: 30000,
+        food: 30000,
+      };
+      const LOYALTY_DISCOUNT_CENTS = 5000; // $50
+      const LOYALTY_START = new Date('2026-05-01T00:00:00-05:00');
+      const LOYALTY_END = new Date('2026-06-01T00:00:00-05:00');
+      const LOYALTY_ELIGIBLE = new Set(['nonprofit', 'forprofit']);
+
+      let expectedAmount: number | undefined;
+
+      if (metadata.type === 'vendor') {
+        const baseAmount = vendorBaseAmounts[metadata.vendorType];
+        if (baseAmount === undefined) {
+          console.warn(`[VerifyPayment] Payment ${paymentIntentId} has invalid vendorType (type: ${metadata.type}, vendorType: ${metadata.vendorType})`);
+          return NextResponse.json(
+            { valid: false, code: 'INVALID_TIER', error: 'Payment verification failed' },
+            { status: 400 }
+          );
+        }
+        // Compute discount validity based on payment intent creation time,
+        // not verification time, to handle edge cases where verification
+        // happens just after the loyalty window closes.
+        const paymentTime = new Date(paymentIntent.created * 1000);
+        const promoApplies =
+          metadata.promoCode === 'LOYAL50' &&
+          LOYALTY_ELIGIBLE.has(metadata.vendorType) &&
+          paymentTime >= LOYALTY_START &&
+          paymentTime < LOYALTY_END;
+        expectedAmount = baseAmount - (promoApplies ? LOYALTY_DISCOUNT_CENTS : 0);
+      } else if (metadata.type === 'sponsor') {
+        expectedAmount = sponsorAmounts[metadata.tier || metadata.category || ''];
+        if (expectedAmount === undefined) {
+          console.warn(`[VerifyPayment] Payment ${paymentIntentId} has invalid sponsor tier (type: ${metadata.type}, tier: ${metadata.tier}, category: ${metadata.category})`);
+          return NextResponse.json(
+            { valid: false, code: 'INVALID_TIER', error: 'Payment verification failed' },
+            { status: 400 }
+          );
+        }
+      }
+
+      if (expectedAmount === undefined) {
+        console.warn(`[VerifyPayment] Payment ${paymentIntentId} has unrecognised type (type: ${metadata.type})`);
         return NextResponse.json(
-          { valid: false, code: 'INVALID_TIER', error: 'Payment verification failed' },
+          { valid: false, code: 'INVALID_TYPE', error: 'Payment verification failed' },
           { status: 400 }
         );
       }
+
       if (paymentIntent.amount !== expectedAmount) {
         console.warn(`[VerifyPayment] Payment ${paymentIntentId} amount mismatch (expected: ${expectedAmount}, actual: ${paymentIntent.amount})`);
         return NextResponse.json(
