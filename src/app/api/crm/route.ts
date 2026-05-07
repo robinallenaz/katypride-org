@@ -6,6 +6,7 @@ import {
   getVendorPipeline,
   getStageIdByName,
   createOpportunity,
+  findOpportunityByContactAndPipeline,
 } from '@/lib/ghl-pipeline';
 
 const GHL_API_KEY = process.env.GHL_API_KEY || '';
