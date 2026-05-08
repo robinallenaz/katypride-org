@@ -130,6 +130,8 @@ export async function GET(request: NextRequest) {
       const LOYALTY_START = new Date('2026-05-01T00:00:00-05:00');
       const LOYALTY_END = new Date('2026-06-01T00:00:00-05:00');
       const LOYALTY_ELIGIBLE = new Set(['nonprofit', 'forprofit']);
+      const TEST_CODE = 'TEST1';
+      const TEST_PERCENT = 0.99;
 
       let expectedAmount: number | undefined;
 
@@ -146,12 +148,24 @@ export async function GET(request: NextRequest) {
         // not verification time, to handle edge cases where verification
         // happens just after the loyalty window closes.
         const paymentTime = new Date(paymentIntent.created * 1000);
-        const promoApplies =
-          metadata.promoCode === 'LOYAL50' &&
+        const submittedPromo = String(metadata.promoCode || '').toUpperCase();
+        const loyaltyApplies =
+          submittedPromo === 'LOYAL50' &&
           LOYALTY_ELIGIBLE.has(metadata.vendorType) &&
           paymentTime >= LOYALTY_START &&
           paymentTime < LOYALTY_END;
-        expectedAmount = baseAmount - (promoApplies ? LOYALTY_DISCOUNT_CENTS : 0);
+        const testApplies = submittedPromo === TEST_CODE;
+        if (loyaltyApplies) {
+          expectedAmount = baseAmount - LOYALTY_DISCOUNT_CENTS;
+        } else if (testApplies) {
+          // 99% off, computed on the dollar base then converted to cents to
+          // match server-side rounding in create-payment-intent.
+          const baseDollars = baseAmount / 100;
+          const discountDollars = Math.round(baseDollars * TEST_PERCENT);
+          expectedAmount = (baseDollars - discountDollars) * 100;
+        } else {
+          expectedAmount = baseAmount;
+        }
       } else if (metadata.type === 'sponsor') {
         expectedAmount = sponsorAmounts[metadata.tier || metadata.category || ''];
         if (expectedAmount === undefined) {

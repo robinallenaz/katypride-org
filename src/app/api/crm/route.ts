@@ -30,6 +30,10 @@ const LOYALTY_DISCOUNT = 50;
 const LOYALTY_START = new Date('2026-05-01T00:00:00-05:00');
 const LOYALTY_END = new Date('2026-06-01T00:00:00-05:00');
 
+// TEST1: internal/test code — 99% off any vendor type, no time window.
+const TEST_CODE = 'TEST1';
+const TEST_PERCENT = 0.99;
+
 function isLoyaltyWindowActive(now: Date = new Date()): boolean {
   return now >= LOYALTY_START && now < LOYALTY_END;
 }
@@ -52,18 +56,40 @@ function computeVendorPricing(vendorType: string, promoCode: unknown): {
   const submittedPromo = typeof promoCode === 'string'
     ? promoCode.trim().toUpperCase()
     : '';
-  const promoValid =
+
+  // LOYAL50: $50 off, eligible types only, within window
+  if (
     submittedPromo === LOYALTY_CODE &&
     pricing.loyaltyEligible &&
-    isLoyaltyWindowActive();
+    isLoyaltyWindowActive()
+  ) {
+    return {
+      baseFee: pricing.price,
+      discount: LOYALTY_DISCOUNT,
+      finalFee: Math.max(0, pricing.price - LOYALTY_DISCOUNT),
+      appliedCode: LOYALTY_CODE,
+      promoValid: true,
+    };
+  }
 
-  const discount = promoValid ? LOYALTY_DISCOUNT : 0;
+  // TEST1: 99% off any vendor type
+  if (submittedPromo === TEST_CODE) {
+    const discount = Math.round(pricing.price * TEST_PERCENT);
+    return {
+      baseFee: pricing.price,
+      discount,
+      finalFee: Math.max(0, pricing.price - discount),
+      appliedCode: TEST_CODE,
+      promoValid: true,
+    };
+  }
+
   return {
     baseFee: pricing.price,
-    discount,
-    finalFee: Math.max(0, pricing.price - discount),
-    appliedCode: promoValid ? LOYALTY_CODE : '',
-    promoValid,
+    discount: 0,
+    finalFee: pricing.price,
+    appliedCode: '',
+    promoValid: false,
   };
 }
 

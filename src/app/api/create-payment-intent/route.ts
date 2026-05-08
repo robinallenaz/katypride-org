@@ -38,6 +38,10 @@ const LOYALTY_DISCOUNT = 50;
 const LOYALTY_START = new Date('2026-05-01T00:00:00-05:00');
 const LOYALTY_END = new Date('2026-06-01T00:00:00-05:00');
 
+// TEST1: internal/test code — 99% off any vendor type, no time window.
+const TEST_CODE = 'TEST1';
+const TEST_PERCENT = 0.99;
+
 function isLoyaltyWindowActive(now: Date = new Date()): boolean {
   return now >= LOYALTY_START && now < LOYALTY_END;
 }
@@ -72,13 +76,19 @@ export async function POST(request: Request) {
       }
 
       const submittedPromo = String(metadata.promoCode || '').trim().toUpperCase();
-      const promoApplies =
+      const loyaltyApplies =
         submittedPromo === LOYALTY_CODE &&
         pricing.loyaltyEligible &&
         isLoyaltyWindowActive();
+      const testApplies = submittedPromo === TEST_CODE;
 
-      const expectedDiscount = promoApplies ? LOYALTY_DISCOUNT : 0;
-      const expectedAmountCents = Math.max(0, (pricing.price - expectedDiscount) * 100);
+      let expectedDiscountDollars = 0;
+      if (loyaltyApplies) {
+        expectedDiscountDollars = LOYALTY_DISCOUNT;
+      } else if (testApplies) {
+        expectedDiscountDollars = Math.round(pricing.price * TEST_PERCENT);
+      }
+      const expectedAmountCents = Math.max(0, (pricing.price - expectedDiscountDollars) * 100);
 
       if (Math.round(amount) !== expectedAmountCents) {
         return NextResponse.json(
@@ -89,6 +99,7 @@ export async function POST(request: Request) {
 
       // If client sent a promo code that doesn't apply, reject so CRM/Stripe
       // records never show a fake discount.
+      const promoApplies = loyaltyApplies || testApplies;
       if (submittedPromo && submittedPromo !== '' && !promoApplies) {
         return NextResponse.json(
           { error: 'Promo code is not valid for this vendor type or is outside the eligible window.' },

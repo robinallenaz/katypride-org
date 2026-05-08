@@ -58,6 +58,10 @@ const LOYALTY_DISCOUNT = 50;
 const LOYALTY_START = new Date('2026-05-01T00:00:00-05:00');
 const LOYALTY_END = new Date('2026-06-01T00:00:00-05:00');
 
+// TEST1: internal/test code — 99% off any vendor type, no time window.
+const TEST_CODE = 'TEST1';
+const TEST_PERCENT = 0.99;
+
 function isLoyaltyWindowActive(now: Date = new Date()): boolean {
   return now >= LOYALTY_START && now < LOYALTY_END;
 }
@@ -178,15 +182,22 @@ function VendorSignupForm() {
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
     }));
 
-    // If the vendor type changed to an ineligible type, remove any applied loyalty discount.
+    // If the vendor type changed and the applied LOYAL50 discount is no
+    // longer eligible, remove it. TEST1 applies to all vendor types so we
+    // re-compute its amount instead of dropping it.
     if (name === 'vendorType' && appliedDiscount) {
       const newType = vendorTypes.find(v => v.value === value);
-      if (!newType || !newType.loyaltyEligible) {
-        setAppliedDiscount(null);
-        setPromoMessage({
-          type: 'error',
-          text: 'LOYAL50 is not eligible for government, political, or food vendors.',
-        });
+      if (appliedDiscount.code === LOYALTY_CODE) {
+        if (!newType || !newType.loyaltyEligible) {
+          setAppliedDiscount(null);
+          setPromoMessage({
+            type: 'error',
+            text: 'LOYAL50 is not eligible for government, political, or food vendors.',
+          });
+        }
+      } else if (appliedDiscount.code === TEST_CODE && newType) {
+        const newAmount = Math.round(newType.price * TEST_PERCENT);
+        setAppliedDiscount({ code: TEST_CODE, amount: newAmount });
       }
     }
 
@@ -206,7 +217,11 @@ function VendorSignupForm() {
   };
 
   const selectedVendorType = vendorTypes.find(v => v.value === formData.vendorType);
-  const discountAmount = appliedDiscount && selectedVendorType?.loyaltyEligible ? appliedDiscount.amount : 0;
+  const discountEligible = !!appliedDiscount && (
+    appliedDiscount.code === TEST_CODE ||
+    (appliedDiscount.code === LOYALTY_CODE && !!selectedVendorType?.loyaltyEligible)
+  );
+  const discountAmount = discountEligible ? appliedDiscount!.amount : 0;
   const finalPrice = Math.max(0, (selectedVendorType?.price || 0) - discountAmount);
 
   const handleApplyPromo = () => {
@@ -215,29 +230,42 @@ function VendorSignupForm() {
       setPromoMessage({ type: 'error', text: 'Please enter a promo code.' });
       return;
     }
-    if (code !== LOYALTY_CODE) {
-      setPromoMessage({ type: 'error', text: 'Invalid promo code.' });
-      setAppliedDiscount(null);
-      return;
-    }
-    if (!isLoyaltyWindowActive()) {
-      setPromoMessage({ type: 'error', text: 'This code is only valid May 1–31, 2026.' });
-      setAppliedDiscount(null);
-      return;
-    }
-    if (selectedVendorType && !selectedVendorType.loyaltyEligible) {
+    if (code === LOYALTY_CODE) {
+      if (!isLoyaltyWindowActive()) {
+        setPromoMessage({ type: 'error', text: 'This code is only valid May 1–31, 2026.' });
+        setAppliedDiscount(null);
+        return;
+      }
+      if (selectedVendorType && !selectedVendorType.loyaltyEligible) {
+        setPromoMessage({
+          type: 'error',
+          text: 'LOYAL50 is not eligible for government, political, or food vendors.',
+        });
+        setAppliedDiscount(null);
+        return;
+      }
+      setAppliedDiscount({ code: LOYALTY_CODE, amount: LOYALTY_DISCOUNT });
       setPromoMessage({
-        type: 'error',
-        text: 'LOYAL50 is not eligible for government, political, or food vendors.',
+        type: 'success',
+        text: `LOYAL50 applied! $${LOYALTY_DISCOUNT} returning-vendor discount.`,
       });
-      setAppliedDiscount(null);
       return;
     }
-    setAppliedDiscount({ code: LOYALTY_CODE, amount: LOYALTY_DISCOUNT });
-    setPromoMessage({
-      type: 'success',
-      text: `LOYAL50 applied! $${LOYALTY_DISCOUNT} returning-vendor discount.`,
-    });
+    if (code === TEST_CODE) {
+      if (!selectedVendorType) {
+        setPromoMessage({ type: 'error', text: 'Please select a vendor type before applying a promo code.' });
+        return;
+      }
+      const amount = Math.round(selectedVendorType.price * TEST_PERCENT);
+      setAppliedDiscount({ code: TEST_CODE, amount });
+      setPromoMessage({
+        type: 'success',
+        text: `TEST1 applied! 99% off ($${amount} discount).`,
+      });
+      return;
+    }
+    setPromoMessage({ type: 'error', text: 'Invalid promo code.' });
+    setAppliedDiscount(null);
   };
 
   const handleRemovePromo = () => {
@@ -274,12 +302,17 @@ function VendorSignupForm() {
     }
 
     // Revalidate discount at submit time (guards against vendor-type changes after apply)
-    const discountValid =
-      appliedDiscount !== null &&
-      currentVendorType.loyaltyEligible &&
-      isLoyaltyWindowActive();
-    const appliedDiscountAmount = discountValid ? appliedDiscount!.amount : 0;
-    const appliedDiscountCode = discountValid ? appliedDiscount!.code : '';
+    let appliedDiscountAmount = 0;
+    let appliedDiscountCode = '';
+    if (appliedDiscount) {
+      if (appliedDiscount.code === LOYALTY_CODE && currentVendorType.loyaltyEligible && isLoyaltyWindowActive()) {
+        appliedDiscountAmount = appliedDiscount.amount;
+        appliedDiscountCode = LOYALTY_CODE;
+      } else if (appliedDiscount.code === TEST_CODE) {
+        appliedDiscountAmount = Math.round(currentVendorType.price * TEST_PERCENT);
+        appliedDiscountCode = TEST_CODE;
+      }
+    }
     const chargeAmount = Math.max(0, currentVendorType.price - appliedDiscountAmount);
 
     setIsSubmitting(true);
