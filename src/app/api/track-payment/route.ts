@@ -146,65 +146,180 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, processing: true })
   }
 
-  // Handle donation payments (PaymentIntent)
+  // Handle PaymentIntent (donations AND vendor/sponsor payments).
+  // The website's vendor/sponsor flow uses PaymentIntent + CardElement,
+  // NOT Stripe Checkout — so vendor/sponsor logic must live here.
   if (event.type === 'payment_intent.succeeded') {
     const paymentIntent = event.data.object as Stripe.PaymentIntent
-    const { donor_email, donor_name, donation_frequency } = paymentIntent.metadata
+    const metadata = paymentIntent.metadata || {}
+    const paymentType = metadata.type
+    const email = metadata.donor_email
+    const name = metadata.donor_name
+    const donation_frequency = metadata.donation_frequency
 
-    if (donor_email) {
+    if (!email) {
+      // Nothing actionable — mark processed to prevent retries
+      markEventProcessed(event.id)
+      return NextResponse.json({ received: true })
+    }
+
+    // ===== Vendor / Sponsor branch =====
+    if (paymentType === 'vendor' || paymentType === 'sponsor') {
+      const isVendor = paymentType === 'vendor'
+      const amount = paymentIntent.amount / 100
+      const crmContactId = metadata.crmContactId || ''
+      const company = metadata.company || ''
+
+      const contactData: any = {
+        email,
+        name: name || '',
+        locationId: GHL_LOCATION_ID,
+        tags: isVendor ? ['vendor', 'paid'] : ['sponsor', 'paid'],
+        customFields: {
+          stripe_payment_intent_id: paymentIntent.id,
+          payment_status: 'paid',
+          payment_amount: amount,
+          payment_date: new Date().toISOString(),
+          last_payment_method: paymentIntent.payment_method_types?.[0] || '',
+          ...(isVendor && { vendor_type: metadata.vendorType || '' }),
+          ...(metadata.promoCode && { promo_code: metadata.promoCode }),
+        },
+      }
+      if (company) {
+        contactData.companyName = company
+      }
+
+      let finalContactId: string | null = crmContactId || null
+
+      // Update existing contact (most common — CRM created it before payment)
       try {
-        const contactData = {
-          email: donor_email,
-          name: donor_name || '',
-          locationId: GHL_LOCATION_ID,
-          tags: ['donor'],
-          customFields: {
-            last_payment_intent_id: paymentIntent.id,
-            last_payment_status: 'succeeded',
-            last_donation_amount: paymentIntent.amount / 100,
-            last_payment_method: paymentIntent.payment_method_types?.[0] || '',
-            donation_frequency: donation_frequency || '',
-          },
-        }
-
-        // Lookup existing contact by email to avoid duplicates on webhook retries
-        let existingContactId: string | null = null
-        try {
-          const lookup = await ghlRequest(
-            `/contacts/lookup?email=${encodeURIComponent(donor_email)}`
-          )
-          existingContactId = lookup?.contacts?.[0]?.id || null
-        } catch {
-          // Contact not found — will create a new one below
-        }
-
-        if (existingContactId) {
-          await ghlRequest(`/contacts/${existingContactId}`, {
+        if (finalContactId) {
+          await ghlRequest(`/contacts/${finalContactId}`, {
             method: 'PUT',
             body: JSON.stringify(contactData),
           })
+          console.log(`[Webhook] Updated ${paymentType} contact ${finalContactId} (PI ${paymentIntent.id})`)
         } else {
-          await ghlRequest('/contacts/', {
-            method: 'POST',
-            body: JSON.stringify(contactData),
-          })
+          // Fallback: lookup by email, then update or create
+          try {
+            const lookup = await ghlRequest(
+              `/contacts/lookup?email=${encodeURIComponent(email)}`
+            )
+            finalContactId = lookup?.contacts?.[0]?.id || null
+          } catch {
+            // Contact not found — create new
+          }
+
+          if (finalContactId) {
+            await ghlRequest(`/contacts/${finalContactId}`, {
+              method: 'PUT',
+              body: JSON.stringify(contactData),
+            })
+          } else {
+            const newContact = await ghlRequest('/contacts/', {
+              method: 'POST',
+              body: JSON.stringify(contactData),
+            })
+            finalContactId = newContact?.contact?.id || null
+          }
         }
-        
-        // Mark as processed only after successful GHL update
-        markEventProcessed(event.id)
-        return NextResponse.json({ received: true })
       } catch (ghlError) {
-        // Mark as failed so retries can attempt it again
         markEventFailed(event.id)
-        console.error('Failed to update GHL contact after donation payment:', ghlError)
+        console.error(`[Webhook] Failed to update GHL contact for ${paymentType} payment:`, ghlError)
         return NextResponse.json(
-          { error: 'Failed to process donation in CRM', received: false },
+          { error: 'Failed to process payment in CRM', received: false },
           { status: 500 }
         )
       }
-    } else {
-      // No donor_email - mark as processed to prevent infinite retries
+
+      // Move the pipeline opportunity to "Paid" stage so the GHL workflow
+      // (Stage Changed → Paid) fires and auto-sends the vendor agreement.
+      if (finalContactId) {
+        try {
+          const pipeline = await getVendorPipeline()
+          if (pipeline) {
+            const paidStageId = getStageIdByName(pipeline, 'Paid')
+            if (paidStageId) {
+              const opp = await findOpportunityByContactAndPipeline(
+                finalContactId,
+                pipeline.id
+              )
+              if (opp && opp.stageId !== paidStageId) {
+                const updated = await updateOpportunityStage(opp.id, paidStageId)
+                if (updated) {
+                  console.log(
+                    `[Pipeline] Moved opportunity ${opp.id} to Paid for contact ${finalContactId} (${email})`
+                  )
+                }
+              } else if (!opp) {
+                console.warn(
+                  `[Pipeline] No opportunity found for contact ${finalContactId} in pipeline ${pipeline.id} — payment recorded but stage not moved`
+                )
+              }
+            } else {
+              console.warn('[Pipeline] "Paid" stage not found in vendor pipeline')
+            }
+          } else {
+            console.warn('[Pipeline] Vendor pipeline not configured (set GHL_VENDOR_PIPELINE_ID)')
+          }
+        } catch (pipelineError) {
+          // Non-fatal — the payment is recorded; the stage move can be done manually
+          console.error('[Pipeline] Failed to update opportunity stage:', pipelineError)
+        }
+      }
+
       markEventProcessed(event.id)
+      return NextResponse.json({ received: true })
+    }
+
+    // ===== Donation branch (default) =====
+    try {
+      const contactData = {
+        email,
+        name: name || '',
+        locationId: GHL_LOCATION_ID,
+        tags: ['donor'],
+        customFields: {
+          last_payment_intent_id: paymentIntent.id,
+          last_payment_status: 'succeeded',
+          last_donation_amount: paymentIntent.amount / 100,
+          last_payment_method: paymentIntent.payment_method_types?.[0] || '',
+          donation_frequency: donation_frequency || '',
+        },
+      }
+
+      // Lookup existing contact by email to avoid duplicates on webhook retries
+      let existingContactId: string | null = null
+      try {
+        const lookup = await ghlRequest(
+          `/contacts/lookup?email=${encodeURIComponent(email)}`
+        )
+        existingContactId = lookup?.contacts?.[0]?.id || null
+      } catch {
+        // Contact not found — will create a new one below
+      }
+
+      if (existingContactId) {
+        await ghlRequest(`/contacts/${existingContactId}`, {
+          method: 'PUT',
+          body: JSON.stringify(contactData),
+        })
+      } else {
+        await ghlRequest('/contacts/', {
+          method: 'POST',
+          body: JSON.stringify(contactData),
+        })
+      }
+
+      markEventProcessed(event.id)
+      return NextResponse.json({ received: true })
+    } catch (ghlError) {
+      markEventFailed(event.id)
+      console.error('Failed to update GHL contact after donation payment:', ghlError)
+      return NextResponse.json(
+        { error: 'Failed to process donation in CRM', received: false },
+        { status: 500 }
+      )
     }
   }
 
