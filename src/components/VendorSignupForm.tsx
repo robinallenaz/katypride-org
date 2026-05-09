@@ -476,22 +476,14 @@ function VendorSignupForm() {
         }
         confirmedPayment = confirmed;
       } catch (paymentError) {
-        // Update CRM with failed status before propagating error
-        try {
-          await fetch('/api/crm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'vendor',
-              email: currentFormData.email,
-              paymentStatus: 'failed',
-              paymentIntentId: paymentIntent.id,
-              paymentError: paymentError instanceof Error ? paymentError.message : 'Payment failed',
-            }),
-          });
-        } catch (crmError) {
-          console.warn('Failed to update CRM with payment failure:', crmError);
-        }
+        // Payment failure is recorded by Stripe; the contact already exists
+        // in the CRM from the initial /api/crm submission. The Stripe
+        // webhook (track-payment) will not fire for failed charges, so
+        // failed payments stay visible as 'Registration Form/No Payment'
+        // pipeline opportunities. No additional CRM call here — the
+        // previous secondary call to /api/crm was rejected as 400 (name
+        // required) and risked stripping tags on retry.
+        console.warn('Payment failed:', paymentError instanceof Error ? paymentError.message : paymentError);
         throw paymentError;
       }
 
@@ -499,47 +491,15 @@ function VendorSignupForm() {
       // Stripe.js automatically handles the modal and resolves after authentication
       // If status is still requires_action, authentication was not completed
       if (confirmedPayment.status === 'requires_action') {
-        // Update CRM with failed status
-        try {
-          await fetch('/api/crm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'vendor',
-              email: currentFormData.email,
-              paymentStatus: 'failed',
-              paymentIntentId: confirmedPayment.id,
-              paymentError: '3D Secure authentication incomplete',
-            }),
-          });
-        } catch (crmError) {
-          console.warn('Failed to update CRM with payment failure:', crmError);
-        }
+        console.warn('Payment requires_action: 3D Secure authentication incomplete', confirmedPayment.id);
         throw new Error('Payment authentication incomplete. Please complete the verification or use a different card.');
       }
 
       if (confirmedPayment.status === 'succeeded') {
-        // Update CRM with payment status (non-blocking - don't fail if CRM update fails)
-        try {
-          const crmUpdateResponse = await fetch('/api/crm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'vendor',
-              email: currentFormData.email,
-              paymentStatus: 'paid',
-              paymentIntentId: confirmedPayment.id,
-            }),
-          });
-          
-          if (!crmUpdateResponse.ok) {
-            console.warn('Failed to update CRM with payment status:', await crmUpdateResponse.text());
-          }
-        } catch (crmError) {
-          console.warn('CRM update failed after payment:', crmError);
-        }
-
-        // Redirect to success page
+        // Payment status is updated authoritatively by the Stripe webhook
+        // (api/track-payment), which also moves the GHL pipeline opportunity
+        // from 'Registration Form/No Payment' to 'Paid' so the agreement
+        // workflow can fire. No client-side /api/crm call needed.
         window.location.href = `/vendor-success?payment_intent=${confirmedPayment.id}`;
       } else {
         throw new Error('Payment was not completed');
