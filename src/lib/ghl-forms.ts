@@ -18,7 +18,12 @@
  * because GHL forms are public by design.
  */
 
-const GHL_FORM_BASE_URL = 'https://services.leadconnectorhq.com/widget/form';
+// LeadForge is a GHL white-label, so the public form widget lives on the
+// LeadForge domain instead of the default services.leadconnectorhq.com.
+// Override via GHL_FORM_WIDGET_BASE_URL if the white-label changes.
+const GHL_FORM_BASE_URL =
+  process.env.GHL_FORM_WIDGET_BASE_URL ||
+  'https://link.leadforge.agency/widget/form';
 
 export interface GhlFormSubmitResult {
   ok: boolean;
