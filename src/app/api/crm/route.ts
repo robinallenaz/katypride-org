@@ -1055,9 +1055,19 @@ export async function POST(request: NextRequest) {
 
     const contactId = extractContactId(contact);
 
-    // Create pipeline opportunity for vendor/sponsor so the team can track
-    // progress through the 2025/2026 Vendor Pipeline stages.
-    if ((type === 'vendor' || type === 'sponsor') && contactId) {
+    // Pipeline opportunity creation strategy (decided 2026-05-09):
+    //
+    //   VENDOR: do NOT create an opportunity here. The GHL workflow
+    //   "1a - Vendor Payment 2026" creates the opp in the Paid stage and
+    //   sends the Vendor Agreement when the GHL "2025 Vendor Form" is
+    //   submitted. /api/track-payment submits to that GHL form after
+    //   Stripe confirms payment, which fires workflow 1a end-to-end.
+    //   Creating an opp here would result in duplicate opps per vendor.
+    //
+    //   SPONSOR: still create an opp in "Registration Form/No Payment"
+    //   because GHL workflow "1b - Sponsorship Paid 2026" is empty (Draft).
+    //   Without this, sponsors would not appear in the pipeline at all.
+    if (type === 'sponsor' && contactId) {
       try {
         const pipeline = await getVendorPipeline();
         if (pipeline) {
@@ -1075,28 +1085,23 @@ export async function POST(request: NextRequest) {
             } else {
               const oppName = company
                 ? `${name} — ${company}`
-                : `${name} — ${type === 'vendor' ? 'Vendor Application' : 'Sponsorship Interest'}`;
-              const monetaryValue =
-                type === 'vendor'
-                  ? (serverPricing ? serverPricing.finalFee : undefined)
-                  : undefined;
+                : `${name} — Sponsorship Interest`;
               const opp = await createOpportunity({
                 name: oppName,
                 contactId,
                 pipelineId: pipeline.id,
                 pipelineStageId: leadsStageId,
-                monetaryValue,
               });
               if (opp) {
-                console.log(`[CRM Pipeline] Created opportunity ${opp.id} in Leads for contact ${contactId}`);
+                console.log(`[CRM Pipeline] Created sponsor opportunity ${opp.id} for contact ${contactId}`);
               }
             }
           } else {
-            console.warn('[CRM Pipeline] Leads stage not found in pipeline');
+            console.warn('[CRM Pipeline] Registration Form/No Payment stage not found');
           }
         }
       } catch (pipelineError) {
-        console.error('[CRM Pipeline] Failed to create opportunity:', pipelineError);
+        console.error('[CRM Pipeline] Failed to create sponsor opportunity:', pipelineError);
         // Non-fatal — don't fail the CRM submission if pipeline is unavailable
       }
     }

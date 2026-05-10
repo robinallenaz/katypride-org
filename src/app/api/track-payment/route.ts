@@ -8,6 +8,17 @@ import {
   findOpportunityByContactAndPipeline,
   updateOpportunityStage,
 } from '@/lib/ghl-pipeline';
+import { submitGhlForm } from '@/lib/ghl-forms';
+
+// GHL form ID for the "2025 Vendor Form" — workflow 1a triggers on
+// submissions to this form and handles opportunity creation, agreement
+// send, and stage progression. Set in Vercel env.
+const GHL_VENDOR_FORM_ID = process.env.GHL_VENDOR_FORM_ID || '';
+
+// GHL form ID for the "Sponsorship Form" — workflow 1b is currently a
+// draft, so even when set this only logs/records the submission. Safe
+// to leave unset until 1b is built out.
+const GHL_SPONSOR_FORM_ID = process.env.GHL_SPONSOR_FORM_ID || '';
 
 // Kill switch: Check if Stripe payments are disabled
 const stripeEnabled = process.env.STRIPE_ENABLED !== 'false';
@@ -232,39 +243,93 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Move the pipeline opportunity to "Paid" stage so the GHL workflow
-      // (Stage Changed → Paid) fires and auto-sends the vendor agreement.
-      if (finalContactId) {
-        try {
-          const pipeline = await getVendorPipeline()
-          if (pipeline) {
-            const paidStageId = getStageIdByName(pipeline, 'Paid')
-            if (paidStageId) {
-              const opp = await findOpportunityByContactAndPipeline(
-                finalContactId,
-                pipeline.id
-              )
-              if (opp && opp.stageId !== paidStageId) {
-                const updated = await updateOpportunityStage(opp.id, paidStageId)
-                if (updated) {
-                  console.log(
-                    `[Pipeline] Moved opportunity ${opp.id} to Paid for contact ${finalContactId} (${email})`
-                  )
+      // Pipeline strategy for vendor vs. sponsor:
+      //
+      //   VENDOR: do NOT move the opp directly. Submit to the GHL
+      //   "2025 Vendor Form" via API. That fires workflow 1a, which
+      //   creates the opportunity in Paid stage, sends the Vendor
+      //   Agreement, and advances to Contract Sent. This keeps the
+      //   GHL-side automation as the single source of truth.
+      //
+      //   SPONSOR: workflow 1b is empty, so we still need to move the
+      //   opp directly. Kristina handles agreement send manually until
+      //   1b is built.
+      if (isVendor) {
+        if (GHL_VENDOR_FORM_ID) {
+          try {
+            // Field names below MUST match the GHL "2025 Vendor Form"
+            // exactly. These are placeholders pending Kristina's confirmation
+            // of the form's field schema. Easiest verification: open the form
+            // in GHL → Embed code → read the `name=` attributes on inputs.
+            const formResult = await submitGhlForm(
+              GHL_VENDOR_FORM_ID,
+              {
+                first_name: (name || '').split(' ')[0] || '',
+                last_name: (name || '').split(' ').slice(1).join(' ') || '',
+                full_name: name || '',
+                email,
+                phone: paymentIntent.charges?.data?.[0]?.billing_details?.phone || '',
+                business_name: company || '',
+                vendor_type: metadata.vendorType || '',
+                payment_amount: amount,
+                payment_intent_id: paymentIntent.id,
+                promo_code: metadata.promoCode || '',
+              },
+              GHL_LOCATION_ID
+            );
+            if (formResult.ok) {
+              console.log(
+                `[GHL Form] Submitted vendor form for ${email} (PI ${paymentIntent.id}) — workflow 1a should fire`
+              );
+            } else {
+              console.error(
+                `[GHL Form] Vendor form submit failed (${formResult.status}): ${formResult.error}`,
+                formResult.body
+              );
+            }
+          } catch (formError) {
+            // Non-fatal — payment + contact are recorded; agreement can be
+            // sent manually from GHL if this fails.
+            console.error('[GHL Form] Vendor form submission threw:', formError);
+          }
+        } else {
+          console.warn(
+            '[GHL Form] GHL_VENDOR_FORM_ID not set — workflow 1a will not fire automatically. Vendor agreement must be sent manually.'
+          );
+        }
+      } else {
+        // Sponsor branch: move opp directly since workflow 1b is empty
+        if (finalContactId) {
+          try {
+            const pipeline = await getVendorPipeline();
+            if (pipeline) {
+              const paidStageId = getStageIdByName(pipeline, 'Paid');
+              if (paidStageId) {
+                const opp = await findOpportunityByContactAndPipeline(
+                  finalContactId,
+                  pipeline.id
+                );
+                if (opp && opp.stageId !== paidStageId) {
+                  const updated = await updateOpportunityStage(opp.id, paidStageId);
+                  if (updated) {
+                    console.log(
+                      `[Pipeline] Moved sponsor opportunity ${opp.id} to Paid for ${email}`
+                    );
+                  }
+                } else if (!opp) {
+                  console.warn(
+                    `[Pipeline] No sponsor opportunity found for contact ${finalContactId} — payment recorded but stage not moved`
+                  );
                 }
-              } else if (!opp) {
-                console.warn(
-                  `[Pipeline] No opportunity found for contact ${finalContactId} in pipeline ${pipeline.id} — payment recorded but stage not moved`
-                )
+              } else {
+                console.warn('[Pipeline] "Paid" stage not found in vendor pipeline');
               }
             } else {
-              console.warn('[Pipeline] "Paid" stage not found in vendor pipeline')
+              console.warn('[Pipeline] Vendor pipeline not configured (set GHL_VENDOR_PIPELINE_ID)');
             }
-          } else {
-            console.warn('[Pipeline] Vendor pipeline not configured (set GHL_VENDOR_PIPELINE_ID)')
+          } catch (pipelineError) {
+            console.error('[Pipeline] Failed to update sponsor opportunity stage:', pipelineError);
           }
-        } catch (pipelineError) {
-          // Non-fatal — the payment is recorded; the stage move can be done manually
-          console.error('[Pipeline] Failed to update opportunity stage:', pipelineError)
         }
       }
 
