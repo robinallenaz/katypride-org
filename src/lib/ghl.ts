@@ -23,17 +23,32 @@ export async function ghlRequest(endpoint: string, options: RequestInit = {}) {
 
     if (!response.ok) {
       let errorMessage = 'CRM service request failed'
+      let responsePreview = ''
       try {
-        const errorDetails: any = await response.json()
-        switch (response.status) {
-          case 401: errorMessage = 'Authentication failed'; break
-          case 403: errorMessage = 'Access denied'; break
-          case 404: errorMessage = 'Resource not found'; break
-          case 429: errorMessage = 'Too many requests'; break
-          case 500: errorMessage = 'Service temporarily unavailable'; break
-          default:  errorMessage = errorDetails.message || errorDetails.error || 'Request failed'
+        const contentType = response.headers.get('content-type') || ''
+        if (contentType.includes('application/json')) {
+          const errorDetails: any = await response.json()
+          switch (response.status) {
+            case 401: errorMessage = 'Authentication failed'; break
+            case 403: errorMessage = 'Access denied'; break
+            case 404: errorMessage = 'Resource not found'; break
+            case 429: errorMessage = 'Too many requests'; break
+            case 500: errorMessage = 'Service temporarily unavailable'; break
+            default:  errorMessage = errorDetails.message || errorDetails.error || 'Request failed'
+          }
+          responsePreview = JSON.stringify(errorDetails).slice(0, 500)
+        } else {
+          const text = await response.text()
+          responsePreview = text.slice(0, 500)
+          errorMessage = `CRM request failed (${response.status}): ${responsePreview.slice(0, 200)}`
         }
-      } catch {}
+      } catch {
+        // If we can't read the body at all, keep the generic message but log status
+      }
+      console.error(
+        `[GHL] ${options.method || 'GET'} ${endpoint} failed with HTTP ${response.status}. ` +
+        `Message: ${errorMessage}. Body preview: ${responsePreview || '(empty)'}`
+      )
       throw new Error(errorMessage)
     }
 

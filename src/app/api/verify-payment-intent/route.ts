@@ -122,8 +122,8 @@ export async function GET(request: NextRequest) {
       const vendorBaseAmounts: Record<string, number> = {
         nonprofit: 22500,
         forprofit: 27500,
-        political: 30000,
-        government: 30000,
+        political: 27500,
+        government: 27500,
         food: 30000,
       };
       const LOYALTY_DISCOUNT_CENTS = 5000; // $50

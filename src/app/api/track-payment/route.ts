@@ -13,7 +13,7 @@ import { submitGhlForm } from '@/lib/ghl-forms';
 // GHL form ID for the "2025 Vendor Form" — workflow 1a triggers on
 // submissions to this form and handles opportunity creation, agreement
 // send, and stage progression. Set in Vercel env.
-const GHL_VENDOR_FORM_ID = process.env.GHL_VENDOR_FORM_ID || '';
+const GHL_VENDOR_FORM_ID = process.env.GHL_VENDOR_FORM_ID || 'ANHnhavGydDuPa4wvvSq';
 
 // GHL form ID for the "Sponsorship Form" — workflow 1b is currently a
 // draft, so even when set this only logs/records the submission. Safe
@@ -23,13 +23,19 @@ const GHL_SPONSOR_FORM_ID = process.env.GHL_SPONSOR_FORM_ID || '';
 // Kill switch: Check if Stripe payments are disabled
 const stripeEnabled = process.env.STRIPE_ENABLED !== 'false';
 
-// Initialize Redis client for idempotency tracking
-const redis = Redis.fromEnv();
-
 // Environment variable validation - lazy, not at module load
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+// Lazy Redis initialization — don't crash the module if env vars are missing.
+let redisInstance: ReturnType<typeof Redis.fromEnv> | null = null;
+function getRedis() {
+  if (!redisInstance) {
+    redisInstance = Redis.fromEnv();
+  }
+  return redisInstance;
+}
 
 // Lazy Stripe initialization
 let stripeInstance: Stripe | null = null;
@@ -63,6 +69,7 @@ const processingEventIds = new Set<string>();
 // Redis-based idempotency check
 async function isEventProcessedRedis(eventId: string): Promise<boolean> {
   try {
+    const redis = getRedis();
     const exists = await redis.exists(`webhook:${eventId}`);
     return exists === 1;
   } catch (error) {
@@ -73,6 +80,7 @@ async function isEventProcessedRedis(eventId: string): Promise<boolean> {
 
 async function markEventProcessedRedis(eventId: string): Promise<void> {
   try {
+    const redis = getRedis();
     // Store with 24-hour expiration to prevent unbounded growth
     await redis.setex(`webhook:${eventId}`, 24 * 60 * 60, '1');
   } catch (error) {
@@ -103,59 +111,56 @@ function markEventProcessing(eventId: string): boolean {
   return true;
 }
 
-function markEventFailed(eventId: string): void {
-  processingEventIds.delete(eventId);
-}
-
 function isEventProcessed(eventId: string): boolean {
   return processedEventIds.has(eventId);
 }
 
 export async function POST(request: NextRequest) {
-  // Check kill switch first
-  if (!stripeEnabled) {
-    return NextResponse.json(
-      { error: 'Payment tracking is currently disabled' },
-      { status: 503 }
-    );
-  }
-
-  if (!webhookSecret) {
-    console.error('STRIPE_WEBHOOK_SECRET is not configured');
-    return NextResponse.json({ error: 'Webhook service not configured' }, { status: 503 });
-  }
-
-  const signature = request.headers.get('stripe-signature');
-  if (!signature) {
-    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
-  }
-
-  const stripe = getStripe();
-
-  let event: Stripe.Event
   try {
-    const body = await request.text()
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret!)
-  } catch (err) {
-    console.error('Webhook signature verification failed:', err)
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
-  }
+    // Check kill switch first
+    if (!stripeEnabled) {
+      return NextResponse.json(
+        { error: 'Payment tracking is currently disabled' },
+        { status: 503 }
+      );
+    }
 
-  // Idempotency check: Skip if already processed or being processed
-  const isProcessed = upstashUrl && upstashToken 
-    ? await isEventProcessedRedis(event.id)
-    : isEventProcessed(event.id);
-    
-  if (isProcessed) {
-    console.log(`Webhook event ${event.id} already processed, skipping`)
-    return NextResponse.json({ received: true, idempotency: true })
-  }
-  
-  // Mark as processing to prevent concurrent processing
-  if (!markEventProcessing(event.id)) {
-    console.log(`Webhook event ${event.id} is already being processed, skipping`)
-    return NextResponse.json({ received: true, processing: true })
-  }
+    if (!webhookSecret) {
+      console.error('STRIPE_WEBHOOK_SECRET is not configured');
+      return NextResponse.json({ error: 'Webhook service not configured' }, { status: 503 });
+    }
+
+    const signature = request.headers.get('stripe-signature');
+    if (!signature) {
+      return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
+    }
+
+    const stripe = getStripe();
+
+    let event: Stripe.Event
+    try {
+      const body = await request.text()
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret!)
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err)
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+    }
+
+    // Idempotency check: Skip if already processed or being processed
+    const isProcessed = upstashUrl && upstashToken
+      ? await isEventProcessedRedis(event.id)
+      : isEventProcessed(event.id);
+
+    if (isProcessed) {
+      console.log(`Webhook event ${event.id} already processed, skipping`)
+      return NextResponse.json({ received: true, idempotency: true })
+    }
+
+    // Mark as processing to prevent concurrent processing
+    if (!markEventProcessing(event.id)) {
+      console.log(`Webhook event ${event.id} is already being processed, skipping`)
+      return NextResponse.json({ received: true, processing: true })
+    }
 
   // Handle PaymentIntent (donations AND vendor/sponsor payments).
   // The website's vendor/sponsor flow uses PaymentIntent + CardElement,
@@ -235,11 +240,13 @@ export async function POST(request: NextRequest) {
           }
         }
       } catch (ghlError) {
-        markEventFailed(event.id)
-        console.error(`[Webhook] Failed to update GHL contact for ${paymentType} payment:`, ghlError)
+        // Non-fatal: return 200 so Stripe stops retrying. Log the error for
+        // manual reconciliation. Re-enabling the webhook without this fix
+        // caused Stripe to disable the endpoint after 9 days of 500 retries.
+        markEventProcessed(event.id)
+        console.error(`[Webhook] GHL contact update failed for ${paymentType} payment (PI ${paymentIntent.id}):`, ghlError)
         return NextResponse.json(
-          { error: 'Failed to process payment in CRM', received: false },
-          { status: 500 }
+          { received: true, warning: 'GHL contact update failed, logged for manual reconciliation' }
         )
       }
 
@@ -257,23 +264,40 @@ export async function POST(request: NextRequest) {
       if (isVendor) {
         if (GHL_VENDOR_FORM_ID) {
           try {
-            // Field names below MUST match the GHL "2025 Vendor Form"
-            // exactly. These are placeholders pending Kristina's confirmation
-            // of the form's field schema. Easiest verification: open the form
-            // in GHL → Embed code → read the `name=` attributes on inputs.
+            // Field names MUST match the GHL "2025 Vendor Form" query keys
+            // exactly. Verified field map (2026-05-12):
+            //   first_name, last_name, email, phone, organization,
+            //   vendor_type, products/services/menu_sold, address, city,
+            //   state, postal_code, website, business_social_media_handle(s),
+            //   terms_and_conditions
+            //
+            // We only send fields we have from Stripe metadata; missing fields
+            // are stripped by submitGhlForm. The contact already exists in GHL
+            // (created by /api/crm), so the form submission updates the contact
+            // and triggers workflow 1a.
+            const vendorTypeMap: Record<string, string> = {
+              nonprofit: 'Non-Profit - $225',
+              forprofit: 'For-Profit - $275',
+              food: 'Food Vendor - $300',
+              political: 'Political Campaign - $275',
+              government: 'Government Entity - $275',
+            };
+
             const formResult = await submitGhlForm(
               GHL_VENDOR_FORM_ID,
               {
                 first_name: (name || '').split(' ')[0] || '',
                 last_name: (name || '').split(' ').slice(1).join(' ') || '',
-                full_name: name || '',
                 email,
-                phone: paymentIntent.charges?.data?.[0]?.billing_details?.phone || '',
-                business_name: company || '',
-                vendor_type: metadata.vendorType || '',
-                payment_amount: amount,
-                payment_intent_id: paymentIntent.id,
-                promo_code: metadata.promoCode || '',
+                // Stripe SDK types removed `charges`; runtime still exposes it via latest_charge expansion.
+                phone:
+                  (paymentIntent as any).charges?.data?.[0]?.billing_details
+                    ?.phone || '',
+                organization: company || '',
+                vendor_type:
+                  vendorTypeMap[metadata.vendorType || ''] ||
+                  metadata.vendorType ||
+                  '',
               },
               GHL_LOCATION_ID
             );
@@ -338,54 +362,45 @@ export async function POST(request: NextRequest) {
     }
 
     // ===== Donation branch (default) =====
-    try {
-      const contactData = {
-        email,
-        name: name || '',
-        locationId: GHL_LOCATION_ID,
-        tags: ['donor'],
-        customFields: {
-          last_payment_intent_id: paymentIntent.id,
-          last_payment_status: 'succeeded',
-          last_donation_amount: paymentIntent.amount / 100,
-          last_payment_method: paymentIntent.payment_method_types?.[0] || '',
-          donation_frequency: donation_frequency || '',
-        },
-      }
-
-      // Lookup existing contact by email to avoid duplicates on webhook retries
-      let existingContactId: string | null = null
-      try {
-        const lookup = await ghlRequest(
-          `/contacts/lookup?email=${encodeURIComponent(email)}`
-        )
-        existingContactId = lookup?.contacts?.[0]?.id || null
-      } catch {
-        // Contact not found — will create a new one below
-      }
-
-      if (existingContactId) {
-        await ghlRequest(`/contacts/${existingContactId}`, {
-          method: 'PUT',
-          body: JSON.stringify(contactData),
-        })
-      } else {
-        await ghlRequest('/contacts/', {
-          method: 'POST',
-          body: JSON.stringify(contactData),
-        })
-      }
-
-      markEventProcessed(event.id)
-      return NextResponse.json({ received: true })
-    } catch (ghlError) {
-      markEventFailed(event.id)
-      console.error('Failed to update GHL contact after donation payment:', ghlError)
-      return NextResponse.json(
-        { error: 'Failed to process donation in CRM', received: false },
-        { status: 500 }
-      )
+    const contactData = {
+      email,
+      name: name || '',
+      locationId: GHL_LOCATION_ID,
+      tags: ['donor'],
+      customFields: {
+        last_payment_intent_id: paymentIntent.id,
+        last_payment_status: 'succeeded',
+        last_donation_amount: paymentIntent.amount / 100,
+        last_payment_method: paymentIntent.payment_method_types?.[0] || '',
+        donation_frequency: donation_frequency || '',
+      },
     }
+
+    // Lookup existing contact by email to avoid duplicates on webhook retries
+    let existingContactId: string | null = null
+    try {
+      const lookup = await ghlRequest(
+        `/contacts/lookup?email=${encodeURIComponent(email)}`
+      )
+      existingContactId = lookup?.contacts?.[0]?.id || null
+    } catch {
+      // Contact not found — will create a new one below
+    }
+
+    if (existingContactId) {
+      await ghlRequest(`/contacts/${existingContactId}`, {
+        method: 'PUT',
+        body: JSON.stringify(contactData),
+      })
+    } else {
+      await ghlRequest('/contacts/', {
+        method: 'POST',
+        body: JSON.stringify(contactData),
+      })
+    }
+
+    markEventProcessed(event.id)
+    return NextResponse.json({ received: true })
   }
 
   // Handle vendor and sponsor payments (Checkout Session)
@@ -454,12 +469,11 @@ export async function POST(request: NextRequest) {
             })
             console.log(`Updated ${type} contact ${finalContactId} with payment info`)
           } catch (updateError) {
-            markEventFailed(event.id)
-            console.error(`Failed to update ${type} contact:`, updateError)
-            // Return 500 to trigger Stripe retry - don't fall back to create duplicate
+            // Non-fatal: return 200 so Stripe stops retrying.
+            markEventProcessed(event.id)
+            console.error(`[Webhook] GHL contact update failed for ${type} payment (session ${session.id}):`, updateError)
             return NextResponse.json(
-              { error: 'Failed to update existing contact', received: false },
-              { status: 500 }
+              { received: true, warning: 'GHL contact update failed, logged for manual reconciliation' }
             )
           }
         } else {
@@ -487,11 +501,11 @@ export async function POST(request: NextRequest) {
               finalContactId = newContact?.contact?.id || null
             }
           } catch (ghlError) {
-            markEventFailed(event.id)
-            console.error(`Failed to create/update ${type} contact:`, ghlError)
+            // Non-fatal: return 200 so Stripe stops retrying.
+            markEventProcessed(event.id)
+            console.error(`[Webhook] GHL contact create/update failed for ${type} payment (session ${session.id}):`, ghlError)
             return NextResponse.json(
-              { error: 'Failed to process payment in CRM', received: false },
-              { status: 500 }
+              { received: true, warning: 'GHL contact create/update failed, logged for manual reconciliation' }
             )
           }
         }
@@ -535,11 +549,11 @@ export async function POST(request: NextRequest) {
           }
         }
       } catch (outerError) {
-        markEventFailed(event.id)
-        console.error(`Failed to update GHL contact after ${type} payment:`, outerError)
+        // Non-fatal: return 200 so Stripe stops retrying.
+        markEventProcessed(event.id)
+        console.error(`[Webhook] GHL contact processing failed for ${type} payment (session ${session.id}):`, outerError)
         return NextResponse.json(
-          { error: 'Failed to process payment in CRM', received: false },
-          { status: 500 }
+          { received: true, warning: 'GHL contact processing failed, logged for manual reconciliation' }
         )
       }
       // Mark as processed only after successful GHL update
@@ -551,5 +565,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ received: true })
+    return NextResponse.json({ received: true })
+  } catch (unexpectedError) {
+    // Absolute safety net: Stripe will keep retrying if we throw or return
+    // anything outside 200-299. Log the error and return 200 so retries stop.
+    console.error('[Webhook] Unexpected error in track-payment handler:', unexpectedError);
+    return NextResponse.json({ received: true, warning: 'Handler error swallowed to prevent Stripe retry loop' });
+  }
 }
