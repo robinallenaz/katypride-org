@@ -1,6 +1,33 @@
-const GHL_BASE_URL = 'https://rest.gohighlevel.com/v1'
+// GHL v2 API base URL (LeadConnector). The legacy v1 endpoint at
+// rest.gohighlevel.com was returning 404 on all calls as of May 2026,
+// indicating GHL has sunset v1 for our account. v2 supports the same
+// location-level Bearer JWTs but uses different endpoint shapes.
+const GHL_BASE_URL = 'https://services.leadconnectorhq.com'
 
 export const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID || ''
+
+/**
+ * Find a contact by email using the v2 /contacts/search endpoint.
+ * Replaces the v1 /contacts/lookup endpoint which no longer exists.
+ * Returns null on no match or on error so callers can branch to create.
+ */
+export async function findContactIdByEmail(email: string): Promise<string | null> {
+  if (!email) return null
+  try {
+    const result: any = await ghlRequest('/contacts/search', {
+      method: 'POST',
+      body: JSON.stringify({
+        locationId: GHL_LOCATION_ID,
+        pageLimit: 1,
+        filters: [{ field: 'email', operator: 'eq', value: email }],
+      }),
+    })
+    return result?.contacts?.[0]?.id || null
+  } catch (error) {
+    console.warn('[GHL] findContactIdByEmail failed:', error instanceof Error ? error.message : error)
+    return null
+  }
+}
 
 export async function ghlRequest(endpoint: string, options: RequestInit = {}) {
   const url = `${GHL_BASE_URL}${endpoint}`
@@ -14,7 +41,8 @@ export async function ghlRequest(endpoint: string, options: RequestInit = {}) {
       headers: {
         'Authorization': `Bearer ${process.env.GHL_API_KEY || ''}`,
         'Content-Type': 'application/json',
-        'Version': '2021-04-15',
+        'Accept': 'application/json',
+        'Version': '2021-07-28',
         ...options.headers,
       },
     })

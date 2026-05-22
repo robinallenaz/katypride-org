@@ -512,16 +512,25 @@ export async function GET(request: NextRequest) {
     let totalSponsors = 0;
     let recentContacts: any[] = [];
     
-    let startAfterId = '';
+    let searchAfter: any[] | null = null;
     let hasMore = true;
     let page = 0;
-    
+
     while (hasMore && page < MAX_PAGES) {
       page += 1;
       try {
-        const url = '/contacts/?locationId=' + GHL_LOCATION_ID + '&limit=' + BATCH_SIZE
-          + (startAfterId ? '&startAfterId=' + startAfterId : '');
-        const data = await ghlRequest(url);
+        // v2 API: POST /contacts/search with searchAfter cursor pagination
+        const searchBody: Record<string, any> = {
+          locationId: GHL_LOCATION_ID,
+          pageLimit: BATCH_SIZE,
+        };
+        if (searchAfter) {
+          searchBody.searchAfter = searchAfter;
+        }
+        const data = await ghlRequest('/contacts/search', {
+          method: 'POST',
+          body: JSON.stringify(searchBody),
+        });
         
         if (!data || typeof data !== 'object') {
           console.warn('Invalid response from GHL API, stopping pagination');
@@ -592,11 +601,13 @@ export async function GET(request: NextRequest) {
         if (batch.length < BATCH_SIZE) {
           hasMore = false;
         } else if (batch.length > 0) {
+          // v2 returns a `searchAfter` cursor on each contact for pagination
           const lastContact = batch[batch.length - 1];
-          if (lastContact?.id && typeof lastContact.id === 'string') {
-            startAfterId = lastContact.id;
+          const cursor = lastContact?.searchAfter;
+          if (Array.isArray(cursor) && cursor.length > 0) {
+            searchAfter = cursor;
           } else {
-            console.warn('Last contact in batch missing valid ID, stopping pagination');
+            console.warn('Last contact missing searchAfter cursor, stopping pagination');
             hasMore = false;
           }
         } else {
@@ -885,9 +896,22 @@ export async function POST(request: NextRequest) {
     let existingContactNote: string | null = null;
     
     try {
-      const searchUrl = `/contacts/?locationId=${GHL_LOCATION_ID}&query=${encodeURIComponent(email)}&limit=1`;
-      const searchResult = await ghlRequest(searchUrl);
-      
+      // v2 API: POST /contacts/search (replaces v1 GET /contacts/?query=)
+      const searchResult = await ghlRequest('/contacts/search', {
+        method: 'POST',
+        body: JSON.stringify({
+          locationId: GHL_LOCATION_ID,
+          pageLimit: 1,
+          filters: [
+            {
+              field: 'email',
+              operator: 'eq',
+              value: email,
+            },
+          ],
+        }),
+      });
+
       if (searchResult?.contacts && searchResult.contacts.length > 0) {
         const existingContact = searchResult.contacts.find((c: any) => 
           c.email?.toLowerCase() === email.toLowerCase()

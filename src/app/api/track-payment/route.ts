@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { Redis } from '@upstash/redis';
-import { ghlRequest, GHL_LOCATION_ID } from '@/lib/ghl';
+import { ghlRequest, GHL_LOCATION_ID, findContactIdByEmail } from '@/lib/ghl';
 import {
   getVendorPipeline,
   getStageIdByName,
@@ -218,10 +218,7 @@ export async function POST(request: NextRequest) {
         } else {
           // Fallback: lookup by email, then update or create
           try {
-            const lookup = await ghlRequest(
-              `/contacts/lookup?email=${encodeURIComponent(email)}`
-            )
-            finalContactId = lookup?.contacts?.[0]?.id || null
+            finalContactId = await findContactIdByEmail(email)
           } catch {
             // Contact not found — create new
           }
@@ -379,10 +376,7 @@ export async function POST(request: NextRequest) {
     // Lookup existing contact by email to avoid duplicates on webhook retries
     let existingContactId: string | null = null
     try {
-      const lookup = await ghlRequest(
-        `/contacts/lookup?email=${encodeURIComponent(email)}`
-      )
-      existingContactId = lookup?.contacts?.[0]?.id || null
+      existingContactId = await findContactIdByEmail(email)
     } catch {
       // Contact not found — will create a new one below
     }
@@ -479,10 +473,7 @@ export async function POST(request: NextRequest) {
         } else {
           // Lookup existing contact by email
           try {
-            const lookup = await ghlRequest(
-              `/contacts/lookup?email=${encodeURIComponent(email)}`
-            )
-            finalContactId = lookup?.contacts?.[0]?.id || null
+            finalContactId = await findContactIdByEmail(email)
           } catch {
             // Contact not found — will create a new one below
           }

@@ -28,16 +28,23 @@ export async function getVendorPipeline(): Promise<Pipeline | null> {
   }
 
   try {
-    const result: any = await ghlRequest(`/pipelines/${GHL_VENDOR_PIPELINE_ID}`);
-    if (!result || !result.pipeline) {
+    // v2 API: pipelines live under /opportunities/pipelines and are returned
+    // as an array scoped to a location. Filter to the configured pipeline id.
+    const locationId = process.env.GHL_LOCATION_ID || '';
+    const result: any = await ghlRequest(
+      `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`
+    );
+    const pipelines: any[] = result?.pipelines || [];
+    const found = pipelines.find((p: any) => p.id === GHL_VENDOR_PIPELINE_ID);
+    if (!found) {
       console.warn('[GHL Pipeline] Pipeline not found:', GHL_VENDOR_PIPELINE_ID);
       return null;
     }
 
     const pipeline: Pipeline = {
-      id: result.pipeline.id,
-      name: result.pipeline.name,
-      stages: (result.pipeline.stages || []).map((s: any) => ({
+      id: found.id,
+      name: found.name,
+      stages: (found.stages || []).map((s: any) => ({
         id: s.id,
         name: s.name,
       })),
@@ -63,8 +70,9 @@ export async function findOpportunityByContactAndPipeline(
   pipelineId: string
 ): Promise<{ id: string; stageId: string } | null> {
   try {
+    // v2 API: /opportunities/search with snake_case query params
     const result: any = await ghlRequest(
-      `/opportunities/?locationId=${process.env.GHL_LOCATION_ID || ''}&contactId=${encodeURIComponent(contactId)}&pipelineId=${encodeURIComponent(pipelineId)}&limit=5`
+      `/opportunities/search?location_id=${encodeURIComponent(process.env.GHL_LOCATION_ID || '')}&contact_id=${encodeURIComponent(contactId)}&pipeline_id=${encodeURIComponent(pipelineId)}&limit=5`
     );
     const opps = result?.opportunities || [];
     for (const opp of opps) {
@@ -88,7 +96,9 @@ export async function createOpportunity(options: {
   status?: string;
 }): Promise<{ id: string } | null> {
   try {
+    // v2 API requires locationId in the create payload
     const payload: Record<string, any> = {
+      locationId: process.env.GHL_LOCATION_ID || '',
       name: options.name,
       contactId: options.contactId,
       pipelineId: options.pipelineId,

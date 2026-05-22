@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { ghlRequest, GHL_LOCATION_ID } from '@/lib/ghl';
+import { ghlRequest, GHL_LOCATION_ID, findContactIdByEmail } from '@/lib/ghl';
 
 import { Redis } from '@upstash/redis';
 
@@ -455,10 +455,7 @@ export async function POST(request: NextRequest) {
         // Lookup existing contact by email to avoid duplicates
         let existingContactId: string | null = null;
         try {
-          const lookup = await ghlRequest(
-            `/contacts/lookup?email=${encodeURIComponent(email || '')}`
-          );
-          existingContactId = lookup?.contacts?.[0]?.id || null;
+          existingContactId = await findContactIdByEmail(email || '');
         } catch {
           // Contact not found — will create a new one below
         }
