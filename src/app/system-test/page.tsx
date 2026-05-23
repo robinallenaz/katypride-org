@@ -145,8 +145,8 @@ export default function SystemTestDashboard() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 type: 'community-member',
-                name: 'Test User',
-                email: 'test@example.com',
+                name: 'System Test',
+                email: `crmtest-${start}@dryrun.katypride.test`,
                 source: 'System Test',
                 _gotcha: ''
               })
