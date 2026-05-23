@@ -1,4 +1,7 @@
+import { redirect } from 'next/navigation';
+
 export default function CelebrationPage() {
+  redirect('https://pridekaty.org/');
   return (
     <>
       <a 
