@@ -165,6 +165,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 402 })
     }
     if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+      console.error('[Stripe] InvalidRequestError:', error.message, error.param, error.code)
       return NextResponse.json({ error: 'Invalid payment request' }, { status: 400 })
     }
     console.error('Error creating payment intent:', error)
