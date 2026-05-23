@@ -429,7 +429,7 @@ function VendorSignupForm() {
             type: 'vendor',
             vendorType: currentVendorTypeValue,
             company: currentFormData.company,
-            crmContactId: crmResult.contactId || '',
+            crmContactId: crmResult.data?.contactId || '',
             baseFee: String(currentVendorType.price),
             promoCode: appliedDiscountCode,
             discountAmount: String(appliedDiscountAmount),

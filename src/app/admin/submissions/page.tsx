@@ -32,7 +32,7 @@ const typeFilters = [
 
 export default function SubmissionsAdmin() {
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [selectedSubmission, setSelectedSubmission] = useState<FormSubmission | null>(null);
@@ -113,11 +113,15 @@ export default function SubmissionsAdmin() {
     setError('');
     
     try {
-      const emailParam = selectedSubmission.email 
-        ? `&email=${encodeURIComponent(selectedSubmission.email)}` 
-        : '';
+      const dbId = selectedSubmission._dbId;
+      if (!dbId) {
+        setError('Cannot delete: submission is missing a database ID. It may be from a legacy backup.');
+        setDeleting(false);
+        setDeleteConfirm(false);
+        return;
+      }
       const response = await fetch(
-        `/api/admin/submissions?timestamp=${encodeURIComponent(selectedSubmission.timestamp)}${emailParam}`,
+        `/api/admin/submissions?id=${encodeURIComponent(dbId)}`,
         {
           method: 'DELETE',
           headers: getAuthHeaders(),
@@ -158,7 +162,7 @@ export default function SubmissionsAdmin() {
     return found?.label || type || 'Unknown';
   };
 
-  if (authLoading || loading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-lg">Loading...</div>
@@ -167,9 +171,18 @@ export default function SubmissionsAdmin() {
   }
 
   if (!isAuthenticated) {
+    if (typeof window !== 'undefined') window.location.href = '/admin';
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-lg">Redirecting to login...</div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading submissions...</div>
       </div>
     );
   }
@@ -352,7 +365,7 @@ export default function SubmissionsAdmin() {
               <strong>{selectedSubmission.name || selectedSubmission.email || 'Unknown'}</strong>?
             </p>
             <p className="text-sm text-gray-500 mb-6">
-              This action cannot be undone. The submission will be permanently removed from the local backup.
+              This action cannot be undone. The submission will be permanently removed from the database.
             </p>
             <div className="flex justify-end gap-3">
               <button

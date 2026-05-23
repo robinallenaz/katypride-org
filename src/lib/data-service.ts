@@ -473,6 +473,82 @@ async function writeFormSubmissionsToDb(submissions: any[]): Promise<void> {
 }
 
 /**
+ * Read all form submissions from PostgreSQL, newest first.
+ * Falls back to the committed JSON file if the table is empty (one-time seed).
+ * Accepts an optional type filter and row limit.
+ */
+export async function getFormSubmissionsFromDb(options?: {
+  type?: string;
+  limit?: number;
+}): Promise<{ submissions: any[]; total: number }> {
+  const { type, limit = 500 } = options || {};
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+  try {
+    await ensureFormSubmissionsTableExists(client);
+
+    const params: any[] = [];
+    let where = '';
+    if (type) {
+      params.push(type);
+      where = `WHERE type = $${params.length}`;
+    }
+
+    const countResult = await client.query(
+      `SELECT COUNT(*) AS total FROM form_submissions ${where}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].total, 10);
+
+    params.push(limit);
+    const result = await client.query(
+      `SELECT id, timestamp, type, name, email, data, crm_success
+       FROM form_submissions
+       ${where}
+       ORDER BY timestamp DESC
+       LIMIT $${params.length}`,
+      params
+    );
+
+    const submissions = result.rows.map((row: any) => ({
+      ...(typeof row.data === 'object' && row.data !== null ? row.data : {}),
+      _dbId: row.id,
+      timestamp: row.timestamp instanceof Date ? row.timestamp.toISOString() : row.timestamp,
+      type: row.type,
+      name: row.name,
+      email: row.email,
+      crmSuccess: row.crm_success,
+    }));
+
+    return { submissions, total };
+  } finally {
+    try { client.release(); } catch { /* ignore */ }
+  }
+}
+
+/**
+ * Delete a single form submission from PostgreSQL by its serial id.
+ */
+export async function deleteFormSubmissionFromDb(id: number): Promise<boolean> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+  try {
+    await ensureFormSubmissionsTableExists(client);
+    const result = await client.query(
+      'DELETE FROM form_submissions WHERE id = $1',
+      [id]
+    );
+    return (result.rowCount ?? 0) > 0;
+  } finally {
+    try { client.release(); } catch { /* ignore */ }
+  }
+}
+
+/**
  * Save a single form submission directly to the PostgreSQL database.
  * This avoids the read-all/write-all race condition of the batch method.
  */

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { Redis } from '@upstash/redis';
-import { ghlRequest, GHL_LOCATION_ID, findContactIdByEmail } from '@/lib/ghl';
+import { ghlRequest, GHL_LOCATION_ID, findContactIdByEmail, normalizeContactPayloadForGhl } from '@/lib/ghl';
 import {
   getVendorPipeline,
   getStageIdByName,
@@ -205,6 +205,9 @@ export async function POST(request: NextRequest) {
         contactData.companyName = company
       }
 
+      // GHL v2 contract: customFields must be an array, not an object map.
+      const { payload: contactDataForGhl } = normalizeContactPayloadForGhl(contactData)
+
       let finalContactId: string | null = crmContactId || null
 
       // Update existing contact (most common — CRM created it before payment)
@@ -212,7 +215,7 @@ export async function POST(request: NextRequest) {
         if (finalContactId) {
           await ghlRequest(`/contacts/${finalContactId}`, {
             method: 'PUT',
-            body: JSON.stringify(contactData),
+            body: JSON.stringify(contactDataForGhl),
           })
           console.log(`[Webhook] Updated ${paymentType} contact ${finalContactId} (PI ${paymentIntent.id})`)
         } else {
@@ -226,12 +229,12 @@ export async function POST(request: NextRequest) {
           if (finalContactId) {
             await ghlRequest(`/contacts/${finalContactId}`, {
               method: 'PUT',
-              body: JSON.stringify(contactData),
+              body: JSON.stringify(contactDataForGhl),
             })
           } else {
             const newContact = await ghlRequest('/contacts/', {
               method: 'POST',
-              body: JSON.stringify(contactData),
+              body: JSON.stringify(contactDataForGhl),
             })
             finalContactId = newContact?.contact?.id || null
           }
@@ -373,6 +376,9 @@ export async function POST(request: NextRequest) {
       },
     }
 
+    // GHL v2 contract: customFields must be an array, not an object map.
+    const { payload: donorDataForGhl } = normalizeContactPayloadForGhl(contactData)
+
     // Lookup existing contact by email to avoid duplicates on webhook retries
     let existingContactId: string | null = null
     try {
@@ -384,12 +390,12 @@ export async function POST(request: NextRequest) {
     if (existingContactId) {
       await ghlRequest(`/contacts/${existingContactId}`, {
         method: 'PUT',
-        body: JSON.stringify(contactData),
+        body: JSON.stringify(donorDataForGhl),
       })
     } else {
       await ghlRequest('/contacts/', {
         method: 'POST',
-        body: JSON.stringify(contactData),
+        body: JSON.stringify(donorDataForGhl),
       })
     }
 
@@ -451,6 +457,9 @@ export async function POST(request: NextRequest) {
           contactData.companyName = company
         }
 
+        // GHL v2 contract: customFields must be an array, not an object map.
+        const { payload: sessionContactDataForGhl } = normalizeContactPayloadForGhl(contactData)
+
         // Determine the contact ID to update (and later find the pipeline opp)
         let finalContactId: string | null = crmContactId || null;
 
@@ -459,7 +468,7 @@ export async function POST(request: NextRequest) {
           try {
             await ghlRequest(`/contacts/${finalContactId}`, {
               method: 'PUT',
-              body: JSON.stringify(contactData),
+              body: JSON.stringify(sessionContactDataForGhl),
             })
             console.log(`Updated ${type} contact ${finalContactId} with payment info`)
           } catch (updateError) {
@@ -482,12 +491,12 @@ export async function POST(request: NextRequest) {
             if (finalContactId) {
               await ghlRequest(`/contacts/${finalContactId}`, {
                 method: 'PUT',
-                body: JSON.stringify(contactData),
+                body: JSON.stringify(sessionContactDataForGhl),
               })
             } else {
               const newContact = await ghlRequest('/contacts/', {
                 method: 'POST',
-                body: JSON.stringify(contactData),
+                body: JSON.stringify(sessionContactDataForGhl),
               })
               finalContactId = newContact?.contact?.id || null
             }

@@ -9,9 +9,114 @@ interface TestResult {
   duration?: number
 }
 
+// Sentinel marker so ops can bulk-delete dry-run contacts in GHL
+// (search GrowthSphere360 contacts for this string and delete).
+const DRY_RUN_EMAIL_DOMAIN = 'dryrun.katypride.test'
+
+type DryRunOutcome = {
+  ok: boolean
+  status: number
+  contactId: string | null
+  crmDeferred: boolean
+  durationMs: number
+  message: string
+  raw: unknown
+}
+
+async function runDryRunSubmission(payload: Record<string, unknown>): Promise<DryRunOutcome> {
+  const start = Date.now()
+  try {
+    const response = await fetch('/api/crm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const durationMs = Date.now() - start
+    let body: any = null
+    try {
+      body = await response.json()
+    } catch {
+      // non-JSON response (shouldn't happen, but don't crash the test)
+    }
+    return {
+      ok: response.ok && !!body?.success,
+      status: response.status,
+      contactId: body?.data?.contactId ?? null,
+      crmDeferred: !!body?.crmDeferred,
+      durationMs,
+      message: body?.message || body?.error || `HTTP ${response.status}`,
+      raw: body,
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      contactId: null,
+      crmDeferred: false,
+      durationMs: Date.now() - start,
+      message: `Network error: ${error instanceof Error ? error.message : String(error)}`,
+      raw: null,
+    }
+  }
+}
+
+function formatDryRun(outcome: DryRunOutcome, label: string): string {
+  if (outcome.ok && outcome.contactId) {
+    return `✅ ${label} reached GHL — contactId ${outcome.contactId} (${outcome.durationMs}ms)`
+  }
+  if (outcome.ok && outcome.crmDeferred) {
+    return `⚠️ ${label} deferred (CRM outage path) — submission saved to DB, NOT sent to GHL (${outcome.durationMs}ms)`
+  }
+  return `❌ ${label} failed — HTTP ${outcome.status}: ${outcome.message}`
+}
+
 export default function SystemTestDashboard() {
   const [testResults, setTestResults] = useState<TestResult[]>([])
   const [isRunning, setIsRunning] = useState(false)
+  const [dryRunResult, setDryRunResult] = useState<{ label: string; outcome: DryRunOutcome } | null>(null)
+  const [dryRunBusy, setDryRunBusy] = useState<null | 'vendor' | 'sponsor'>(null)
+
+  const dryRunVendor = async () => {
+    setDryRunBusy('vendor')
+    const stamp = Date.now()
+    const outcome = await runDryRunSubmission({
+      type: 'vendor',
+      name: 'Dry Run Vendor',
+      email: `dryrun-vendor-${stamp}@${DRY_RUN_EMAIL_DOMAIN}`,
+      phone: '5555550100',
+      company: 'Dry Run Co',
+      address: '123 Test St',
+      city: 'Katy',
+      state: 'TX',
+      postalCode: '77449',
+      vendorType: 'non-profit',
+      vendorFee: 225,
+      vendorBaseFee: 225,
+      productsServices: 'Dry run — DELETE ME',
+      paymentStatus: 'pending',
+      event: 'katy-pride-celebration-2026',
+      _gotcha: '',
+    })
+    setDryRunResult({ label: 'Vendor', outcome })
+    setDryRunBusy(null)
+  }
+
+  const dryRunSponsor = async () => {
+    setDryRunBusy('sponsor')
+    const stamp = Date.now()
+    const outcome = await runDryRunSubmission({
+      type: 'sponsor',
+      name: 'Dry Run Sponsor',
+      email: `dryrun-sponsor-${stamp}@${DRY_RUN_EMAIL_DOMAIN}`,
+      phone: '5555550101',
+      company: 'Dry Run Sponsorship Inc',
+      sponsorshipLevel: 'rainbow',
+      additionalInfo: 'Dry run — DELETE ME',
+      _gotcha: '',
+    })
+    setDryRunResult({ label: 'Sponsor', outcome })
+    setDryRunBusy(null)
+  }
 
   const runTests = async () => {
     setIsRunning(true)
@@ -66,7 +171,7 @@ export default function SystemTestDashboard() {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                amount: 1.00, // $1 test
+                amount: 100, // $1.00 in cents (Stripe minimum is 50 cents)
                 currency: 'usd',
                 payment_method_type: 'card',
                 donor_email: 'test@example.com',
@@ -123,14 +228,15 @@ export default function SystemTestDashboard() {
         test: async () => {
           try {
             // Make multiple rapid requests
-            const requests = Array(6).fill(null).map(() =>
+            const stamp = Date.now()
+            const requests = Array(6).fill(null).map((_, i) =>
               fetch('/api/crm', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   type: 'community-member',
                   name: 'Rate Test',
-                  email: `ratetest${Date.now()}@example.com`,
+                  email: `ratetest-${stamp}-${i}@dryrun.katypride.test`,
                   source: 'Rate Limit Test',
                   _gotcha: ''
                 })
@@ -210,15 +316,54 @@ export default function SystemTestDashboard() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">System Test Dashboard</h1>
           <p className="text-gray-600 mb-8">Comprehensive testing of Katy Pride website systems</p>
           
-          <div className="mb-8">
+          <div className="mb-8 flex flex-wrap gap-3">
             <button
               onClick={runTests}
-              disabled={isRunning}
+              disabled={isRunning || dryRunBusy !== null}
               className="bg-purple-600 text-white px-6 py-3 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
             >
               {isRunning ? 'Running Tests...' : 'Run All Tests'}
             </button>
+            <button
+              onClick={dryRunVendor}
+              disabled={isRunning || dryRunBusy !== null}
+              className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+              title="Submits a synthetic vendor application to /api/crm only. Does NOT call Stripe — no card is charged."
+            >
+              {dryRunBusy === 'vendor' ? 'Submitting…' : 'Dry-run Vendor Submit (no payment)'}
+            </button>
+            <button
+              onClick={dryRunSponsor}
+              disabled={isRunning || dryRunBusy !== null}
+              className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+              title="Submits a synthetic sponsor application to /api/crm only. Does NOT call Stripe — no card is charged."
+            >
+              {dryRunBusy === 'sponsor' ? 'Submitting…' : 'Dry-run Sponsor Submit (no payment)'}
+            </button>
           </div>
+
+          {dryRunResult && (
+            <div className={`mb-8 p-4 rounded-lg border ${
+              dryRunResult.outcome.ok && dryRunResult.outcome.contactId ? 'bg-green-50 border-green-200' :
+              dryRunResult.outcome.ok && dryRunResult.outcome.crmDeferred ? 'bg-yellow-50 border-yellow-200' :
+              'bg-red-50 border-red-200'
+            }`}>
+              <h3 className="font-semibold text-gray-900 mb-1">{dryRunResult.label} Dry-run Result</h3>
+              <p className="text-sm text-gray-800">{formatDryRun(dryRunResult.outcome, dryRunResult.label)}</p>
+              <p className="text-xs text-gray-600 mt-2">
+                User-facing message: <em>{dryRunResult.outcome.message}</em>
+              </p>
+              <details className="mt-2">
+                <summary className="text-xs text-gray-600 cursor-pointer">Raw response</summary>
+                <pre className="text-xs bg-white/60 p-2 mt-1 rounded overflow-x-auto">
+{JSON.stringify(dryRunResult.outcome.raw, null, 2)}
+                </pre>
+              </details>
+              <p className="text-xs text-gray-500 mt-2">
+                Cleanup: in GrowthSphere360 Contacts, search for <code>@{DRY_RUN_EMAIL_DOMAIN}</code> and delete.
+              </p>
+            </div>
+          )}
 
           {testResults.length > 0 && (
             <div className="space-y-4">

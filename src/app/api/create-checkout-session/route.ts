@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { ghlRequest, GHL_LOCATION_ID, findContactIdByEmail } from '@/lib/ghl';
+import { ghlRequest, GHL_LOCATION_ID, findContactIdByEmail, normalizeContactPayloadForGhl } from '@/lib/ghl';
 
 import { Redis } from '@upstash/redis';
 
@@ -242,11 +242,14 @@ export async function POST(request: NextRequest) {
       if (company) contactData.companyName = company;
       if (phone) contactData.customFields.phone = String(phone);
 
+      // GHL v2 contract: customFields must be an array, not an object map.
+      const { payload: pendingContactDataForGhl } = normalizeContactPayloadForGhl(contactData);
+
       // Create/update contact in CRM
       try {
         await ghlRequest('/contacts/', {
           method: 'POST',
-          body: JSON.stringify(contactData),
+          body: JSON.stringify(pendingContactDataForGhl),
         });
       } catch (crmError) {
         console.warn('[Checkout] CRM recording failed:', crmError);
@@ -452,6 +455,9 @@ export async function POST(request: NextRequest) {
           contactData.companyName = company;
         }
 
+        // GHL v2 contract: customFields must be an array, not an object map.
+        const { payload: freeContactDataForGhl } = normalizeContactPayloadForGhl(contactData);
+
         // Lookup existing contact by email to avoid duplicates
         let existingContactId: string | null = null;
         try {
@@ -463,12 +469,12 @@ export async function POST(request: NextRequest) {
         if (existingContactId) {
           await ghlRequest(`/contacts/${existingContactId}`, {
             method: 'PUT',
-            body: JSON.stringify(contactData),
+            body: JSON.stringify(freeContactDataForGhl),
           });
         } else {
           await ghlRequest('/contacts/', {
             method: 'POST',
-            body: JSON.stringify(contactData),
+            body: JSON.stringify(freeContactDataForGhl),
           });
         }
 

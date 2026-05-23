@@ -373,7 +373,7 @@ function SponsorSignupForm() {
             type: 'sponsor',
             sponsorshipLevel: currentFormData.sponsorshipLevel,
             company: currentFormData.organizationName,
-            crmContactId: crmResult.contactId || '',
+            crmContactId: crmResult.data?.contactId || '',
           },
         }),
       });

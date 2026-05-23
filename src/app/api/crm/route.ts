@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual, createHash } from 'crypto';
-import { ghlRequest, GHL_LOCATION_ID } from '@/lib/ghl';
+import { ghlRequest, GHL_LOCATION_ID, normalizeContactPayloadForGhl, postContactNote } from '@/lib/ghl';
 import { readData, writeData, saveFormSubmissionToDb } from '@/lib/data-service';
 import {
   getVendorPipeline,
@@ -36,6 +36,52 @@ const TEST_PERCENT = 0.99;
 
 function isLoyaltyWindowActive(now: Date = new Date()): boolean {
   return now >= LOYALTY_START && now < LOYALTY_END;
+}
+
+/**
+ * Detect whether an error from the CRM call path looks like a transient
+ * connectivity / outage failure (vs. a programmer bug or a "this submission
+ * is bad" rejection from GHL).
+ *
+ * Only connectivity-class errors are eligible for graceful degradation —
+ * everything else should still surface as a 5xx so monitoring catches real
+ * defects and so users with bad data see a real error instead of a deceptive
+ * "thank you" that will fail again on replay.
+ *
+ * Classification is driven by the `crmCause` marker that `ghlRequest` in
+ * src/lib/ghl.ts attaches to errors it knows are connectivity-class. Avoid
+ * fragile string matching against `error.message`.
+ */
+function isCrmConnectivityError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  // Authoritative signal: ghlRequest tags connectivity-class failures
+  // (5xx, 429, timeout, fetch-level network errors) with
+  // crmCause === 'CRM_OUTAGE'. Anything else (programmer bugs, GHL
+  // validation rejections, 404 missing endpoints) is intentionally
+  // NOT tagged so it surfaces as a 500 to the user.
+  return (error as Error & { crmCause?: string }).crmCause === 'CRM_OUTAGE';
+}
+
+/**
+ * User-facing success copy. Centralized so the success path and the deferred
+ * (graceful-degradation) path stay in sync.
+ *
+ * `deferred` callers should NOT promise downstream automation (e.g. the GHL
+ * vendor agreement workflow) since GHL did not actually receive the
+ * submission yet — it'll be replayed by ops once the CRM is back.
+ */
+function buildSuccessMessage(type: string, deferred: boolean): string {
+  if (type === 'vendor') {
+    return deferred
+      ? 'Thank you for your vendor application! We have safely recorded your submission and our team will follow up by email with next steps.'
+      : 'Thank you for your vendor application! You will receive an email with the vendor agreement after payment is confirmed.';
+  }
+  if (type === 'sponsor') {
+    return deferred
+      ? 'Thank you for your sponsorship interest! We have safely recorded your submission and our team will reach out within 2 business days with next steps and payment information.'
+      : 'Thank you for your sponsorship interest! We will contact you within 2 business days with next steps and payment information.';
+  }
+  return 'Thank you! Your information has been submitted successfully.';
 }
 
 /**
@@ -712,6 +758,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Basic email format validation — reject before hitting GHL so a bad
+    // address never produces a 422 from the CRM endpoint.
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!EMAIL_RE.test(email)) {
+      return NextResponse.json(
+        { success: false, error: 'A valid email address is required' },
+        { status: 400 }
+      );
+    }
+
     if (!type || !ALLOWED_CONTACT_TYPES.includes(type)) {
       return NextResponse.json(
         { success: false, error: 'Invalid contact type' },
@@ -1061,23 +1117,60 @@ export async function POST(request: NextRequest) {
       contactPayload.contactNote = fullNote.substring(0, MAX_NOTE_LENGTH);
     }
     
+    // Normalize internal payload shape → GHL v2 contract:
+    //   - customFields: object map → array of { key, field_value }
+    //   - contactNote: stripped (v2 stores notes at a separate resource)
+    const { payload: contactPayloadForGhl, note: pendingNote } =
+      normalizeContactPayloadForGhl(contactPayload);
+
     let contact;
-    
+
     if (existingContactId) {
       // Update existing contact
       contact = await ghlRequest(`/contacts/${existingContactId}`, {
         method: 'PUT',
-        body: JSON.stringify(contactPayload),
+        body: JSON.stringify(contactPayloadForGhl),
       });
     } else {
-      // Create new contact
-      contact = await ghlRequest('/contacts/', {
-        method: 'POST',
-        body: JSON.stringify(contactPayload),
-      });
+      // Create new contact — if GHL rejects with "no duplicates" (400 + meta.contactId),
+      // fall back to updating the existing contact GHL identified. This handles the race
+      // where the pre-flight search misses a recently-created contact.
+      try {
+        contact = await ghlRequest('/contacts/', {
+          method: 'POST',
+          body: JSON.stringify(contactPayloadForGhl),
+        });
+      } catch (postError: any) {
+        const dupeId = postError?.responseBody?.meta?.contactId;
+        if (postError?.status === 400 && dupeId) {
+          console.warn(`[GHL] Duplicate contact detected for ${email}, updating existing contact ${dupeId}`);
+          contact = await ghlRequest(`/contacts/${dupeId}`, {
+            method: 'PUT',
+            body: JSON.stringify(contactPayloadForGhl),
+          });
+        } else {
+          throw postError;
+        }
+      }
     }
 
     const contactId = extractContactId(contact);
+
+    // GHL v2: notes are a separate resource. Post the assembled submission
+    // note (vendor/sponsor/volunteer/community-member detail) to the contact
+    // after the contact write succeeds. Non-fatal — losing a note shouldn't
+    // fail the whole submission since the contact and tags already landed.
+    if (contactId && pendingNote) {
+      try {
+        await postContactNote(contactId, pendingNote);
+      } catch (noteError) {
+        console.warn(
+          `[GHL] Failed to attach submission note to contact ${contactId}:`,
+          noteError instanceof Error ? noteError.message : noteError
+        );
+        // Non-fatal — contact write already succeeded.
+      }
+    }
 
     // Pipeline opportunity creation strategy (decided 2026-05-09):
     //
@@ -1156,17 +1249,24 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: type === 'vendor'
-        ? 'Thank you for your vendor application! You will receive an email with the vendor agreement after payment is confirmed.'
-        : type === 'sponsor'
-        ? 'Thank you for your sponsorship interest! We will contact you within 2 business days with next steps and payment information.'
-        : 'Thank you! Your information has been submitted successfully.',
+      message: buildSuccessMessage(type, false),
       data: { contactId },
     });
   } catch (error) {
-    console.error('CRM API Error:', error);
-    
-    // Save form data to backup if CRM fails (requestBody is already available)
+    // Classify the error: only transient CRM connectivity failures are
+    // eligible for graceful degradation. Programmer bugs, malformed-data
+    // rejections from GHL (4xx other than the auth/throttle ones), etc.
+    // must still surface as 500 so monitoring catches real defects and so
+    // users with bad data don't get a deceptive "thank you" that will fail
+    // again on replay.
+    const isConnectivity = isCrmConnectivityError(error);
+    const logTag = isConnectivity ? '[CRM_DEFERRED]' : '[CRM_ERROR]';
+    console.error(`${logTag} CRM API Error:`, error);
+
+    // Save form data to backup regardless (requestBody is already available).
+    // NOTE: this writes to the local filesystem and is ephemeral on Vercel —
+    // we intentionally do NOT count it as durable capture for the graceful
+    // degradation gate below.
     try {
       await saveFormBackup({
         ...requestBody,
@@ -1174,20 +1274,50 @@ export async function POST(request: NextRequest) {
         crmSuccess: false,
       });
     } catch (backupSaveError) {
-      console.error('Failed to save form backup:', backupSaveError);
+      console.error(`${logTag} Failed to save form backup:`, backupSaveError);
     }
 
-    // Also persist directly to PostgreSQL to avoid ephemeral JSON loss on Vercel
+    // Persist directly to PostgreSQL — this is the only durable capture path
+    // on Vercel and the one we'll replay into GHL when service is restored.
+    let dbSaved = false;
     try {
       await saveFormSubmissionToDb({
         ...requestBody,
         error: error instanceof Error ? error.message : 'Unknown error',
         crmSuccess: false,
       });
+      dbSaved = true;
     } catch (dbSaveError) {
-      console.error('Failed to save failed submission to DB:', dbSaveError);
+      console.error(`${logTag} Failed to save failed submission to DB:`, dbSaveError);
     }
-    
+
+    // Graceful degradation only for transient CRM connectivity failures
+    // when we have a durable DB capture to replay from. All other error
+    // classes fall through to the 500 response below.
+    if (isConnectivity && dbSaved) {
+      // No contact id is available: a GHL contact lookup would hit the same
+      // dead endpoint that just failed. Vendor/Sponsor forms tolerate a null
+      // contactId (they fall back to `crmResult.data?.contactId || ''` before
+      // posting to Stripe), and ops will reconcile from the DB on replay.
+      const requestType = (requestBody?.type as string) || '';
+      return NextResponse.json({
+        success: true,
+        message: buildSuccessMessage(requestType, true),
+        data: { contactId: null },
+        // Signals to clients (vendor/sponsor forms) that the CRM did NOT
+        // actually receive this submission yet — downstream automation
+        // (e.g. GHL vendor agreement workflow) will not fire until ops
+        // replays from the DB. Forms can use this to soften copy or to
+        // surface a clearer "we'll follow up manually" message.
+        crmDeferred: true,
+      });
+    }
+
+    // Either a non-connectivity error (programmer bug, bad-data rejection,
+    // 404 on a missing endpoint, etc.) or a catastrophic case where we
+    // couldn't even save the submission to the DB. Surface 500 so the
+    // form shows the user something went wrong and they can retry/correct
+    // — better than silently losing their submission or lying to them.
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'An unexpected error occurred' },
       { status: 500 }

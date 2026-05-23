@@ -1,21 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readData, writeData } from '@/lib/data-service';
+import { getFormSubmissionsFromDb, deleteFormSubmissionFromDb } from '@/lib/data-service';
 import { verifySession } from '../auth/route';
-
-interface FormSubmission {
-  timestamp: string;
-  type?: string;
-  name?: string;
-  email?: string;
-  company?: string;
-  error?: string;
-  source?: string;
-  [key: string]: any;
-}
-
-interface FormBackupData {
-  submissions: FormSubmission[];
-}
 
 // Helper to check authentication
 function authenticate(request: NextRequest): { success: boolean; response?: NextResponse } {
@@ -40,36 +25,19 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type');
-    const limit = parseInt(searchParams.get('limit') || '100', 10);
+    const type = searchParams.get('type') || undefined;
+    const limit = parseInt(searchParams.get('limit') || '500', 10);
 
-    // Read form backup data
-    const data = await readData<FormBackupData>('form-backup');
-    let submissions = data?.submissions || [];
-
-    // Filter by type if specified
-    if (type) {
-      submissions = submissions.filter((sub: FormSubmission) => sub.type === type);
-    }
-
-    // Sort by timestamp descending (newest first)
-    submissions.sort((a: FormSubmission, b: FormSubmission) => {
-      const timeA = new Date(a.timestamp).getTime() || 0;
-      const timeB = new Date(b.timestamp).getTime() || 0;
-      return timeB - timeA;
-    });
-
-    // Limit results
-    const limitedSubmissions = submissions.slice(0, limit);
+    const { submissions, total } = await getFormSubmissionsFromDb({ type, limit });
 
     return NextResponse.json({
       success: true,
-      submissions: limitedSubmissions,
-      total: submissions.length,
-      filters: { type, limit }
+      submissions,
+      total,
+      filters: { type, limit },
     });
   } catch (error) {
-    console.error('Error reading form backup:', error);
+    console.error('Error reading form submissions from DB:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to read form submissions' },
       { status: 500 }
@@ -83,65 +51,32 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const timestamp = searchParams.get('timestamp');
-    const email = searchParams.get('email');
+    // Primary key: _dbId (PostgreSQL serial id) preferred; falls back to legacy
+    // timestamp+email for submissions that pre-date the DB migration.
+    const dbId = searchParams.get('id');
 
-    if (!timestamp) {
+    if (!dbId || isNaN(parseInt(dbId, 10))) {
       return NextResponse.json(
-        { success: false, error: 'Timestamp is required' },
+        { success: false, error: 'Numeric id is required for deletion' },
         { status: 400 }
       );
     }
 
-    // Read current data
-    const data = await readData<FormBackupData>('form-backup');
-    let submissions = data?.submissions || [];
+    const deleted = await deleteFormSubmissionFromDb(parseInt(dbId, 10));
 
-    // Find and remove the matching submission
-    const initialCount = submissions.length;
-    
-    // If no email provided, require exact timestamp match AND verify only one match
-    // to prevent accidental mass deletion
-    if (!email) {
-      const matchingSubmissions = submissions.filter((sub: FormSubmission) => 
-        sub.timestamp === timestamp
-      );
-      
-      if (matchingSubmissions.length > 1) {
-        return NextResponse.json(
-          { success: false, error: 'Multiple submissions with same timestamp. Email required for deletion.' },
-          { status: 400 }
-        );
-      }
-    }
-    
-    submissions = submissions.filter((sub: FormSubmission) => {
-      // Match by timestamp and optionally email
-      // If email provided, match both; if no email, match by timestamp only
-      if (sub.timestamp !== timestamp) return true;
-      if (email && sub.email !== email) return true;
-      return false;
-    });
-
-    const deletedCount = initialCount - submissions.length;
-
-    if (deletedCount === 0) {
+    if (!deleted) {
       return NextResponse.json(
         { success: false, error: 'Submission not found' },
         { status: 404 }
       );
     }
 
-    // Write updated data back
-    await writeData('form-backup', { submissions });
-
     return NextResponse.json({
       success: true,
-      message: `Deleted ${deletedCount} submission(s)`,
-      remaining: submissions.length
+      message: 'Submission deleted',
     });
   } catch (error) {
-    console.error('Error deleting submission:', error);
+    console.error('Error deleting form submission from DB:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to delete submission' },
       { status: 500 }
