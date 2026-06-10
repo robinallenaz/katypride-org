@@ -18,7 +18,14 @@ export default function DonatePage() {
             </p>
           </div>
 
-          <div className="bg-purple-50 rounded-xl p-6 mb-8">
+          {/* Givebutter Campaign Widget */}
+          <div className="flex justify-center">
+            <div className="w-full max-w-2xl">
+              <GivebutterCampaign widgetId="LylovA" />
+            </div>
+          </div>
+
+          <div className="bg-purple-50 rounded-xl p-6 mb-8 mt-8">
             <h3 className="text-xl font-bold text-purple-700 mb-4">Your Contribution Matters</h3>
             <p className="text-gray-700 mb-4">
               Every donation, no matter the size, plays a crucial role in our journey towards a more inclusive society. Here's how your generosity makes a difference:
@@ -72,9 +79,6 @@ export default function DonatePage() {
               </div>
             </div>
           </div>
-
-          {/* Givebutter Campaign Widget */}
-          <GivebutterCampaign widgetId="LylovA" />
 
           {/* Contact Information */}
           <div className="mt-12 pt-8 border-t border-gray-200">
