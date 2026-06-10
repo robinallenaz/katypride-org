@@ -74,7 +74,7 @@ export default function DonatePage() {
           </div>
 
           {/* Givebutter Campaign Widget */}
-          <GivebutterCampaign campaignId="2026-giving-xc5foh" />
+          <GivebutterCampaign widgetId="LylovA" />
 
           {/* Contact Information */}
           <div className="mt-12 pt-8 border-t border-gray-200">

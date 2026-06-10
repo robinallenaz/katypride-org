@@ -3,10 +3,10 @@
 import { useEffect, useRef } from 'react';
 
 interface GivebutterCampaignProps {
-  campaignId: string;
+  widgetId: string;
 }
 
-export default function GivebutterCampaign({ campaignId }: GivebutterCampaignProps) {
+export default function GivebutterCampaign({ widgetId }: GivebutterCampaignProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const injectedRef = useRef(false);
 
@@ -15,7 +15,7 @@ export default function GivebutterCampaign({ campaignId }: GivebutterCampaignPro
     injectedRef.current = true;
 
     const widget = document.createElement('givebutter-widget');
-    widget.setAttribute('id', campaignId);
+    widget.setAttribute('id', widgetId);
     widget.style.width = '100%';
     widget.style.display = 'block';
     containerRef.current.appendChild(widget);
@@ -24,7 +24,7 @@ export default function GivebutterCampaign({ campaignId }: GivebutterCampaignPro
       widget.remove();
       injectedRef.current = false;
     };
-  }, [campaignId]);
+  }, [widgetId]);
 
   return (
     <div
