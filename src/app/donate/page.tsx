@@ -1,4 +1,4 @@
-import TwoStepDonationForm from '@/components/TwoStepDonationForm';
+import GivebutterCampaign from '@/components/GivebutterCampaign';
 
 export default function DonatePage() {
   return (
@@ -73,8 +73,8 @@ export default function DonatePage() {
             </div>
           </div>
 
-          {/* Two-Step Donation Form */}
-          <TwoStepDonationForm />
+          {/* Givebutter Campaign Widget */}
+          <GivebutterCampaign campaignId="2026-giving-xc5foh" />
 
           {/* Contact Information */}
           <div className="mt-12 pt-8 border-t border-gray-200">
