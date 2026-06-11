@@ -1,5 +1,3 @@
-import CRMContactForm from '@/components/CRMContactForm';
-
 export default function VolunteerPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
@@ -9,8 +7,8 @@ export default function VolunteerPage() {
             Volunteer with Katy Pride
           </h1>
           <p className="text-lg text-gray-700 leading-relaxed max-w-3xl mb-8">
-            Join our amazing team of volunteers and help make a difference in the Katy LGBTQ+ community. 
-            Whether you have a few hours a month or want to take on a leadership role, we have opportunities 
+            Join our amazing team of volunteers and help make a difference in the Katy LGBTQ+ community.
+            Whether you have a few hours a month or want to take on a leadership role, we have opportunities
             for everyone to contribute their skills and passion.
           </p>
 
@@ -18,7 +16,7 @@ export default function VolunteerPage() {
             {/* Volunteer Information */}
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-purple-600">Why Volunteer?</h2>
-              
+
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
                   <div className="text-purple-600 text-xl">🤝</div>
@@ -70,7 +68,18 @@ export default function VolunteerPage() {
 
             {/* Volunteer Form */}
             <div>
-              <CRMContactForm type="volunteer" source="Volunteer Page" />
+              <iframe
+                src="https://docs.google.com/forms/d/e/1FAIpQLScBwvurj55dXGfU_KjZRBp2AJMbH-KDTHIvx8N_xWz4tRDGPw/viewform?embedded=true"
+                width="100%"
+                height="900"
+                frameBorder="0"
+                marginHeight={0}
+                marginWidth={0}
+                title="Volunteer Signup Form"
+                className="rounded-xl"
+              >
+                Loading form…
+              </iframe>
             </div>
           </div>
         </div>
