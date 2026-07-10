@@ -1,10 +1,18 @@
 'use client';
 
 import React from 'react';
+import { notFound } from 'next/navigation';
 import LazySponsorSection from '@/components/LazySponsorSection';
 import SponsorSignupForm from '@/components/SponsorSignupForm';
 
+// Chase the Rainbow 5K happened on 2026-06-13. Set to true to show this page again next year.
+const SHOW_5K: boolean = false;
+
 export default function FiveKPage() {
+  if (!SHOW_5K) {
+    notFound();
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50">
       <div className="max-w-6xl mx-auto px-4 py-12">

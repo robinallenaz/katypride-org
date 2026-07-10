@@ -1,6 +1,9 @@
 import Carousel from "@/components/Carousel";
 import { Check, Shield, Users, Calendar, Heart, ArrowRight, MapPin } from "lucide-react";
 
+// Chase the Rainbow 5K happened on 2026-06-13. Set to true to show it again next year.
+const SHOW_5K: boolean = false;
+
 export default function Home() {
   return (
     <>
@@ -32,6 +35,7 @@ export default function Home() {
                 <span>Make a Donation</span>
                 <span className="mt-0.5 text-xs sm:text-sm font-normal text-white/90">Support our mission</span>
               </a>
+              {SHOW_5K && (
               <a
                 href="https://raceroster.com/events/2026/116853/chase-the-rainbow-stride-with-pride/volunteer/register"
                 target="_blank"
@@ -41,6 +45,7 @@ export default function Home() {
                 <span>Katy Pride 5K</span>
                 <span className="mt-0.5 text-xs sm:text-sm font-normal text-white/90">Register or Volunteer</span>
               </a>
+              )}
               <a
                 href="/celebration"
                 className="font-heading inline-flex min-w-[200px] sm:min-w-[240px] flex-col items-center justify-center rounded-full border-2 border-[#760088] text-[#760088] px-6 sm:px-7 py-3 font-semibold transition-all hover:bg-[#760088] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#760088] focus-visible:ring-offset-2 focus-visible:ring-offset-white text-sm sm:text-base"
@@ -179,6 +184,7 @@ export default function Home() {
           </section>
 
           {/* Upcoming Events Section */}
+          {SHOW_5K && (
           <section aria-label="Upcoming Events" className="mb-8 md:mb-12">
             <h2 className="font-heading text-2xl md:text-3xl font-medium text-gray-900 mb-6 md:mb-8 text-center">Upcoming Events</h2>
             <div className="max-w-4xl mx-auto">
@@ -257,6 +263,7 @@ export default function Home() {
               </div>
             </div>
           </section>
+          )}
         </main>
       </div>
     </>
