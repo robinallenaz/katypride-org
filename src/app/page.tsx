@@ -47,11 +47,13 @@ export default function Home() {
               </a>
               )}
               <a
-                href="/volunteer"
+                href="https://forms.gle/CMxB2CZ4KrbzqMXU8"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="font-heading inline-flex min-w-[200px] sm:min-w-[240px] flex-col items-center justify-center rounded-full bg-[#06bd01] text-white border border-[#06bd01] px-6 sm:px-7 py-3 font-semibold transition-all hover:bg-[#05a801] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#06bd01] focus-visible:ring-offset-2 focus-visible:ring-offset-white text-sm sm:text-base shadow-md"
               >
-                <span>Volunteer with Katy Pride</span>
-                <span className="mt-0.5 text-xs sm:text-sm font-normal text-white/90">Join our team</span>
+                <span>Volunteer at Katy Pride</span>
+                <span className="mt-0.5 text-xs sm:text-sm font-normal text-white/90">Be a part of our celebration</span>
               </a>
               <a
                 href="/celebration"
