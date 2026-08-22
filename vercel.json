@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/admin/crm-health/",
+      "schedule": "0 14 * * *"
+    }
+  ],
   "build": {
     "env": {
       "NEXT_PUBLIC_STRAPI_URL": "https://katypride-org.onrender.com",

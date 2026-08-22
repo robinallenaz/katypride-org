@@ -158,9 +158,23 @@ CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 ADMIN_PASSWORD_HASH=bcrypt_hash_of_admin_password
+CRON_SECRET=secret_sent_by_the_scheduler_as_a_bearer_token
+CRM_ALERT_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
 Add to Vercel environment variables for production; to `.env.local` for local development.
+
+### CRM failure alerting
+
+`GET /api/admin/crm-health/` reports how many form submissions failed to sync to
+GoHighLevel recently (`?hours=`, default 24) and, once failures reach the
+threshold (`?threshold=`, default 3), posts a summary to `CRM_ALERT_WEBHOOK_URL`
+(Slack/Discord incoming webhook). Without a webhook configured it still returns
+the stats and logs the failures. A daily Vercel cron in `vercel.json` calls it
+with `CRON_SECRET`; an admin session token also works for ad-hoc checks.
+
+To re-sync submissions that failed, run
+`node scripts/replay-failed-crm-submissions.mjs` (dry run; add `--apply`).
 
 ---
 
