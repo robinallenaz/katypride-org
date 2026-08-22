@@ -578,6 +578,68 @@ export async function saveFormSubmissionToDb(submission: any): Promise<void> {
   }
 }
 
+export interface CrmFailureStats {
+  windowHours: number;
+  failed: number;
+  succeeded: number;
+  contacts: number;
+  topErrors: { error: string; count: number }[];
+  latestFailureAt: string | null;
+}
+
+/**
+ * Summarise CRM sync outcomes over a recent time window so a scheduled check
+ * can flag a run of failures instead of leaving them to sit unnoticed.
+ */
+export async function getCrmFailureStats(windowHours = 24): Promise<CrmFailureStats> {
+  const client = await getDbClient();
+  if (!client) {
+    throw new Error('Database not available');
+  }
+  try {
+    await ensureFormSubmissionsTableExists(client);
+    const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
+
+    const totals = await client.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE crm_success = FALSE) AS failed,
+         COUNT(*) FILTER (WHERE crm_success = TRUE) AS succeeded,
+         COUNT(DISTINCT LOWER(email)) FILTER (WHERE crm_success = FALSE) AS contacts,
+         MAX(timestamp) FILTER (WHERE crm_success = FALSE) AS latest_failure
+       FROM form_submissions
+       WHERE timestamp >= $1`,
+      [since]
+    );
+
+    const errors = await client.query(
+      `SELECT COALESCE(data->>'error', 'Unknown error') AS error, COUNT(*) AS count
+       FROM form_submissions
+       WHERE crm_success = FALSE AND timestamp >= $1
+       GROUP BY 1
+       ORDER BY count DESC
+       LIMIT 5`,
+      [since]
+    );
+
+    const row = totals.rows[0];
+    const latest = row.latest_failure;
+
+    return {
+      windowHours,
+      failed: parseInt(row.failed, 10),
+      succeeded: parseInt(row.succeeded, 10),
+      contacts: parseInt(row.contacts, 10),
+      topErrors: errors.rows.map((e: { error: string; count: string }) => ({
+        error: e.error,
+        count: parseInt(e.count, 10),
+      })),
+      latestFailureAt: latest instanceof Date ? latest.toISOString() : latest ?? null,
+    };
+  } finally {
+    try { client.release(); } catch { /* ignore */ }
+  }
+}
+
 async function readSiteImagesFromDb(): Promise<{ images: SiteImage[] }> {
   const client = await getDbClient();
   if (!client) {
