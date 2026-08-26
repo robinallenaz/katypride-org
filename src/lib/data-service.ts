@@ -342,6 +342,23 @@ async function ensureEventsTableExists(client: PoolClient): Promise<void> {
     )
   `);
 
+  // Keep databases created by earlier deployments compatible with the
+  // current event editor. CREATE TABLE IF NOT EXISTS does not add columns to
+  // an existing table.
+  await client.query(`
+    ALTER TABLE events
+      ADD COLUMN IF NOT EXISTS image_src VARCHAR(500),
+      ADD COLUMN IF NOT EXISTS image_alt VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS event_category VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS external_url VARCHAR(500),
+      ADD COLUMN IF NOT EXISTS external_cta_label VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS summary TEXT,
+      ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS parent_id INTEGER,
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  `);
+
   await client.query(`
     CREATE INDEX IF NOT EXISTS idx_events_start ON events(start)
   `);
