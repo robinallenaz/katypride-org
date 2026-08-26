@@ -59,7 +59,40 @@ type ImageState = {
   triedFallback: boolean
 }
 
-function EventImage({ src, srcOriginal, fallbackSrc, alt }: { src: string; srcOriginal?: string; fallbackSrc: string; alt: string }) {
+function formatEventSummary(summary: unknown): string[] {
+  const text = typeof summary === 'string' ? summary : JSON.stringify(summary)
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\s+(?=(?:What|When|Where|Tickets are)\s*:)/g, '\n')
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(Boolean)
+}
+
+function EventSummary({ summary }: { summary: unknown }) {
+  return (
+    <div className="space-y-2">
+      {formatEventSummary(summary).map((line, index) => {
+        const labeledLine = line.match(/^(What|When|Where|Tickets are)\s*:\s*(.*)$/)
+        const ticketLine = line.match(/^(Tickets are)\s+(.*)$/)
+        const match = labeledLine || ticketLine
+
+        return (
+          <p key={`${line}-${index}`} className={index === 0 ? 'font-medium text-gray-900' : ''}>
+            {match ? (
+              <>
+                <strong className="font-bold text-gray-900">{match[1]}{labeledLine ? ':' : ''}</strong>{' '}
+                {match[2]}
+              </>
+            ) : line}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
+
+function EventImage({ src, srcOriginal, fallbackSrc, alt, priority = false }: { src: string; srcOriginal?: string; fallbackSrc: string; alt: string; priority?: boolean }) {
   const [imageState, setImageState] = useState<ImageState>({
     src: src || fallbackSrc,
     error: false,
@@ -91,7 +124,9 @@ function EventImage({ src, srcOriginal, fallbackSrc, alt }: { src: string; srcOr
       src={imageState.src}
       alt={alt}
       className="block w-full h-auto"
-      loading="lazy"
+      loading={priority ? 'eager' : 'lazy'}
+      fetchPriority={priority ? 'high' : 'low'}
+      decoding="async"
       onError={handleError}
     />
   )
@@ -302,6 +337,7 @@ export default function EventsList({ initialEvents, error }: EventsListProps) {
                               srcOriginal={event.imageSrcOriginal}
                               fallbackSrc={getEventFallbackImage(event.title)}
                               alt={event.imageAlt}
+                              priority={index === 0}
                             />
                           ) : (
                             <img
@@ -355,9 +391,7 @@ export default function EventsList({ initialEvents, error }: EventsListProps) {
                                 More info
                               </summary>
                               <div className="mt-2 sm:mt-3 text-xs sm:text-sm leading-relaxed text-gray-700">
-                                {typeof event.summary === 'string' 
-                                  ? event.summary 
-                                  : JSON.stringify(event.summary)}
+                                <EventSummary summary={event.summary} />
                               </div>
                             </details>
                           )}
