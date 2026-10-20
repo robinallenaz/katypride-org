@@ -40,6 +40,9 @@ export async function findContactIdByEmail(email: string): Promise<string | null
  *     at a separate /contacts/{id}/notes resource. This helper strips it
  *     from the returned payload and returns it separately so the caller can
  *     post it via `postContactNote` after the contact write succeeds.
+ *   - address: v2 has no nested `address` object and rejects it outright with
+ *     "property address should not exist". Address parts are flat top-level
+ *     properties: address1, city, state, postalCode, country.
  *
  * Callers should send `payload` to /contacts/ and, if `note` is non-empty,
  * post it via `postContactNote(contactId, note)` afterwards.
@@ -65,6 +68,22 @@ export function normalizeContactPayloadForGhl(
       delete payload.customFields;
     }
   }
+  if (payload.address && typeof payload.address === 'object' && !Array.isArray(payload.address)) {
+    const { street, address1, city, state, postalCode, country } = payload.address as Record<string, unknown>;
+    const flattened: Record<string, unknown> = { address1: address1 ?? street, city, state, postalCode, country };
+    for (const [key, value] of Object.entries(flattened)) {
+      if (value !== undefined && value !== null && value !== '' && payload[key] === undefined) {
+        payload[key] = value;
+      }
+    }
+    delete payload.address;
+  } else if (typeof payload.address === 'string') {
+    if (payload.address.trim() && payload.address1 === undefined) {
+      payload.address1 = payload.address;
+    }
+    delete payload.address;
+  }
+
   const note =
     typeof contactNote === 'string' && contactNote.trim() ? contactNote : null;
   return { payload, note };
