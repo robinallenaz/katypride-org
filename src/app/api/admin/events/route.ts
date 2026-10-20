@@ -5,7 +5,7 @@ import { verifySession } from '../auth/route';
 // Enhanced text sanitization to prevent XSS.
 // IMPORTANT: '&' must be escaped FIRST, otherwise the '&' it produces in
 // later replacements (e.g. &lt;, &#x27;) gets re-escaped into &amp;lt;.
-function sanitizeText(text: string | undefined): string {
+function sanitizeText(text: string | undefined, maxLen = 1000): string {
   if (!text || typeof text !== 'string') return '';
   return text
     .replace(/&/g, '&amp;')
@@ -14,7 +14,27 @@ function sanitizeText(text: string | undefined): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#x27;')
     .trim()
-    .substring(0, 1000);
+    .substring(0, maxLen);
+}
+
+// Sanitize URL fields — do NOT HTML-encode since these values are used as
+// href/src attributes where the browser already handles entity decoding.
+// Only allow https:// URLs or relative paths; strip anything else.
+function sanitizeUrl(url: string | undefined, maxLen = 2048): string {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  // Allow relative paths (e.g. /uploads/image.jpg) but not protocol-relative
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+    return trimmed.substring(0, maxLen);
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'https:') return '';
+    return trimmed.substring(0, maxLen);
+  } catch {
+    return '';
+  }
 }
 
 function validateEvent(event: Partial<Event>): { valid: boolean; error?: string } {
@@ -57,16 +77,16 @@ function sanitizeEvent(event: Partial<Event>): Event {
 
   return {
     id: safeId,
-    title: sanitizeText(event.title),
+    title: sanitizeText(event.title, 255),
     start: event.start || new Date().toISOString(),
     end: event.end && !isNaN(Date.parse(event.end)) ? event.end : undefined,
-    location: sanitizeText(event.location),
-    imageSrc: sanitizeText(event.imageSrc),
-    imageAlt: sanitizeText(event.imageAlt) || 'Event image',
+    location: sanitizeText(event.location, 500),
+    imageSrc: sanitizeUrl(event.imageSrc, 2048),
+    imageAlt: sanitizeText(event.imageAlt, 255) || 'Event image',
     eventCategory: validCategory,
-    externalUrl: sanitizeText(event.externalUrl),
-    externalCtaLabel: sanitizeText(event.externalCtaLabel),
-    summary: sanitizeText(event.summary),
+    externalUrl: sanitizeUrl(event.externalUrl, 2048),
+    externalCtaLabel: sanitizeText(event.externalCtaLabel, 100),
+    summary: sanitizeText(event.summary, 1000),
   };
 }
 
@@ -149,10 +169,14 @@ export async function POST(request: NextRequest) {
     console.log('[Events API] Successfully wrote events');
     return NextResponse.json({ success: true, event });
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     console.error('[Events API] Error saving event:', error);
-    console.error('[Events API] Error details:', error instanceof Error ? error.message : String(error));
+    console.error('[Events API] Error details:', errMsg);
     console.error('[Events API] Error stack:', error instanceof Error ? error.stack : 'No stack');
-    return NextResponse.json({ success: false, error: 'Failed to save event' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: `Failed to save event: ${errMsg}` },
+      { status: 500 }
+    );
   }
 }
 

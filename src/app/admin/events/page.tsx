@@ -480,7 +480,7 @@ function EventForm({ event, onSave, onCancel, getAuthHeaders }: { event: Event |
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
+              accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.heic,.heif"
               onChange={handleFileInputChange}
               className="hidden"
             />
@@ -491,7 +491,7 @@ function EventForm({ event, onSave, onCancel, getAuthHeaders }: { event: Event |
               <p className="text-sm font-medium">
                 {uploading ? uploadProgress : 'Click to upload or drag and drop'}
               </p>
-              <p className="text-xs text-gray-500 mt-1">JPEG, PNG, WebP, GIF up to 5MB</p>
+              <p className="text-xs text-gray-500 mt-1">JPEG, PNG, WebP, GIF, HEIC up to 10MB</p>
             </div>
           </div>
           <div className="mt-3">

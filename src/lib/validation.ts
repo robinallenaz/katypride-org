@@ -3,9 +3,9 @@
  */
 
 // File validation constants
-export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
-export const ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif'] as const;
-export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'] as const;
+export const ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic', '.heif'] as const;
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB (accommodates iPhone HEIC→JPEG conversions)
 
 /**
  * Validate image URL to prevent XSS attacks
@@ -31,8 +31,11 @@ export function isValidImageUrl(url: string): boolean {
 export function isValidImageFile(file: File): boolean {
   const lastDot = file.name.lastIndexOf('.');
   const ext = lastDot === -1 ? '' : file.name.toLowerCase().slice(lastDot);
-  return ALLOWED_IMAGE_TYPES.includes(file.type as typeof ALLOWED_IMAGE_TYPES[number]) &&
-         ALLOWED_IMAGE_EXTENSIONS.includes(ext as typeof ALLOWED_IMAGE_EXTENSIONS[number]);
+  const mimeOk = ALLOWED_IMAGE_TYPES.includes(file.type as typeof ALLOWED_IMAGE_TYPES[number]);
+  const extOk = ext !== '' && ALLOWED_IMAGE_EXTENSIONS.includes(ext as typeof ALLOWED_IMAGE_EXTENSIONS[number]);
+  // Accept if EITHER MIME type OR extension is valid. This handles iOS Safari
+  // which converts HEIC content to JPEG but may preserve the original filename.
+  return mimeOk || extOk;
 }
 
 /**
@@ -47,10 +50,10 @@ export function isValidFileSize(file: File, maxSize: number = MAX_FILE_SIZE): bo
  */
 export function getFileValidationError(file: File): string | null {
   if (!isValidImageFile(file)) {
-    return 'Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.';
+    return 'Invalid file type. Only JPEG, PNG, WebP, GIF, and HEIC are allowed.';
   }
   if (!isValidFileSize(file)) {
-    return 'File too large. Maximum size is 5MB.';
+    return 'File too large. Maximum size is 10MB.';
   }
   return null;
 }

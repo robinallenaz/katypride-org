@@ -347,16 +347,28 @@ async function ensureEventsTableExists(client: PoolClient): Promise<void> {
   // an existing table.
   await client.query(`
     ALTER TABLE events
-      ADD COLUMN IF NOT EXISTS image_src VARCHAR(500),
-      ADD COLUMN IF NOT EXISTS image_alt VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS image_src TEXT,
+      ADD COLUMN IF NOT EXISTS image_alt VARCHAR(1000),
       ADD COLUMN IF NOT EXISTS event_category VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS external_url VARCHAR(500),
+      ADD COLUMN IF NOT EXISTS external_url TEXT,
       ADD COLUMN IF NOT EXISTS external_cta_label VARCHAR(100),
       ADD COLUMN IF NOT EXISTS summary TEXT,
       ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS parent_id INTEGER,
       ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  `);
+
+  // Widen columns that were created with VARCHAR constraints too small for
+  // real-world content (Cloudinary URLs, long alt text, long location strings).
+  // ALTER COLUMN ... TYPE is safe and backward-compatible in PostgreSQL.
+  await client.query(`
+    ALTER TABLE events
+      ALTER COLUMN image_src TYPE TEXT,
+      ALTER COLUMN external_url TYPE TEXT,
+      ALTER COLUMN location TYPE TEXT,
+      ALTER COLUMN image_alt TYPE VARCHAR(1000),
+      ALTER COLUMN title TYPE VARCHAR(1000)
   `);
 
   await client.query(`

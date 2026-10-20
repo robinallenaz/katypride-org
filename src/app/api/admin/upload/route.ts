@@ -48,12 +48,15 @@ export async function POST(request: NextRequest) {
 
     const file = fileField;
 
-    // Validate file type (MIME can be spoofed, also check extension)
-    const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type as typeof ALLOWED_IMAGE_TYPES[number]) ||
-        !ALLOWED_IMAGE_EXTENSIONS.includes(ext as typeof ALLOWED_IMAGE_EXTENSIONS[number])) {
+    // Validate file type (MIME can be spoofed, also check extension).
+    // iOS sends HEIC photos — check MIME first, then fall back to extension.
+    const lastDot = file.name.lastIndexOf('.');
+    const ext = lastDot !== -1 ? file.name.toLowerCase().slice(lastDot) : '';
+    const mimeOk = ALLOWED_IMAGE_TYPES.includes(file.type as typeof ALLOWED_IMAGE_TYPES[number]);
+    const extOk = ext !== '' && ALLOWED_IMAGE_EXTENSIONS.includes(ext as typeof ALLOWED_IMAGE_EXTENSIONS[number]);
+    if (!mimeOk && !extOk) {
       return NextResponse.json(
-        { error: 'Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.' },
+        { error: 'Invalid file type. Only JPEG, PNG, WebP, GIF, and HEIC are allowed.' },
         { status: 400 }
       );
     }
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: 'File too large. Maximum size is 5MB.' },
+        { error: 'File too large. Maximum size is 10MB.' },
         { status: 400 }
       );
     }
