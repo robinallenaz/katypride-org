@@ -67,6 +67,26 @@ function getSecondFridayDate(skipMonths: number[] = []): Date | null {
   return null
 }
 
+// Returns the UTC offset string (e.g. "-06:00" or "-05:00") for America/Chicago
+// on the given calendar date, correctly handling the CST/CDT switch.
+function getCentralOffset(year: number, month: number, day: number): string {
+  // Use noon UTC on that date so we're safely inside the day for DST detection.
+  const probe = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    timeZoneName: 'shortOffset',
+  }).formatToParts(probe)
+  const tzName = parts.find((p) => p.type === 'timeZoneName')?.value ?? ''
+  const match = /GMT([+-])(\d+)(?::(\d+))?/.exec(tzName)
+  if (match) {
+    const sign = match[1]
+    const hrs = match[2].padStart(2, '0')
+    const mins = (match[3] ?? '00').padStart(2, '0')
+    return `${sign}${hrs}:${mins}`
+  }
+  return '-06:00' // fallback to CST
+}
+
 // Parse time string (HH:MM) to hours and minutes.
 // Falls back to 13:00 if input is malformed so a corrupt config never produces
 // an Invalid Date when passed to setHours().
@@ -133,8 +153,8 @@ async function createCoffeeMeetupFromConfig(): Promise<EventItem | null> {
     return null
   }
 
-  // Set time — build an ISO string with explicit -05:00 offset so the
-  // Date represents the correct Central Time regardless of server timezone.
+  // Set time — build an ISO string with the correct America/Chicago UTC offset
+  // for this specific date so CST (-06:00) and CDT (-05:00) are handled correctly.
   const timeStr = specificEvent?.timeOverride || config.defaultTime
   const { hours, minutes } = parseTime(timeStr)
   const yyyy = targetDate.getFullYear()
@@ -142,7 +162,8 @@ async function createCoffeeMeetupFromConfig(): Promise<EventItem | null> {
   const dd = String(targetDate.getDate()).padStart(2, '0')
   const hh = String(hours).padStart(2, '0')
   const min = String(minutes).padStart(2, '0')
-  targetDate = new Date(`${yyyy}-${mm}-${dd}T${hh}:${min}:00-05:00`)
+  const tzOffset = getCentralOffset(yyyy, targetDate.getMonth() + 1, targetDate.getDate())
+  targetDate = new Date(`${yyyy}-${mm}-${dd}T${hh}:${min}:00${tzOffset}`)
 
   // Calculate end date
   const endDate = new Date(targetDate.getTime() + config.defaultDuration * 60 * 60 * 1000)
